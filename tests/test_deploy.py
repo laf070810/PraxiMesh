@@ -6,6 +6,10 @@ These fakes record ordering and durable intent across simulated process crashes.
 
 import copy
 import json
+import os
+import stat
+import sys
+from contextlib import nullcontext
 from types import SimpleNamespace
 
 import pytest
@@ -479,6 +483,182 @@ def test_control_timeout_removes_only_its_owned_management_container(harness, mo
         deploy.Deployment.control(harness, harness.old, "judge_admission", "pause")
     assert len(calls) == 2
     assert calls[1] == ("rm", "--force", "--volumes", calls[0][2])
+
+
+@pytest.fixture
+def diagnostic_control(private_config, tmp_path, monkeypatch):
+    _, config = private_config
+    host = deploy.Deployment.__new__(deploy.Deployment)
+    host.config = config
+    host.directory = tmp_path / "private-state"
+    host.directory.mkdir(mode=0o700)
+    monkeypatch.setattr(host, "environment", lambda *args: {"PRIVATE_ENV": "env-only-marker"})
+    monkeypatch.setattr(host, "runtime", lambda generation, role, name: ["--name", name])
+    monkeypatch.setattr(host, "inspect", lambda name: {"owned": True})
+
+    def fail(failure):
+        calls = []
+
+        def run(arguments, **options):
+            calls.append(arguments)
+            if arguments[1] == "run":
+                if callable(failure):
+                    return failure(arguments, options)
+                raise failure
+            return SimpleNamespace(stdout=b"")
+
+        monkeypatch.setattr(deploy.subprocess, "run", run)
+        with pytest.raises(deploy.DeploymentError) as caught:
+            host.control(
+                {"id": "test-generation", "manifest": MANIFEST}, "migrate", "argv-only-marker"
+            )
+        assert calls[-1] == ["docker", "rm", "--force", "--volumes", calls[0][3]]
+        return caught.value
+
+    return host, fail
+
+
+def test_failed_control_captures_real_process_output_privately_and_redacts_secrets(
+    diagnostic_control, monkeypatch, capsys
+):
+    host, fail = diagnostic_control
+    # Credentials may contain each other and URL/JSON/Python escape characters.
+    short = host.config["database"]["owner_password"]
+    host.config["database"]["web_password"] = short + "sensitive-suffix"
+    special = 'secret/ +"\\\n非ASCII' + "z" * 50
+    host.config["application"]["secret_key"] = special
+    credentials = [
+        host.config["database"][key]
+        for key in ("owner_password", "web_password", "worker_password")
+    ] + [special, host.config["application"]["worker_secret"]]
+    representations = [
+        *credentials,
+        deploy.urllib.parse.quote(special, safe=""),
+        deploy.urllib.parse.quote_plus(special, safe=""),
+        json.dumps(special, ensure_ascii=True)[1:-1],
+        json.dumps(special, ensure_ascii=False)[1:-1],
+        repr(special)[1:-1],
+    ]
+    stdout = "migration stdout marker\n" + "\n".join(representations)
+    stderr = "Actual migration exception marker\n" + special
+    real_run = deploy.subprocess.run
+
+    def real_failure(arguments, options):
+        program = (
+            f"import sys; sys.stdout.write({stdout!r}); sys.stderr.write({stderr!r}); sys.exit(19)"
+        )
+        return real_run([sys.executable, "-c", program, "argv-only-marker"], **options)
+
+    error = fail(real_failure)
+    path = host.directory / error.diagnostic
+    assert list(host.directory.iterdir()) == [path]
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    assert path.stat().st_uid == os.getuid()
+    data = json.loads(path.read_text())
+    assert data["command"] == "migrate" and data["failure"] == "exit"
+    assert data["exit_code"] == 19
+    assert "migration stdout marker" in data["stdout"]
+    assert "Actual migration exception marker" in data["stderr"]
+    assert not data["stdout_truncated"] and not data["stderr_truncated"]
+    captured = data["stdout"] + data["stderr"]
+    assert "[REDACTED]" in captured
+    assert all(secret not in captured for secret in representations)
+    assert "sensitive-suffix" not in captured
+    assert "argv-only-marker" not in path.read_text()
+    assert "env-only-marker" not in path.read_text()
+    assert "Actual migration exception marker" not in str(error)
+
+    def raise_error():
+        raise error
+
+    controller = SimpleNamespace(
+        locked=nullcontext,
+        database=SimpleNamespace(operation_lock=nullcontext),
+        maintain=raise_error,
+    )
+    monkeypatch.setattr(deploy, "Deployment", lambda *args: controller)
+    monkeypatch.setattr(deploy, "configuration", lambda *args: {})
+    monkeypatch.setattr(
+        sys, "argv", ["deploy.py", "--config", "private", "--state", "private", "maintain"]
+    )
+    with pytest.raises(SystemExit) as exited:
+        deploy.main()
+    assert exited.value.code == 1
+    output = capsys.readouterr().err
+    assert error.diagnostic in output
+    assert "Actual migration exception marker" not in output and special not in output
+
+
+def test_control_timeout_diagnostic_redacts_before_truncating_and_bounds_json(diagnostic_control):
+    host, fail = diagnostic_control
+    secret = host.config["database"]["owner_password"]
+    limit = deploy.CONTROL_DIAGNOSTIC_STREAM_BYTES
+    stdout = "prefix:" * 100 + secret + "X" * (limit - len(secret) // 2)
+    stderr = "\0" * (limit * 2) + "partial timeout output"
+    error = fail(
+        deploy.subprocess.TimeoutExpired(
+            ["argv-only-marker"], 1, output=stdout.encode(), stderr=stderr.encode()
+        )
+    )
+    path = host.directory / error.diagnostic
+    data = json.loads(path.read_text())
+    assert data["failure"] == "timeout" and data["exit_code"] is None
+    assert data["stdout_truncated"] and data["stderr_truncated"]
+    assert secret[-len(secret) // 2 :] not in data["stdout"]
+    assert data["stderr"].endswith("partial timeout output")
+    assert path.stat().st_size <= deploy.CONTROL_DIAGNOSTIC_MAX_BYTES
+
+
+def test_control_diagnostic_write_failure_still_cleans_container(diagnostic_control, monkeypatch):
+    host, fail = diagnostic_control
+
+    def broken_write(path, value):
+        path.write_text("partial diagnostic")
+        raise OSError("private storage detail must not escape")
+
+    monkeypatch.setattr(deploy, "atomic_json", broken_write)
+    error = fail(
+        deploy.subprocess.CalledProcessError(7, ["argv-only-marker"], output="failure", stderr=None)
+    )
+    assert error.diagnostic is None
+    assert "private diagnostic could not be written" in str(error)
+    assert "private storage detail" not in str(error)
+    assert list(host.directory.iterdir()) == []
+
+
+@pytest.mark.parametrize("invalid", ["permissions", "missing", "symlink"])
+def test_control_diagnostic_requires_existing_private_directory(
+    diagnostic_control, tmp_path, invalid
+):
+    host, fail = diagnostic_control
+    outside = tmp_path / "outside"
+    outside.mkdir(mode=0o700)
+    if invalid == "permissions":
+        host.directory.chmod(0o750)
+    else:
+        host.directory.rmdir()
+        if invalid == "symlink":
+            host.directory.symlink_to(outside, target_is_directory=True)
+    error = fail(deploy.subprocess.CalledProcessError(7, ["argv-only-marker"], stderr=b"failure"))
+    assert error.diagnostic is None
+    assert not list(outside.iterdir())
+    if host.directory.exists():
+        assert not list(host.directory.iterdir())
+
+
+def test_other_docker_failures_do_not_capture_output(diagnostic_control, monkeypatch):
+    host, _ = diagnostic_control
+
+    def fail(*args, **kwargs):
+        raise deploy.subprocess.CalledProcessError(
+            1, ["argv-only-marker"], output=b"private output"
+        )
+
+    monkeypatch.setattr(deploy.subprocess, "run", fail)
+    with pytest.raises(deploy.DeploymentError, match="container operation failed") as caught:
+        host.run("inspect", "owned")
+    assert caught.value.diagnostic is None
+    assert list(host.directory.iterdir()) == []
 
 
 def test_inspection_refuses_foreign_container_before_control(harness, monkeypatch):

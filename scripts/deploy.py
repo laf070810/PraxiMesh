@@ -13,6 +13,7 @@ import json
 import os
 import re
 import ssl
+import stat
 import subprocess
 import sys
 import tempfile
@@ -31,9 +32,22 @@ from scripts.deploy_database import DeploymentDatabase, DeploymentDatabaseError 
 from scripts.deploy_proxy import DeploymentProxy, ProxyError  # noqa: E402
 from scripts.release import inspect_images, verify  # noqa: E402
 
+CONTROL_DIAGNOSTIC_STREAM_BYTES = 64 * 1024
+CONTROL_DIAGNOSTIC_MAX_BYTES = 1024 * 1024
+CONTROL_COMMANDS = {
+    "check",
+    "content_import",
+    "deployment_check",
+    "judge_admission",
+    "maintain",
+    "migrate",
+}
+
 
 class DeploymentError(RuntimeError):
-    pass
+    def __init__(self, message, *, diagnostic=None):
+        super().__init__(message)
+        self.diagnostic = diagnostic
 
 
 def atomic_json(path, value):
@@ -181,7 +195,72 @@ class Deployment:
         self.state["updated_at"] = datetime.now(UTC).isoformat()
         atomic_json(self.path, self.state)
 
-    def run(self, *arguments, environment=None, timeout=120, input=None):
+    def control_diagnostic(self, error, category):
+        """Retain bounded private output, never the command line or environment."""
+        path = self.directory / f"control-failure-{uuid.uuid4().hex}.json"
+        try:
+            info = self.directory.lstat()
+            if (
+                not stat.S_ISDIR(info.st_mode)
+                or info.st_uid != os.getuid()
+                or stat.S_IMODE(info.st_mode) != 0o700
+            ):
+                return None
+            secrets = [
+                self.config["database"][key]
+                for key in ("owner_password", "web_password", "worker_password")
+            ] + [self.config["application"][key] for key in ("secret_key", "worker_secret")]
+            variants = set()
+            for secret in secrets:
+                variants.update(
+                    (
+                        secret,
+                        urllib.parse.quote(secret, safe=""),
+                        urllib.parse.quote_plus(secret, safe=""),
+                        json.dumps(secret, ensure_ascii=True)[1:-1],
+                        json.dumps(secret, ensure_ascii=False)[1:-1],
+                        repr(secret)[1:-1],
+                    )
+                )
+            variants = sorted(variants, key=len, reverse=True)
+            data = {
+                "command": category if category in CONTROL_COMMANDS else "management",
+                "created_at": datetime.now(UTC).isoformat(),
+                "failure": "timeout"
+                if isinstance(error, subprocess.TimeoutExpired)
+                else "exit"
+                if isinstance(error, subprocess.CalledProcessError)
+                else "start",
+                "exit_code": getattr(error, "returncode", None),
+            }
+            for field in ("stdout", "stderr"):
+                output = getattr(error, field, None) or b""
+                if isinstance(output, bytes):
+                    output = output.decode("utf-8", errors="replace")
+                # Redact before truncation so the boundary cannot reveal a secret suffix.
+                for secret in variants:
+                    output = output.replace(secret, "[REDACTED]")
+                encoded = output.encode("utf-8")
+                data[field + "_truncated"] = len(encoded) > CONTROL_DIAGNOSTIC_STREAM_BYTES
+                data[field] = encoded[-CONTROL_DIAGNOSTIC_STREAM_BYTES:].decode(
+                    "utf-8", errors="replace"
+                )
+            # JSON escaping can expand each output byte; bound the actual file too.
+            if len((json.dumps(data, sort_keys=True, indent=2) + "\n").encode()) > (
+                CONTROL_DIAGNOSTIC_MAX_BYTES
+            ):
+                return None
+            atomic_json(path, data)
+            return path.name
+        except OSError:
+            # Diagnostic storage must not replace the failure or prevent cleanup/recovery.
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            return None
+
+    def run(self, *arguments, environment=None, timeout=120, input=None, diagnostic=None):
         try:
             return subprocess.run(
                 ["docker", *arguments],
@@ -191,7 +270,17 @@ class Deployment:
                 capture_output=True,
                 timeout=timeout,
             ).stdout
-        except (subprocess.SubprocessError, OSError):
+        except (subprocess.SubprocessError, OSError) as error:
+            if diagnostic is not None:
+                filename = self.control_diagnostic(error, diagnostic)
+                location = (
+                    f"see private diagnostic {filename} in the state directory"
+                    if filename
+                    else "private diagnostic could not be written"
+                )
+                raise DeploymentError(
+                    f"A deployment management command failed; {location}", diagnostic=filename
+                ) from None
             # Docker inspect/environment and DB failures can contain credentials.
             raise DeploymentError("A deployment container operation failed") from None
 
@@ -292,6 +381,7 @@ class Deployment:
                 *command,
                 environment=environment,
                 timeout=timeout,
+                diagnostic=command[0] if command else "management",
             )
         finally:
             # A Docker CLI timeout does not terminate the management transaction.
@@ -689,9 +779,13 @@ def main():
                 )
             )
     except Exception as error:
+        location = ""
+        if isinstance(error, DeploymentError) and error.diagnostic:
+            location = f" Private diagnostic: {error.diagnostic} in the state directory."
         parser.exit(
             1,
-            f"Deployment operation failed ({type(error).__name__}); inspect the private journal.\n",
+            f"Deployment operation failed ({type(error).__name__}); inspect the private journal."
+            f"{location}\n",
         )
 
 

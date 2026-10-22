@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth import get_user_model
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.forms import UserCreationForm, UsernameField
 from django.contrib.auth.password_validation import validate_password
 
 
@@ -11,7 +11,7 @@ class RegisterForm(UserCreationForm):
 
 
 class RecoveryForm(forms.Form):
-    username = forms.CharField(max_length=150, label="用户名")
+    username = UsernameField(max_length=150, label="用户名")
     recovery_code = forms.CharField(max_length=100, label="恢复码", widget=forms.PasswordInput)
     password = forms.CharField(label="新密码", widget=forms.PasswordInput, max_length=256)
 

@@ -13,7 +13,7 @@
 - [ADR-005：代理信任与真实 HTTPS 验收](adr/005-production-acceptance.md) — 接受，隔离部署实测
 - [RFC-004：一致版本的发布制品](rfcs/004-release-artifacts.md) — 制品已验证
 - [ADR-006：Web/worker 不可变制品](adr/006-release-artifacts.md) — 接受，实际镜像闭环验证
-- [RFC-005：任务排空与版本协调](rfcs/005-deployment-coordination.md) — 协调器已实现，本地四代部署与中断恢复通过
+- [RFC-005：任务排空与版本协调](rfcs/005-deployment-coordination.md) — 协调器已实现，本地五代部署、失败迁移与中断恢复通过
 - [ADR-007：暂停入口与策略绑定](adr/007-admission-coordination.md) — 接受
 - [ADR-008：维护窗口发布与保留数据的恢复](adr/008-deployment-generations.md) — 接受
 - [威胁模型](security.md)

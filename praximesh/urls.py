@@ -12,6 +12,7 @@ urlpatterns = [
     path("problems/<slug:slug>/", views.problem_detail, name="problem"),
     path("problems/<slug:slug>/draft/", views.save_draft, name="draft"),
     path("problems/<slug:slug>/submit/", views.submit, name="submit"),
+    path("drafts/<int:draft_id>/", views.draft_detail, name="draft_detail"),
     path("submissions/<uuid:job_id>/", views.submission_detail, name="submission"),
     path("api/submissions/<uuid:job_id>/", views.submission_status, name="submission_status"),
     path("me/", views.dashboard, name="dashboard"),

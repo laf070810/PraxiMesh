@@ -1,6 +1,7 @@
 import ipaddress
 
 from django.conf import settings
+from django.contrib.auth.forms import UsernameField
 from django.http import HttpResponse
 
 from core.limits import consume
@@ -43,7 +44,13 @@ class SecurityPolicyMiddleware:
             if not consume("account-ip", client_address(request), 30, 900):
                 response = HttpResponse("操作过于频繁，请 15 分钟后重试。", status=429)
                 response["Retry-After"] = "900"
-            username = request.POST.get("username", "").casefold()[:150]
+            # Match authentication's whitespace stripping and NFKC conversion:
+            # equivalent spellings must not create fresh per-account quotas.
+            username = (
+                UsernameField(max_length=150)
+                .to_python(request.POST.get("username", ""))
+                .casefold()[:150]
+            )
             if response is None and username and not consume("account-name", username, 15, 900):
                 response = HttpResponse("操作过于频繁，请稍后重试。", status=429)
         response = response or self.get_response(request)

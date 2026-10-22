@@ -103,7 +103,10 @@ def test_csrf_and_post_only(catalog, user):
     assert client.get("/problems/sum-positive/submit/").status_code == 405
 
 
-def test_registration_recovery_rotates_token_and_sessions(db, client):
+@pytest.mark.parametrize(
+    "recovery_username", ["newlearner", "  newlearner  ", "ｎｅｗｌｅａｒｎｅｒ"]
+)
+def test_registration_recovery_rotates_token_and_sessions(db, client, recovery_username):
     response = client.post(
         "/accounts/register/",
         {
@@ -122,7 +125,7 @@ def test_registration_recovery_rotates_token_and_sessions(db, client):
     second = Client()
     response = second.post(
         "/accounts/recover/",
-        {"username": "newlearner", "recovery_code": token, "password": "Another-secret-73104"},
+        {"username": recovery_username, "recovery_code": token, "password": "Another-secret-73104"},
     )
     assert b"recovery-code" in response.content
     profile.refresh_from_db()
@@ -177,6 +180,35 @@ def test_rate_limit_shared_by_account(db, client):
         ).status_code
         == 429
     )
+
+
+@pytest.mark.parametrize("username", ["  learner  ", "ｌｅａｒｎｅｒ"])
+def test_equivalent_login_names_cannot_bypass_account_quota(user, client, username):
+    for index in range(15):
+        assert (
+            client.post(
+                "/accounts/login/",
+                {"username": "learner", "password": "wrong"},
+                REMOTE_ADDR=f"192.0.2.{index + 1}",
+            ).status_code
+            == 200
+        )
+    response = client.post(
+        "/accounts/login/",
+        {"username": username, "password": "Test-passphrase-9621"},
+        REMOTE_ADDR="192.0.2.99",
+    )
+    assert response.status_code == 429
+    assert "_auth_user_id" not in client.session
+
+
+@pytest.mark.parametrize("username", ["  learner  ", "ｌｅａｒｎｅｒ"])
+def test_equivalent_login_names_still_authenticate_with_available_quota(user, client, username):
+    response = client.post(
+        "/accounts/login/", {"username": username, "password": "Test-passphrase-9621"}
+    )
+    assert response.status_code == 302
+    assert client.session["_auth_user_id"] == str(user.pk)
 
 
 def test_stale_editor_cannot_submit_or_overwrite_new_revision(catalog, logged_client):

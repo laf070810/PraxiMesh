@@ -64,6 +64,15 @@ def main():
         expect(page.locator("#editor-status")).to_have_text("草稿已私密保存")
         page.reload()
         expect(page.get_by_label("Python 源代码")).to_have_value(source)
+        page.goto(base + "/me/")
+        draft_link = page.locator('a[href^="/drafts/"]')
+        expect(draft_link).to_have_count(1)
+        draft_link.focus()
+        page.keyboard.press("Enter")
+        expect(page.locator(".source-view")).to_have_text(source.strip())
+        page.get_by_role("link", name="继续编辑", exact=False).focus()
+        page.keyboard.press("Enter")
+        expect(page.get_by_label("Python 源代码")).to_have_value(source)
         if os.environ.get("BROWSER_JUDGE") == "1":
             page.get_by_role("button", name="运行样例", exact=True).click()
             expect(page.get_by_role("heading", name="通过", exact=True)).to_be_visible(

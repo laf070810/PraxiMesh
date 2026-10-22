@@ -230,6 +230,25 @@ def save_draft(request, slug):
     return redirect("problem", slug=slug)
 
 
+@require_GET
+@login_required
+def draft_detail(request, draft_id):
+    draft = get_object_or_404(
+        Draft.objects.select_related("version__problem"), id=draft_id, user=request.user
+    )
+    problem = draft.version.problem
+    return render(
+        request,
+        "draft.html",
+        {
+            "draft": draft,
+            "problem": public_problem(draft.version),
+            "current_available": problem.published and problem.current_id is not None,
+            "is_current": problem.current_id == draft.version_id,
+        },
+    )
+
+
 @require_POST
 @login_required
 def submit(request, slug):
@@ -308,9 +327,12 @@ def dashboard(request):
             "enrollments": Enrollment.objects.filter(
                 user=request.user, path__published=True
             ).select_related("path"),
-            "drafts": Draft.objects.filter(
-                user=request.user, version__problem__published=True
-            ).select_related("version")[:20],
+            "drafts": Paginator(
+                Draft.objects.filter(user=request.user)
+                .select_related("version")
+                .order_by("-updated_at", "-pk"),
+                20,
+            ).get_page(request.GET.get("draft_page")),
         },
     )
 

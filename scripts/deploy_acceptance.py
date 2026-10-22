@@ -431,6 +431,23 @@ class Rehearsal:
             )
         )
         assert marker_seen
+        diagnostic_paths = list(self.state_dir.glob("control-failure-*.json"))
+        diagnostics = []
+        for path in diagnostic_paths:
+            assert path.stat().st_mode & 0o077 == 0
+            assert path.stat().st_size <= 1024 * 1024
+            raw = path.read_text()
+            for section, keys in [
+                ("database", ["owner_password", "web_password", "worker_password"]),
+                ("application", ["secret_key", "worker_secret"]),
+            ]:
+                assert all(self.config[section][key] not in raw for key in keys)
+            diagnostics.append(json.loads(raw))
+        assert any(
+            entry["command"] == "migrate"
+            and "PRAXIMESH_ACCEPTANCE_MIGRATION_FAILED_AFTER_DDL" in entry["stderr"]
+            for entry in diagnostics
+        ), "The failed management container must leave a private root-cause diagnostic"
         with self.connection(candidate) as connection:
             assert (
                 connection.execute(
@@ -479,6 +496,7 @@ class Rehearsal:
             atomic_probe_table_and_migration_record_absent=True,
             failed_candidate_never_exposed=True,
             migration_rollback_preserved_data_and_real_judging=True,
+            private_migration_diagnostic_retained=True,
         )
 
     def browser(self):
@@ -515,6 +533,20 @@ class Rehearsal:
                     return process
             time.sleep(0.1)
         raise RuntimeError("Coordinator did not reach the real interruption checkpoint")
+
+    def migration_rehearsal(self):
+        print("Testing initial HTTPS deployment and a genuine failed migration", flush=True)
+        self.run(*self.apply_args(initial=True), log="initial")
+        first = self.journal()["current"]
+        self.browser()
+        user = self.register("before")
+        self.failed_migration(first, [user])
+        self.result.update(
+            scope="initial deployment and failed migration; synthetic data; loopback HTTPS",
+            browser_real_https_run_wrong_accepted=True,
+            generations_attempted=2,
+            completed_at=datetime.now(UTC).isoformat(),
+        )
 
     def exercise(self):
         print(
@@ -810,6 +842,7 @@ def main():
     parser.add_argument("--failed-release", type=Path)
     parser.add_argument("--failed-manifest-sha256")
     parser.add_argument("--worker-restart-only", action="store_true")
+    parser.add_argument("--migration-only", action="store_true")
     parser.add_argument("--caddy", type=Path, required=True)
     parser.add_argument("--artifacts", type=Path, default=ROOT / "test-results/deployment")
     parser.add_argument("--output", type=Path)
@@ -818,6 +851,10 @@ def main():
         parser.error("--failed-release and --failed-manifest-sha256 must be supplied together")
     if options.worker_restart_only and options.failed_release:
         parser.error("--worker-restart-only does not run the optional migration fixture")
+    if options.migration_only and (not options.failed_release or options.worker_restart_only):
+        parser.error(
+            "--migration-only requires a failed release and excludes --worker-restart-only"
+        )
     options.release, options.caddy = options.release.resolve(), options.caddy.resolve()
     if options.failed_release:
         options.failed_release = options.failed_release.resolve()
@@ -843,6 +880,8 @@ def main():
             rehearsal.start()
             if options.worker_restart_only:
                 rehearsal.worker_restart()
+            elif options.migration_only:
+                rehearsal.migration_rehearsal()
             else:
                 rehearsal.exercise()
             rehearsal.result["passed"] = True

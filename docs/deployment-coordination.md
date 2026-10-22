@@ -106,6 +106,8 @@ export PRAXIMESH_DEPLOYMENT_TOKEN="$(python3 -c 'import uuid; print(uuid.uuid4()
 
 ## 恢复入口
 
+管理命令失败时，协调器在私有状态目录保存 `control-failure-<UUID>.json`，文件为 0600。其中记录命令类别、退出码和脱敏后的 stdout/stderr 尾部，每路最多 64 KiB、整个文件最多 1 MiB；常规错误只给文件名定位。日志不记录命令行或环境，已知配置凭证会被替换，但它仍是仅供部署维护者读取的内部诊断，不应作为公开 CI artifact 上传。诊断无法落盘时，原有控制容器清理和恢复流程仍会执行。
+
 候选或恢复后的版本完成实际隔离探针、健康检查和功能验证后，用原 token 恢复：
 
 ```sh
@@ -137,6 +139,8 @@ RUN_SANDBOX_TESTS=1 .venv/bin/python scripts/postgres_tests.py -q
     --failed-release var/releases/migration-failure \
     --failed-manifest-sha256 "$FAILED_RELEASE_SHA256" \
     --caddy var/tools/caddy-2.11.7
+# 只复验首次 HTTPS 核心闭环、失败迁移诊断和旧库恢复时，
+# 在上一条命令追加 --migration-only；此模式不运行中断/自动重启矩阵。
 # 只重放自动重启期间的恢复检查时，可使用独立模式：
 .venv/bin/python scripts/deploy_acceptance.py \
     --release var/releases/candidate --manifest-sha256 "$RELEASE_SHA256" \
