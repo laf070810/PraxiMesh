@@ -1,0 +1,30 @@
+# Local content/account preview. Deliberately has no judge or Docker socket.
+services:
+  web:
+    build:
+      context: .
+      args:
+        PYTHON_IMAGE: ${PYTHON_IMAGE:?Set a digest-pinned Python 3.11 image}
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      SQLITE_PATH: /data/praximesh.sqlite3
+      APP_SECRET_KEY: ${APP_SECRET_KEY:?Set a random local instance secret}
+      JUDGE_ENABLED: "0"
+    volumes:
+      - app-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    pids_limit: 64
+    command: ["sh", "-c", "python manage.py migrate --noinput && python manage.py content_import && exec gunicorn praximesh.wsgi:application --bind 0.0.0.0:8000 --workers 1 --threads 2 --worker-tmp-dir /tmp --access-logfile -"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+volumes:
+  app-data:

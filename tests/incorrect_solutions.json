@@ -1,0 +1,34 @@
+{
+  "sum-positive": [
+    {"mistake": "包含负数", "source": "def solve(values): return sum(values)"},
+    {"mistake": "返回计数而非总和", "source": "def solve(values): return sum(1 for x in values if x > 0)"}
+  ],
+  "unique-stable": [
+    {"mistake": "排序破坏原顺序", "source": "def solve(values): return sorted(set(values))"},
+    {"mistake": "未去重", "source": "def solve(values): return values"}
+  ],
+  "word-count": [
+    {"mistake": "忽略大小写", "source": "def solve(words):\n d={}\n for word in words:\n  word=word.lower()\n  d[word]=d.get(word,0)+1\n return d"},
+    {"mistake": "遗漏空字符串", "source": "def solve(words):\n d={}\n for word in words:\n  if word: d[word]=d.get(word,0)+1\n return d"}
+  ],
+  "lower-bound": [
+    {"mistake": "返回相等区间右端", "source": "import bisect\ndef solve(values,target): return bisect.bisect_right(values,target)"},
+    {"mistake": "未找到时返回减一", "source": "def solve(values,target): return values.index(target) if target in values else -1"}
+  ],
+  "dot-product": [
+    {"mistake": "只逐元素乘未求和", "source": "def solve(a,b): return [x*y for x,y in zip(a,b)]"},
+    {"mistake": "把乘积和写成和的乘积", "source": "def solve(a,b): return sum(a)*sum(b)"}
+  ],
+  "transpose": [
+    {"mistake": "没有转置", "source": "def solve(matrix): return matrix"},
+    {"mistake": "错误地假设方阵", "source": "def solve(matrix): return [[matrix[j][i] for j in range(len(matrix))] for i in range(len(matrix))]"}
+  ],
+  "normalize-rows": [
+    {"mistake": "使用整张矩阵的和", "source": "def solve(matrix):\n total=sum(map(sum,matrix))\n return [[x/total if total else 0 for x in row] for row in matrix]"},
+    {"mistake": "零行除以零", "source": "def solve(matrix): return [[x/sum(row) for x in row] for row in matrix]"}
+  ],
+  "stable-softmax": [
+    {"mistake": "直接指数导致溢出", "source": "import math\ndef solve(scores):\n e=[math.exp(x) for x in scores]\n return [x/sum(e) for x in e]"},
+    {"mistake": "误用最大指数作分母", "source": "import math\ndef solve(scores):\n e=[math.exp(x-max(scores)) for x in scores]\n return [x/max(e) for x in e]"}
+  ]
+}

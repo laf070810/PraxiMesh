@@ -1,0 +1,83 @@
+name: Application and content checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  container:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t praximesh:phase-a-check .
+      - run: python3 scripts/container_smoke.py
+  checks:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        database: [sqlite, postgres]
+    services:
+      postgres:
+        image: postgres:17-alpine@sha256:e4cb93687b062cd25a0e8f672d85a7708235009d70d31f8a7698d9370092a9c4
+        env:
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: praximesh
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install uv==0.11.8
+      - run: uv sync --frozen
+      - run: uv run ruff check . && uv run ruff format --check .
+      - run: uv run python manage.py content_check
+      - run: uv run python manage.py makemigrations --check --dry-run
+      - name: Tests
+        env:
+          DATABASE_URL: ${{ matrix.database == 'postgres' && 'postgresql://postgres:ci-only-password@localhost:5432/praximesh' || '' }}
+          DB_SSLMODE: disable
+        run: uv run pytest -q --junitxml=test-results/application.xml
+      - run: uv run pip-audit --progress-spinner off
+      - name: Check exported production lock
+        run: |
+          uv export --frozen --no-dev --no-emit-project --format requirements-txt --no-header --quiet -o /tmp/requirements.lock
+          diff -u requirements.lock /tmp/requirements.lock
+          uv export --frozen --no-dev --group judge --no-emit-project --format requirements-txt --no-header --quiet -o /tmp/requirements-judge.lock
+          diff -u requirements-judge.lock /tmp/requirements-judge.lock
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: application-${{ matrix.database }}
+          path: test-results/
+  browser:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install uv==0.11.8
+      - run: uv sync --frozen --group browser
+      - run: uv run --group browser playwright install --with-deps chromium
+      - name: Local browser journey, evaluation disabled
+        run: |
+          uv run python manage.py migrate --noinput
+          uv run python manage.py content_import
+          uv run python manage.py runserver 127.0.0.1:8765 --noreload > /tmp/server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8765/health/; then break; fi
+            sleep 1
+          done
+          uv run --group browser python tests/browser_smoke.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser
+          path: test-results/

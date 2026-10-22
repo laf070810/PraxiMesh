@@ -1,0 +1,50 @@
+name: Real WASI learning and practice acceptance
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-wasi:
+    # Disposable hosted runner, never a privileged shared execution node.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install uv==0.11.8
+      - run: uv sync --frozen --group judge --group browser
+      - name: Build pinned trusted interpreter
+        run: |
+          .venv/bin/python scripts/build_wasi.py --output var/wasi-python --workdir "$RUNNER_TEMP/wasi-build" --jobs 4
+          printf 'JUDGE_BACKEND=wasi\n' >> "$GITHUB_ENV"
+          printf 'JUDGE_WASI_BUNDLE=%s/var/wasi-python\n' "$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+          printf 'JUDGE_WASI_SHA256=%s\n' "$(sha256sum var/wasi-python/manifest.json | cut -d ' ' -f 1)" >> "$GITHUB_ENV"
+      - name: Real isolation, reference, incorrect solution and lifecycle checks
+        env:
+          RUN_SANDBOX_TESTS: '1'
+        run: .venv/bin/python scripts/postgres_tests.py -q --junitxml=test-results/wasi.xml
+      - run: .venv/bin/playwright install --with-deps chromium
+      - name: Fetch the pinned TLS proxy
+        run: .venv/bin/python scripts/fetch_caddy.py --output var/tools/caddy-2.11.7
+      - name: Real HTTPS deployment, browser journey, PostgreSQL roles and capacity
+        run: .venv/bin/python scripts/production_acceptance.py --caddy var/tools/caddy-2.11.7
+      - name: Build an immutable Web and WASI worker release
+        run: |
+          .venv/bin/python scripts/release.py build --bundle var/wasi-python --bundle-sha256 "$JUDGE_WASI_SHA256" --output var/releases/candidate
+          printf 'RELEASE_SHA256=%s\n' "$(sha256sum var/releases/candidate/release.json | cut -d ' ' -f 1)" >> "$GITHUB_ENV"
+      - name: Import and exercise the packaged release
+        run: .venv/bin/python scripts/release_acceptance.py --release var/releases/candidate --sha256 "$RELEASE_SHA256"
+      - name: Audit judge dependencies
+        run: .venv/bin/pip-audit --progress-spinner off
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: real-wasi-acceptance
+          path: |
+            test-results/
+            var/wasi-python/manifest.json
+            var/releases/candidate/release.json

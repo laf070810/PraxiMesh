@@ -1,0 +1,16 @@
+.git
+.venv
+__pycache__
+*.sqlite3*
+.env
+.env.*
+**/*.env
+**/.env*
+**/*.key
+**/*.pem
+var
+test-results
+.pytest_cache
+.ruff_cache
+staticfiles
+node_modules

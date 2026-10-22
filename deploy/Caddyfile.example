@@ -1,0 +1,6 @@
+# Replace the hostname. Restrict direct backend access to this TLS proxy.
+learn.example.org {
+    import proxy.caddy 127.0.0.1:8000
+    # Application access logs omit raw IPs, queries and headers.
+    # Enable proxy access logging only with an explicit retention/redaction policy.
+}

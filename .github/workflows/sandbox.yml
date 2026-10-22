@@ -1,0 +1,24 @@
+name: Trusted-host sandbox acceptance
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-sandbox:
+    environment: judge-acceptance
+    runs-on: [self-hosted, linux, x64, praximesh-judge]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Real gVisor checks (trusted reviewed code only)
+        env:
+          JUDGE_BACKEND: gvisor
+          JUDGE_IMAGE: ${{ vars.JUDGE_IMAGE }}
+          RUN_SANDBOX_TESTS: '1'
+        run: |
+          uv sync --frozen
+          uv run pytest -m sandbox -q --junitxml=test-results/sandbox.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sandbox-acceptance
+          path: test-results/sandbox.xml

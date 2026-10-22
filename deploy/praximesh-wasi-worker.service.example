@@ -1,0 +1,31 @@
+[Unit]
+Description=PraxiMesh CPython WASI judge worker
+After=network-online.target
+
+[Service]
+Type=simple
+User=praximesh-judge
+WorkingDirectory=/srv/praximesh
+EnvironmentFile=/etc/praximesh/judge.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/srv/praximesh/.venv/bin/python manage.py judge_worker --worker-id wasi-1
+Restart=on-failure
+RestartSec=30
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+PrivateTmp=true
+PrivateDevices=true
+ReadWritePaths=/srv/praximesh/var
+TasksMax=32
+MemoryMax=2G
+CPUQuota=100%
+LimitNOFILE=128
+LimitCORE=0
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target

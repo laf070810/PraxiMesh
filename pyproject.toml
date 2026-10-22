@@ -1,0 +1,32 @@
+[project]
+name = "praximesh"
+version = "0.1.0"
+description = "Structured knowledge and trustworthy programming practice"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "Django>=5.2,<5.3",
+  "argon2-cffi>=25.1,<26",
+  "gunicorn>=23,<24",
+  "jsonschema>=4.25,<5",
+  "psycopg[binary]>=3.2,<4",
+  "whitenoise>=6.9,<7",
+]
+
+[dependency-groups]
+dev = ["pytest>=9.0.3,<10", "pytest-django>=4.11,<5", "ruff>=0.14,<1", "pip-audit>=2.9,<3"]
+browser = ["playwright>=1.56,<2"]
+judge = ["wasmtime==50.0.1"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "praximesh.settings"
+python_files = ["test_*.py"]
+testpaths = ["tests"]
+markers = ["sandbox: requires an explicitly configured real backend and pinned artifacts"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]

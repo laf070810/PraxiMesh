@@ -1,0 +1,20 @@
+[Unit]
+Description=PraxiMesh trusted judge worker
+After=network-online.target docker.service
+
+[Service]
+Type=simple
+User=praximesh-judge
+WorkingDirectory=/srv/praximesh
+EnvironmentFile=/etc/praximesh/judge.env
+ExecStart=/srv/praximesh/.venv/bin/python manage.py judge_worker --worker-id dedicated-judge-1
+Restart=on-failure
+RestartSec=30
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/srv/praximesh/var
+
+[Install]
+WantedBy=multi-user.target

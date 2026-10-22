@@ -1,0 +1,85 @@
+"""Actual capability/limit probes, run only inside the reviewed WASI backend."""
+
+PROBES = [
+    (
+        "python-version",
+        "import sys\ndef solve(): return [sys.platform, list(sys.version_info[:3])]",
+        "ok",
+        ["wasi", [3, 14, 9]],
+    ),
+    ("correct", "def solve(): return 42", "ok", 42),
+    ("syntax", "def solve(: pass", "syntax_error", None),
+    ("exception", "def solve(): return 1/0", "runtime_error", None),
+    ("fuel", "def solve():\n while True: pass", "time_limit", None),
+    ("wall-clock", "import time\ndef solve():\n time.sleep(60)\n return 1", "time_limit", None),
+    ("memory", "def solve(): return len(bytearray(512*1024*1024))", "memory_limit", None),
+    ("output", "def solve():\n print('x'*100000)\n return 1", "output_limit", None),
+    ("no-environment", "import os\ndef solve(): return dict(os.environ)", "ok", {}),
+    (
+        "read-only-library",
+        "def solve():\n try:\n  open('/python/lib/python314.zip', 'wb').write(b'bad')\n  return False\n except OSError: return True",
+        "ok",
+        True,
+    ),
+    (
+        "no-host-files",
+        "def solve():\n for path in ['/etc/passwd','/proc/self/environ','/var/run/docker.sock','/python/lib/../../etc/passwd']:\n  try:\n   open(path).read()\n   return False\n  except OSError: pass\n return True",
+        "ok",
+        True,
+    ),
+    (
+        "no-write",
+        "def solve():\n for path in ['/tmp/private-probe','/python/lib/private-probe','private-probe']:\n  try:\n   open(path,'w').write('x')\n   return False\n  except OSError: pass\n return True",
+        "ok",
+        True,
+    ),
+    (
+        "no-network",
+        "def solve():\n try:\n  import socket\n  s=socket.socket()\n  s.connect(('1.1.1.1',443))\n  return False\n except (ImportError,OSError): return True",
+        "ok",
+        True,
+    ),
+    (
+        "no-process",
+        "import os\ndef solve():\n try:\n  os.fork()\n  return False\n except (AttributeError,OSError): return True",
+        "ok",
+        True,
+    ),
+    (
+        "no-native-exec",
+        "def solve():\n try:\n  import subprocess\n  subprocess.run(['/bin/true'],check=True)\n  return False\n except (ImportError,OSError): return True",
+        "ok",
+        True,
+    ),
+    (
+        "no-threads",
+        "def solve():\n try:\n  import threading\n  t=threading.Thread(target=lambda:None)\n  t.start()\n  t.join()\n  return False\n except (ImportError,RuntimeError,OSError): return True",
+        "ok",
+        True,
+    ),
+    (
+        "file-descriptors",
+        "import os\ndef solve():\n files=[]\n try:\n  for i in range(100): files.append(os.open('/python/lib/python314.zip',os.O_RDONLY))\n  return False\n except OSError: return True\n finally:\n  for f in files: os.close(f)",
+        "ok",
+        True,
+    ),
+    (
+        "guest-exit-is-not-host-status",
+        "import os\ndef solve(): os._exit(72)",
+        "runtime_error",
+        None,
+    ),
+    ("empty-success-is-not-result", "import os\ndef solve(): os._exit(0)", "runtime_error", None),
+    (
+        "instance-write",
+        "import builtins\ndef solve():\n builtins.private_probe=123\n return True",
+        "ok",
+        True,
+    ),
+    (
+        "instance-read",
+        "import builtins\ndef solve(): return not hasattr(builtins,'private_probe')",
+        "ok",
+        True,
+    ),
+]

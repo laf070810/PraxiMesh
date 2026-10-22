@@ -1,0 +1,9 @@
+# Imported with one argument: the private Gunicorn upstream address.
+request_body {
+    max_size 100KB
+}
+reverse_proxy {args[0]} {
+    header_up X-Forwarded-Proto {scheme}
+    header_up X-Real-IP {remote_host}
+}
+# Access logging remains off. Do not enable log_credentials.

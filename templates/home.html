@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="hero">
+  <div><p class="eyebrow">KNOWLEDGE, PUT INTO PRACTICE</p><h1>把“我懂了”<br>变成<span>“我做到了”。</span></h1><p class="hero-intro">从一个概念，到一段能解决问题的代码。<br>沿着知识路径探索，也可以直接挑一道题开始。</p><div class="actions"><a class="button accent" href="{% url 'practice' %}">打开练习台 ↗</a><a class="hero-link" href="{% url 'learn' %}">探索知识地图 →</a></div><p class="hero-note">Python 起步 · 自由跳转 · 私有学习记录</p></div>
+  <div class="route-preview"><p class="eyebrow">从基础，走向更远</p><ol><li><span>01</span><div>写出第一个函数<small>输入、返回值与边界情况</small></div></li><li><span>02</span><div>用数据结构组织问题<small>列表、映射与二分查找</small></div></li><li><span>03</span><div>理解向量与数值计算<small>点积、矩阵与稳定 Softmax</small></div></li></ol><div class="code-preview"><span># 每个抽象概念，都值得一次实践</span><br>def solve(values):<br>&nbsp;&nbsp;&nbsp;&nbsp;return your_understanding</div></div>
+</section>
+<section class="section"><div class="section-heading"><div><p class="eyebrow">CHOOSE YOUR START</p><h2>从你感兴趣的地方开始</h2></div><a href="{% url 'learn' %}">浏览所有知识 →</a></div><div class="grid domains">{% for domain in domains %}<a class="card domain" href="{% url 'node' domain.id %}"><span class="card-index">0{{ forloop.counter }} / 领域</span><h3>{{ domain.title }} <span>↗</span></h3><p>{{ domain.summary }}</p></a>{% empty %}<p class="empty">内容正在准备，请稍后回来。</p>{% endfor %}</div></section>
+<section class="section path-section"><div class="section-heading"><div><p class="eyebrow">A PATH, AT YOUR PACE</p><h2>有方向，也有选择</h2></div></div>{% for path in paths %}<a class="path-banner" href="{% url 'node' path.id %}"><div><span class="badge">推荐学习路径</span><h3>{{ path.title }}</h3><p>{{ path.summary }}</p></div><span class="round-arrow" aria-hidden="true">↗</span></a>{% endfor %}<p class="muted">{{ problem_count }} 道基础练习。无需先读教程，也不必按固定顺序完成。</p></section>
+{% endblock %}
