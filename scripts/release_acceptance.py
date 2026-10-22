@@ -24,7 +24,7 @@ import psycopg
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from scripts.production_acceptance import POSTGRES, Client, database_roles  # noqa: E402
-from scripts.release import docker, inspect_images, verify  # noqa: E402
+from scripts.release import docker, initial_content_commands, inspect_images, verify  # noqa: E402
 
 
 def runtime_args(name, network, memory, pids):
@@ -214,7 +214,7 @@ def main():
             DATABASE_URL=url("postgres", owner_password, pg),
             APP_SECRET_KEY=secrets.token_urlsafe(48),
         )
-        for command in [["migrate", "--noinput"], ["content_import"]]:
+        for command in [["migrate", "--noinput"], *initial_content_commands(manifest)]:
             name = f"praximesh-release-{token}-prepare"
             stack.callback(remove_container, name)
             docker(
@@ -278,7 +278,7 @@ def main():
         )
         base = f"http://127.0.0.1:{web_port}"
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-        deadline = time.monotonic() + 180
+        deadline = time.monotonic() + 300
         while time.monotonic() < deadline:
             for name in [web, worker]:
                 running = docker(
@@ -326,8 +326,26 @@ def main():
                 .strip()
             )
             assert digest == manifest["judge"]["policy_sha256"]
+        receipt_summary = json.loads(
+            docker(
+                "exec",
+                worker,
+                "python",
+                "-c",
+                "import os,json; from pathlib import Path; "
+                "os.environ.setdefault('DJANGO_SETTINGS_MODULE','praximesh.settings'); "
+                "import django; django.setup(); from django.conf import settings; "
+                "from judge.backends import configured_sandbox; "
+                "from core.management.commands.sandbox_check import check_receipt; "
+                "identity=configured_sandbox().preflight(); check_receipt(identity); "
+                "receipt=json.loads(Path(settings.JUDGE_RECEIPT).read_text()); "
+                "print(json.dumps({'count':len(receipt['passed']),'suite':receipt['suite']}))",
+                capture_output=True,
+            ).stdout
+        )
         browser_env = dict(os.environ, BROWSER_URL=base, BROWSER_JUDGE="1")
         browser_env.pop("BROWSER_TEST_SPKI", None)
+        browser_env.pop("BROWSER_CA_FILE", None)
         with (artifacts / "release-browser.log").open("wb") as log:
             subprocess.run(
                 [sys.executable, "tests/browser_smoke.py"],
@@ -338,6 +356,33 @@ def main():
                 check=True,
                 timeout=240,
             )
+        feature_browsers = {
+            "localization/migrations/0001_initial.py": "browser_i18n",
+            "projects/migrations/0001_initial.py": "browser_projects_i18n",
+            "practice_api/migrations/0001_initial.py": "browser_practice",
+        }
+        checked_feature_browsers = []
+        for capability, script in feature_browsers.items():
+            if capability not in manifest["source_files"]:
+                continue
+            if (
+                script == "browser_practice"
+                and browser_env.get("JUDGE_WASI_SHA256") != manifest["judge"]["bundle_sha256"]
+            ):
+                raise RuntimeError(
+                    "CLI acceptance requires the matching verified local WASI bundle"
+                )
+            with (artifacts / f"release-{script}.log").open("wb") as log:
+                subprocess.run(
+                    [sys.executable, f"tests/{script}.py"],
+                    cwd=ROOT,
+                    env=browser_env,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    check=True,
+                    timeout=300,
+                )
+            checked_feature_browsers.append(script)
 
         def control(action, token=None, timeout=180, success=True):
             name = "praximesh-release-" + uuid.uuid4().hex[:12] + "-control"
@@ -400,7 +445,9 @@ def main():
             "web_has_no_wasi_runtime": True,
             "no_docker_socket_or_host_binds": True,
             "worker_network_internal": True,
-            "startup_probes": 21,
+            "startup_probes": receipt_summary["count"],
+            "startup_probe_suite": receipt_summary["suite"],
+            "feature_browser_journeys": checked_feature_browsers,
             "browser_real_run_wrong_accepted_progress_delete": True,
             "admission_timeout_closed_real_drain_and_resume": True,
             "wrong_runtime_stops_before_worker": True,

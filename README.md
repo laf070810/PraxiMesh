@@ -2,9 +2,11 @@
 
 以结构化知识为导航、以编程实践为核心的学习平台。需求基线见 [PRD.md](PRD.md)。
 
-**已交付可自部署的阶段 A 核心，尚未公开上线。** 导航、教程、题库、账户、私有草稿、CPython/WASI 执行、历史与路径进度已联通；评测默认关闭，配置真实沙箱后才接收提交。当前结果与缺口见 [验收记录](docs/acceptance.md)。
+**当前交付方向为可本地验证的自部署版本，公开运营和许可证选择留待后续。** 已验证阶段 A/B 的知识、练习和社区闭环；评测默认关闭，配置真实沙箱后才接收提交。后续专业 CPU 评测、组织与智能学习正在集成，范围见[需求追踪](docs/requirements.md)。
 
 完整阶段 B/C 正在实施，范围见[需求追踪](docs/requirements.md)。本批将题库扩充至 18 题、3 条路径，并新增私有收藏和笔记、阅读记录、实践证据与复习建议，以及需要主动送审的社区讨论、题解、评论、举报和申诉。本批已通过真实 PostgreSQL/WASI、浏览器与冻结镜像升级验证，范围见 [B1 验收](docs/acceptance-b1.md)。
+
+B2 已通过本地联合验收：当前目录为 22 题、4 条路径，新增 JavaScript 函数、Python 完整程序、四阶段传感器分析项目、本地公开测试与令牌提交、中英界面、可撤回的公开结果和同环境榜单。721 项 PostgreSQL/真实 WASI 回归通过，冻结镜像、HTTPS 浏览器和 B1→B2 数据保留升级通过，详见 [B2 验收](docs/acceptance-b2.md)。
 
 ## 本地体验
 
@@ -14,7 +16,8 @@
 uv sync --frozen
 uv run python manage.py migrate
 uv run python manage.py content_check
-uv run python manage.py content_import
+uv run python manage.py content_import --translations content/en.json
+uv run python manage.py project_import content/projects.json
 uv run python manage.py runserver 127.0.0.1:8000
 ```
 
@@ -53,6 +56,10 @@ uv run --group browser python scripts/browser_acceptance.py
 | `core/` | 知识与题目版本、私有账户数据、Web 页面与队列 |
 | `learning/` | 私有收藏、笔记、阅读记录及实践证据 |
 | `community/` | 主动送审的讨论、题解、评论、举报与申诉 |
+| `practice_api/` | 有效期与用途受限的访问令牌、版本化公开任务和本人提交 API |
+| `projects/` | 维护者发布的不可变项目计划、固定题目版本与私有进度 |
+| `showcase/` | 自愿公开主页、可撤回结果和可比较的分组榜单 |
+| `localization/`, `locale/` | 中英界面、精确源版本译文与明确原文回退 |
 | `judge/` | 可信结果比较、WASI 执行器和独立选择的 gVisor 适配器 |
 | `content/` | JSON Schema、原创示例包、公开样例和维护测试 |
 | `templates/`, `static/` | 自托管页面、样式与渐进交互 |

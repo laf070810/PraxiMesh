@@ -1,16 +1,24 @@
-"""Fixed capabilities and budgets for the reviewed CPython WASI artifact."""
+"""Fixed capabilities and budgets for the reviewed Python and JavaScript WASI artifact."""
 
-POLICY_VERSION = "wasi-python-function-v1"
+POLICY_VERSION = "wasi-functions-v2"
+QUICKJS_VERSION = "2026-06-04"
+LANGUAGES = ("python", "javascript")
 PYTHON_VERSION = "3.14.9"
 WASMTIME_VERSION = "50.0.1"
 TARGET = "x86_64-unknown-linux-gnu"
-BUNDLE_FILES = (
+PYTHON_BUNDLE_FILES = (
     "python.wasm",
     "python.cwasm",
     "stdlib/python314.zip",
     "LICENSE.python",
     "THIRD_PARTY_NOTICES.txt",
 )
+BUNDLE_FILES = PYTHON_BUNDLE_FILES + (
+    "quickjs.wasm",
+    "quickjs.cwasm",
+    "LICENSE.quickjs",
+)
+JAVASCRIPT_FUEL = 100_000_000
 MEMORY = 128 * 1024 * 1024
 OUTPUT = 32 * 1024
 INPUT = 256000
@@ -25,7 +33,7 @@ def engine_config():
 
     config = wasmtime.Config()
     # An explicit target disables build-host CPU feature inference. The only
-    # accepted guest module is our trusted CPython core-Wasm artifact.
+    # accepted guest module is our trusted interpreter core-Wasm artifacts.
     config.target = TARGET
     config.wasm_component_model = False
     config.consume_fuel = True

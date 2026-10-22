@@ -23,12 +23,17 @@ INSTALLED_APPS = [
     "core",
     "learning",
     "community",
+    "practice_api",
+    "showcase",
+    "localization",
+    "projects",
 ]
 MIDDLEWARE = [
     "core.middleware.ProxyHeadersMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -115,6 +120,11 @@ CSRF_TRUSTED_ORIGINS = [x for x in os.environ.get("CSRF_TRUSTED_ORIGINS", "").sp
 DATA_UPLOAD_MAX_MEMORY_SIZE = 100_000
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 30
 LANGUAGE_CODE = "zh-hans"
+LANGUAGES = [("zh-hans", "简体中文"), ("en", "English")]
+LOCALE_PATHS = [BASE_DIR / "locale"]
+LANGUAGE_COOKIE_SECURE = PRODUCTION
+LANGUAGE_COOKIE_HTTPONLY = True
+LANGUAGE_COOKIE_SAMESITE = "Lax"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True

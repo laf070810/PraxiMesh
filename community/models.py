@@ -5,15 +5,16 @@ import uuid
 from django.conf import settings
 from django.db import models
 from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
 
 
 class State(models.TextChoices):
-    DRAFT = "draft", "私有草稿"
-    PENDING = "pending", "等待审核"
-    PUBLISHED = "published", "已公开"
-    REJECTED = "rejected", "审核未通过"
-    HIDDEN = "hidden", "已隐藏"
-    WITHDRAWN = "withdrawn", "已撤回"
+    DRAFT = "draft", _("私有草稿")
+    PENDING = "pending", _("等待审核")
+    PUBLISHED = "published", _("已公开")
+    REJECTED = "rejected", _("审核未通过")
+    HIDDEN = "hidden", _("已隐藏")
+    WITHDRAWN = "withdrawn", _("已撤回")
 
 
 class Writing(models.Model):
@@ -35,9 +36,9 @@ class Writing(models.Model):
 
 class Post(Writing):
     class Kind(models.TextChoices):
-        DISCUSSION = "discussion", "讨论"
-        QUESTION = "question", "提问"
-        SOLUTION = "solution", "题解"
+        DISCUSSION = "discussion", _("讨论")
+        QUESTION = "question", _("提问")
+        SOLUTION = "solution", _("题解")
 
     kind = models.CharField(max_length=12, choices=Kind.choices)
     title = models.CharField(max_length=160)
@@ -62,9 +63,9 @@ class Comment(Writing):
 
 class Report(models.Model):
     class Status(models.TextChoices):
-        OPEN = "open", "待处理"
-        RESOLVED = "resolved", "已处理"
-        DISMISSED = "dismissed", "未采纳"
+        OPEN = "open", _("待处理")
+        RESOLVED = "resolved", _("已处理")
+        DISMISSED = "dismissed", _("未采纳")
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     reporter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -96,10 +97,10 @@ class Report(models.Model):
 
 class Appeal(models.Model):
     class Status(models.TextChoices):
-        OPEN = "open", "待处理"
-        REOPENED = "reopened", "已重新送审"
-        UPHELD = "upheld", "维持原决定"
-        SUPERSEDED = "superseded", "内容已修订或撤回"
+        OPEN = "open", _("待处理")
+        REOPENED = "reopened", _("已重新送审")
+        UPHELD = "upheld", _("维持原决定")
+        SUPERSEDED = "superseded", _("内容已修订或撤回")
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)

@@ -15,6 +15,7 @@ from django.core.management import call_command
 
 from judge.backends import configured_sandbox
 from judge.evaluator import evaluate
+from judge.sandbox import SandboxUnavailable
 
 pytestmark = [
     pytest.mark.sandbox,
@@ -32,20 +33,39 @@ def test_isolation_probes(settings, tmp_path):
 
 def test_every_reference_and_constant_mutant(package):
     sandbox = configured_sandbox()
-    sandbox.preflight()
+    environment = sandbox.preflight()
     for problem in package["problems"]:
+        if (
+            environment["policy"] == "gvisor-python-function-v1"
+            and problem["evaluator"] != "python-function-v1"
+        ):
+            with pytest.raises(SandboxUnavailable):
+                evaluate(problem, problem["reference"], "submit", sandbox)
+            continue
         correct = evaluate(problem, problem["reference"], "submit", sandbox)
         assert correct["verdict"] == "accepted", problem["id"]
-        mutant = evaluate(problem, "def solve(*args): return None", "submit", sandbox)
+        source = (
+            "function solve() { return null; }"
+            if problem["language"] == "javascript"
+            else "print('null')"
+            if problem["evaluator"] == "python-stdio-v1"
+            else "def solve(*args): return None"
+        )
+        mutant = evaluate(problem, source, "submit", sandbox)
         assert mutant["verdict"] == "wrong_answer", problem["id"]
 
 
 def test_targeted_mistakes_and_forged_scores(package):
     sandbox = configured_sandbox()
-    sandbox.preflight()
+    environment = sandbox.preflight()
     mistakes = json.loads(Path(__file__).with_name("incorrect_solutions.json").read_text())
     assert set(mistakes) == {problem["id"] for problem in package["problems"]}
     for problem in package["problems"]:
+        if (
+            environment["policy"] == "gvisor-python-function-v1"
+            and problem["evaluator"] != "python-function-v1"
+        ):
+            continue  # The reference test above verifies explicit backend refusal.
         for mistake in mistakes[problem["id"]]:
             result = evaluate(problem, mistake["source"], "submit", sandbox)
             assert result["verdict"] in {"wrong_answer", "runtime_error"}, (

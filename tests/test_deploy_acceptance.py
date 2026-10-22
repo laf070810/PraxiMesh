@@ -149,3 +149,38 @@ def test_schema_preflight_rejects_a_false_upgrade_contract(change):
         target["images"]["web"] = previous["images"]["web"]
     with pytest.raises(ValueError):
         validate_upgrade_manifests(previous, target)
+
+
+def b2_manifests():
+    from scripts.deploy_acceptance import B2_MIGRATIONS
+
+    _, previous = manifests()
+    target = copy.deepcopy(previous)
+    target["images"]["web"] = "sha256:" + "c" * 64
+    target["source_files"].update(
+        {f"{app}/migrations/{name}.py": "d" * 64 for app, name in B2_MIGRATIONS}
+    )
+    return previous, target
+
+
+def test_b1_to_b2_upgrade_selects_extended_data_and_role_rehearsal():
+    previous, target = b2_manifests()
+    assert validate_upgrade_manifests(previous, target) == "b2"
+
+
+@pytest.mark.parametrize(
+    "change", ["partial-previous", "missing-target", "edited-history", "same-image"]
+)
+def test_b2_upgrade_contract_rejects_partial_schema_or_rewritten_history(change):
+    previous, target = b2_manifests()
+    path = "localization/migrations/0002_backfill_snapshots.py"
+    if change == "partial-previous":
+        previous["source_files"][path] = target["source_files"][path]
+    elif change == "missing-target":
+        target["source_files"].pop(path)
+    elif change == "edited-history":
+        target["source_files"]["community/migrations/0001_initial.py"] = "f" * 64
+    else:
+        target["images"]["web"] = previous["images"]["web"]
+    with pytest.raises(ValueError):
+        validate_upgrade_manifests(previous, target)

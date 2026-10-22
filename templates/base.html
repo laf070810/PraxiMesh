@@ -1,24 +1,25 @@
-{% load static %}<!doctype html>
-<html lang="zh-CN">
+{% load i18n localized %}{% load static %}<!doctype html>
+{% get_current_language as current_language %}<html lang="{{ current_language }}">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}PraxiMesh · 用代码理解知识{% endblock %}</title>
-  <meta name="description" content="从结构化知识到亲手编程，沿路径学习，也可以直接开始练习。">
+  <title>{% block title %}{% translate "PraxiMesh · 用代码理解知识" %}{% endblock %}</title>
+  <meta name="description" content="{% translate '从结构化知识到亲手编程，沿路径学习，也可以直接开始练习。' %}">
   <link rel="stylesheet" href="{% static 'app.css' %}">
+  <script src="{% url 'javascript-catalog' %}" defer></script>
   <script src="{% static 'app.js' %}" defer></script>
 </head>
 <body>
-<a class="skip" href="#main">跳到主要内容</a>
+<a class="skip" href="#main">{% translate "跳到主要内容" %}</a>
 <header class="site-header">
   <a class="brand" href="{% url 'home' %}"><span class="brand-mark" aria-hidden="true">⌘</span> PraxiMesh<span class="alpha">ALPHA</span></a>
-  <nav aria-label="主导航"><a href="{% url 'learn' %}">Learn <span>知识与路径</span></a><a href="{% url 'practice' %}">Practice <span>直接练习</span></a>
-  <a href="{% url 'community:index' %}">社区</a>
-  {% if user.is_authenticated %}<a href="{% url 'dashboard' %}">我的学习</a><a href="{% url 'account' %}" class="user-link">{{ user.username }}</a><form action="{% url 'logout' %}" method="post" class="inline">{% csrf_token %}<button class="text-button">退出</button></form>
-  {% else %}<a href="{% url 'login' %}">登录</a><a href="{% url 'register' %}" class="button small">开始学习 ↗</a>{% endif %}</nav>
-</header>
+  <nav aria-label="{% translate '主导航' %}"><a href="{% url 'learn' %}">Learn <span>{% translate "知识与路径" %}</span></a><a href="{% url 'practice' %}">Practice <span>{% translate "直接练习" %}</span></a>
+  <a href="{% url 'community:index' %}">{% translate "社区" %}</a><a href="{% url 'projects:index' %}">{% translate "工程项目" %}</a><a href="{% url 'showcase:boards' %}">{% translate "作品与榜单" %}</a>
+  {% if user.is_authenticated %}<a href="{% url 'dashboard' %}">{% translate "我的学习" %}</a><a href="{% url 'account' %}" class="user-link">{{ user.username }}</a><form action="{% url 'logout' %}" method="post" class="inline">{% csrf_token %}<button class="text-button">{% translate "退出" %}</button></form>
+  {% else %}<a href="{% url 'login' %}">{% translate "登录" %}</a><a href="{% url 'register' %}" class="button small">{% translate "开始学习 ↗" %}</a>{% endif %}</nav>
+<form action="{% url 'set_language' %}" method="post" class="inline" aria-label="{% translate '界面语言' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><label for="language-select">{% translate "界面语言" %}</label><select id="language-select" name="language"><option value="zh-hans" {% if current_language == 'zh-hans' %}selected{% endif %}>简体中文</option><option value="en" {% if current_language == 'en' %}selected{% endif %}>English</option></select><button type="submit">{% translate "切换" %}</button></form></header>
 <main id="main" tabindex="-1">
 {% if messages %}<div class="messages" role="status">{% for message in messages %}<p>{{ message }}</p>{% endfor %}</div>{% endif %}
 {% block content %}{% endblock %}
 </main>
-<footer><a class="brand" href="{% url 'home' %}">PraxiMesh</a><p>理解一个概念，亲手验证一次。<br><span class="muted">中文内容 · Learn Anything by Coding.</span></p><a href="{% url 'practice' %}">去写一段代码 →</a></footer>
+<footer><a class="brand" href="{% url 'home' %}">PraxiMesh</a><p>{% translate "理解一个概念，亲手验证一次。" %}<br><span class="muted">{% translate "中文内容 · Learn Anything by Coding." %}</span></p><a href="{% url 'practice' %}">{% translate "去写一段代码 →" %}</a></footer>
 </body></html>

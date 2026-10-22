@@ -84,6 +84,7 @@ def main():
         )
         # This launcher owns a new local HTTP endpoint, not an inherited TLS fixture.
         env.pop("BROWSER_TEST_SPKI", None)
+        env.pop("BROWSER_CA_FILE", None)
         env.pop("BROWSER_MODERATOR_USERNAME", None)
         env.pop("BROWSER_MODERATOR_PASSWORD", None)
 
@@ -92,7 +93,8 @@ def main():
             subprocess.run([sys.executable, *args], cwd=root, env=environment, check=True, **kwargs)
 
         run("manage.py", "migrate", "--noinput", "--verbosity=0")
-        run("manage.py", "content_import")
+        run("manage.py", "content_import", "--translations", str(root / "content/en.json"))
+        run("manage.py", "project_import", str(root / "content/projects.json"))
         browser_env = dict(env, **bootstrap_moderator(run, env))
         if options.judge:
             run("manage.py", "sandbox_check")
@@ -153,6 +155,10 @@ def main():
                     raise RuntimeError("Application or real judge did not become ready.")
                 run("tests/browser_smoke.py", timeout=300)
                 run("tests/browser_community.py", env=browser_env, timeout=300)
+                run("tests/browser_i18n.py", timeout=300)
+                run("tests/browser_projects_i18n.py", timeout=300)
+                if options.judge:
+                    run("tests/browser_practice.py", timeout=300)
             finally:
                 for process in processes:
                     if process.poll() is None:

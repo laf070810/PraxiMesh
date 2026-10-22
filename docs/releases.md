@@ -67,6 +67,6 @@ candidate-6 已使用同一不可变发布包完成四代真实部署，验证�
 
 ## 当前发布边界
 
-WASI bundle format 2 使用显式 `x86_64-unknown-linux-gnu` target、关闭 component model，并保留 CPython 与固定 SDK 运行库声明。旧 format 1 bundle 和 receipt 不可复用。目标主机仍须运行实际门槛；不同 CPU/内核兼容性不能只靠架构标签宣称通过。
+当前 WASI bundle format 3 使用显式 `x86_64-unknown-linux-gnu` target、关闭 component model，绑定 Python、QuickJS、桥接代码与兼容补丁，并保留两种解释器和固定 SDK 运行库声明。旧 format 1/2 及旧 receipt 不能直接供当前 worker 使用；冻结旧版镜像仍按各自历史契约验收。目标主机须运行实际门槛；不同 CPU/内核兼容性不能只靠架构标签宣称通过。
 
 单独导入镜像不会迁移数据库或切换服务；激活必须通过已配置的协调器，并审查内容与迁移。部署工作流只支持手工触发，默认禁用，受保护环境、专用 runner 和生产目标尚未配置，托管 CI 运行也未验证。本地演练不证明公有证书、系统服务、持续容量或异机灾难恢复已通过。本项目代码与内容许可、公开实例及运营决策仍待确认；工具不会推送镜像或自行创建公网服务。

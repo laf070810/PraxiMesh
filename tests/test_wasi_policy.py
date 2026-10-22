@@ -7,7 +7,15 @@ import pytest
 from judge.backends import configured_sandbox
 from judge.sandbox import SandboxUnavailable
 from judge.wasi import WasiSandbox
-from judge.wasi_policy import BUNDLE_FILES, PYTHON_VERSION, TARGET, WASMTIME_VERSION
+from judge.wasi_policy import (
+    BUNDLE_FILES,
+    LANGUAGES,
+    POLICY_VERSION,
+    PYTHON_VERSION,
+    QUICKJS_VERSION,
+    TARGET,
+    WASMTIME_VERSION,
+)
 
 
 @pytest.fixture
@@ -20,7 +28,13 @@ def artifact(tmp_path):
         (root / name).write_bytes(name.encode())
         files[name] = hashlib.sha256(name.encode()).hexdigest()
     data = {
-        "format": 2,
+        "format": 3,
+        "quickjs": QUICKJS_VERSION,
+        "languages": list(LANGUAGES),
+        "javascript_bridge": hashlib.sha256(
+            Path("judge/javascript_bridge.c").read_bytes()
+        ).hexdigest(),
+        "quickjs_patch": hashlib.sha256(Path("vendor/quickjs/wasi.patch").read_bytes()).hexdigest(),
         "python": PYTHON_VERSION,
         "wasmtime": WASMTIME_VERSION,
         "architecture": "x86_64",
@@ -35,7 +49,23 @@ def artifact(tmp_path):
 
 @pytest.mark.parametrize(
     "change",
-    ["code", "library", "manifest", "symlink", "extra", "writable", "target", "format", "notice"],
+    [
+        "code",
+        "javascript-code",
+        "javascript-runtime",
+        "library",
+        "manifest",
+        "symlink",
+        "extra",
+        "writable",
+        "target",
+        "format",
+        "legacy-format",
+        "notice",
+        "javascript-version",
+        "javascript-source",
+        "languages",
+    ],
 )
 def test_changed_artifact_never_reaches_execution(artifact, monkeypatch, change):
     root, digest = artifact
@@ -43,6 +73,10 @@ def test_changed_artifact_never_reaches_execution(artifact, monkeypatch, change)
     sandbox.verify_bundle()
     if change == "code":
         (root / "python.cwasm").write_bytes(b"modified native code")
+    elif change in {"javascript-code", "javascript-runtime"}:
+        (root / ("quickjs.wasm" if change == "javascript-code" else "quickjs.cwasm")).write_bytes(
+            b"modified JavaScript runtime"
+        )
     elif change == "library":
         (root / "stdlib/python314.zip").write_bytes(b"modified library")
     elif change == "manifest":
@@ -51,9 +85,24 @@ def test_changed_artifact_never_reaches_execution(artifact, monkeypatch, change)
         (root / "stdlib/host").symlink_to("/etc")
     elif change == "extra":
         (root / "stdlib/credentials").write_text("must not become visible")
-    elif change in {"target", "format"}:
+    elif change in {
+        "target",
+        "format",
+        "legacy-format",
+        "javascript-version",
+        "javascript-source",
+        "languages",
+    }:
         data = json.loads((root / "manifest.json").read_text())
-        data[change] = "aarch64-unknown-linux-gnu" if change == "target" else 1
+        field, value = {
+            "target": ("target", "aarch64-unknown-linux-gnu"),
+            "format": ("format", 1),
+            "legacy-format": ("format", 2),
+            "javascript-version": ("quickjs", "unreviewed"),
+            "javascript-source": ("javascript_bridge", "0" * 64),
+            "languages": ("languages", ["python"]),
+        }[change]
+        data[field] = value
         content = json.dumps(data).encode()
         (root / "manifest.json").write_bytes(content)
         sandbox.digest = hashlib.sha256(content).hexdigest()
@@ -79,7 +128,7 @@ def test_unknown_backend_never_falls_back(settings):
 def test_receipt_cannot_cross_backend_or_expire(settings, tmp_path, monkeypatch):
     from core.management.commands import sandbox_check
 
-    identity = {"policy": "wasi-python-function-v1", "bundle": "a" * 64}
+    identity = {"policy": POLICY_VERSION, "bundle": "a" * 64}
     monkeypatch.setattr(sandbox_check.time, "time", lambda: 100000)
     path = tmp_path / "receipt.json"
     settings.JUDGE_RECEIPT = str(path)

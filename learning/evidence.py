@@ -6,9 +6,11 @@ from datetime import timedelta
 from django.db.models import Count, Max, Q
 from django.db.models.functions import Coalesce
 from django.utils import timezone
+from django.utils.translation import gettext
 
 from core.models import KnowledgeNode, Problem, Submission
-from judge.results import LABELS
+from localization.presentation import DIFFICULTIES, localized_node, localized_problem
+from localization.presentation import VERDICTS as LABELS
 
 LEARNER_VERDICTS = tuple(key for key in LABELS if key != "internal_error")
 RECENT_DAYS = 30
@@ -52,7 +54,8 @@ def build_evidence(user, *, now=None):
         cards.append(
             {
                 "id": problem.pk,
-                "title": version.data["title"],
+                "title": localized_problem(version)["title"],
+                "translation_fallback": localized_problem(version)["translation_fallback"],
                 "revision": version.revision,
                 "difficulty": version.data["difficulty"],
                 "concepts": set(version.data["concepts"]) & concepts.keys(),
@@ -83,7 +86,7 @@ def build_evidence(user, *, now=None):
                 for verdict, count in sorted(errors.items())
             ],
             "difficulty_evidence": [
-                {"difficulty": difficulty, "count": count}
+                {"difficulty": DIFFICULTIES.get(difficulty, difficulty), "count": count}
                 for difficulty, count in sorted(
                     Counter(item["difficulty"] for item in items if item["completed"]).items()
                 )
@@ -93,7 +96,8 @@ def build_evidence(user, *, now=None):
     concept_rows = [
         {
             "id": key,
-            "title": node.title,
+            "title": localized_node(node)["title"],
+            "translation_fallback": localized_node(node)["translation_fallback"],
             **summarize([card for card in cards if key in card["concepts"]]),
         }
         for key, node in concepts.items()
@@ -117,7 +121,8 @@ def build_evidence(user, *, now=None):
         domain_rows.append(
             {
                 "id": key,
-                "title": node.title,
+                "title": localized_node(node)["title"],
+                "translation_fallback": localized_node(node)["translation_fallback"],
                 **summarize([card for card in cards if card["concepts"] & domain_concepts]),
             }
         )
@@ -137,8 +142,9 @@ def build_evidence(user, *, now=None):
         if card["recent_errors"] and card["last_verdict"] != "accepted":
             recommend(
                 card,
-                "复习",
-                f"当前版本最近一次正式结果为「{LABELS[card['last_verdict']]}」，可复查边界与约束。",
+                gettext("复习"),
+                gettext("当前版本最近一次正式结果为「%(verdict)s」，可复查边界与约束。")
+                % {"verdict": LABELS[card["last_verdict"]]},
             )
     for card in cards:
         if card["completed"]:
@@ -163,26 +169,36 @@ def build_evidence(user, *, now=None):
                 if prerequisite:
                     recommend(
                         prerequisite,
-                        "前置练习",
-                        f"「{card['title']}」涉及「{concepts[concept_id].title}」；其前置「{concepts[target].title}」尚无当前题正式通过记录。可先练习，也可以跳过。",
+                        gettext("前置练习"),
+                        gettext(
+                            "「%(problem)s」涉及「%(concept)s」；其前置「%(target)s」尚无当前题正式通过记录。可先练习，也可以跳过。"
+                        )
+                        % {
+                            "problem": card["title"],
+                            "concept": localized_node(concepts[concept_id])["title"],
+                            "target": localized_node(concepts[target])["title"],
+                        },
                     )
         if card["attempts"]:
-            reason = f"当前版本已有 {card['attempts']} 次正式结果，尚无通过记录。"
+            reason = gettext("当前版本已有 %(attempts)s 次正式结果，尚无通过记录。") % {
+                "attempts": card["attempts"]
+            }
         else:
-            reason = "当前版本尚无正式评测记录，可以从公开样例开始。"
-        recommend(card, "继续练习", reason)
+            reason = gettext("当前版本尚无正式评测记录，可以从公开样例开始。")
+        recommend(card, gettext("继续练习"), reason)
     for card in cards:
         if card["completed"] and card["last_result_at"] < since:
             recommend(
                 card,
-                "间隔复习",
-                f"当前版本已有通过记录，最近正式结果距今超过 {RECENT_DAYS} 天；可尝试独立重做。",
+                gettext("间隔复习"),
+                gettext("当前版本已有通过记录，最近正式结果距今超过 %(days)s 天；可尝试独立重做。")
+                % {"days": RECENT_DAYS},
             )
 
     recent_errors = [
         {
             "id": job.pk,
-            "problem": job.version.data["title"],
+            "problem": localized_problem(job.version)["title"],
             "revision": job.version.revision,
             "label": LABELS[job.verdict],
             "result_at": job.result_at,

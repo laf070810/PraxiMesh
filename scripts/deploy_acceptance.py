@@ -2,8 +2,8 @@
 
 All resources are disposable, owner-labelled and loopback/private. The default
 mode applies the same release to successive generations. --upgrade-only instead
-installs an explicitly verified Phase A release, creates real private data and
-formal AC, then applies B1's schema migrations without republishing the catalogue.
+installs an explicitly verified previous release, creates real private data and
+formal AC, then applies the next schema without republishing the catalogue.
 Interruption checkpoints only pause a real CLI process with SIGSTOP. They do not
 alter its journal, database, verdicts or production implementation.
 """
@@ -46,6 +46,13 @@ UPGRADE_TABLES = (
     "community_appeal",
     "community_moderationevent",
 )
+B2_MIGRATIONS = {
+    ("practice_api", "0001_initial"),
+    ("showcase", "0001_initial"),
+    ("projects", "0001_initial"),
+    ("localization", "0001_initial"),
+    ("localization", "0002_backfill_snapshots"),
+}
 
 # This trusted administrative program runs only in the labelled worker container.
 # Killing its exact controller models unexpected process death. `docker kill`
@@ -1271,7 +1278,7 @@ def parse_options(arguments=None):
     parser.add_argument("--release", type=Path, required=True)
     parser.add_argument("--manifest-sha256", required=True)
     parser.add_argument(
-        "--previous-release", type=Path, help="Verified frozen Phase A release, for --upgrade-only"
+        "--previous-release", type=Path, help="Verified previous release, for --upgrade-only"
     )
     parser.add_argument(
         "--previous-manifest-sha256",
@@ -1284,7 +1291,7 @@ def parse_options(arguments=None):
     parser.add_argument(
         "--upgrade-only",
         action="store_true",
-        help="Upgrade Phase A to B1 without importing the expanded catalogue",
+        help="Upgrade Phase A to B1 or B1 to B2 without republishing the catalogue",
     )
     parser.add_argument("--caddy", type=Path, required=True)
     parser.add_argument("--artifacts", type=Path, default=ROOT / "test-results/deployment")
@@ -1321,6 +1328,18 @@ def parse_options(arguments=None):
 def validate_upgrade_manifests(previous, target):
     """Preflight contract only. It cannot prove that a live migration succeeds."""
     paths = {f"{app}/migrations/{name}.py" for app, name in UPGRADE_MIGRATIONS}
+    b2_paths = {f"{app}/migrations/{name}.py" for app, name in B2_MIGRATIONS}
+    if paths <= previous["source_files"].keys():
+        if any(path in previous["source_files"] for path in b2_paths):
+            raise ValueError("The previous release must precede the B2 schema")
+        if not b2_paths <= target["source_files"].keys():
+            raise ValueError("The target release must contain all B2 migrations")
+        for path, digest in previous["source_files"].items():
+            if "/migrations/" in path and target["source_files"].get(path) != digest:
+                raise ValueError("An upgrade must preserve existing migration sources")
+        if previous["images"]["web"] == target["images"]["web"]:
+            raise ValueError("A schema upgrade must exercise a different Web image")
+        return "b2"
     if any(
         path.startswith(("learning/migrations/", "community/migrations/"))
         and path.endswith(".py")
@@ -1332,6 +1351,7 @@ def validate_upgrade_manifests(previous, target):
         raise ValueError("The target release must contain both B1 initial migrations")
     if previous["images"]["web"] == target["images"]["web"]:
         raise ValueError("A schema upgrade must exercise a different Web image")
+    return "b1"
 
 
 def main():
@@ -1346,9 +1366,13 @@ def main():
     output.unlink(missing_ok=True)
     manifest = verify(options.release, options.manifest_sha256)
     previous_manifest = None
+    rehearsal_type = Rehearsal
     if options.upgrade_only:
         previous_manifest = verify(options.previous_release, options.previous_manifest_sha256)
-        validate_upgrade_manifests(previous_manifest, manifest)
+        if validate_upgrade_manifests(previous_manifest, manifest) == "b2":
+            from scripts.deploy_b2_acceptance import B2Rehearsal
+
+            rehearsal_type = B2Rehearsal
         docker(
             "image", "load", "--input", str(options.previous_release / "images.tar"), timeout=900
         )
@@ -1359,7 +1383,7 @@ def main():
     if not version.startswith("v2.11.7 "):
         raise ValueError("Use the pinned Caddy 2.11.7 executable")
     with tempfile.TemporaryDirectory(prefix="px-deploy-") as temporary:
-        rehearsal = Rehearsal(options, Path(temporary))
+        rehearsal = rehearsal_type(options, Path(temporary))
         rehearsal.result.update(
             source_id=manifest["source_id"], images=manifest["images"], caddy=version
         )

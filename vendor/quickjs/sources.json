@@ -1,0 +1,10 @@
+{
+  "version": "2026-06-04",
+  "url": "https://bellard.org/quickjs/quickjs-2026-06-04.tar.xz",
+  "source_sha256": "b376e839b322978313d929fd20663b11ba58b75df5a46c126dd19ea2fa70ad2a",
+  "license": "MIT",
+  "license_sha256": "598fd7fc928e4350abce36e337ba5a1346923c5c692f5be92c3d8e29ddd7c18d",
+  "patch_sha256": "5b44d26b78944cfedb6090654b7c61d2728a8ad08f5e1fc35e1f413a05cf642e",
+  "wasi_sdk": "24",
+  "notes": "Only the fixed interpreter is host-compiled; submitted JavaScript is compiled and executed inside WASI. No quickjs-libc or native learner bytecode."
+}

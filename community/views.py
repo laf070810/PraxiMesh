@@ -7,6 +7,7 @@ from django.core.paginator import Paginator
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.translation import gettext
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from community import forms, services
@@ -21,7 +22,7 @@ def guarded(view):
         if request.method == "POST" and not consume(
             "community-write", str(request.user.pk), 30, 60
         ):
-            return HttpResponse("操作过于频繁，请稍后重试。", status=429)
+            return HttpResponse(gettext("操作过于频繁，请稍后重试。"), status=429)
         try:
             return view(request, *args, **kwargs)
         except services.CommunityError as error:
@@ -30,7 +31,10 @@ def guarded(view):
             )
         except ValidationError:
             return render(
-                request, "community/error.html", {"error": "内容格式或长度不符合要求。"}, status=400
+                request,
+                "community/error.html",
+                {"error": gettext("内容格式或长度不符合要求。")},
+                status=400,
             )
 
     return wrapped
@@ -152,13 +156,13 @@ def post_edit(request, pk=None):
             request.user, form.cleaned_data, pk=pk, revision=form.cleaned_data.get("revision")
         )
         messages.success(
-            request, "内容已保存。私有草稿需主动送审；已送审内容的编辑会重新等待审核。"
+            request, gettext("内容已保存。私有草稿需主动送审；已送审内容的编辑会重新等待审核。")
         )
         return redirect("community:detail", pk=post.pk)
     return render(
         request,
         "community/edit.html",
-        {"form": form, "heading": "编辑内容" if post else "写讨论、提问或题解"},
+        {"form": form, "heading": gettext("编辑内容") if post else gettext("写讨论、提问或题解")},
         status=400 if request.method == "POST" else 200,
     )
 
@@ -180,14 +184,14 @@ def comment_edit(request, pk=None, post_id=None):
             pk=pk,
             revision=form.cleaned_data.get("revision"),
         )
-        messages.success(request, "评论已保存，需主动送审后才可能公开。")
+        messages.success(request, gettext("评论已保存，需主动送审后才可能公开。"))
         if services.visible_posts(request.user).filter(pk=comment.post_id).exists():
             return redirect("community:comment_detail", pk=comment.pk)
         return redirect(reverse("community:mine") + "?kind=comment")
     return render(
         request,
         "community/edit.html",
-        {"form": form, "heading": "编辑评论"},
+        {"form": form, "heading": gettext("编辑评论")},
         status=400 if request.method == "POST" else 200,
     )
 
@@ -198,15 +202,15 @@ def comment_edit(request, pk=None, post_id=None):
 def author_action(request, kind, pk, action):
     form = forms.RevisionForm(request.POST)
     if not form.is_valid():
-        return HttpResponse("请刷新页面后重试。", status=400)
+        return HttpResponse(gettext("请刷新页面后重试。"), status=400)
     services.author_action(request.user, kind, pk, action, form.cleaned_data["revision"])
     messages.success(
         request,
         {
-            "submit": "已提交审核，尚未公开。",
-            "withdraw": "已撤回，不再公开。",
-            "delete": "已删除正文及关联评论和私有处理记录。",
-        }.get(action, "操作完成。"),
+            "submit": gettext("已提交审核，尚未公开。"),
+            "withdraw": gettext("已撤回，不再公开。"),
+            "delete": gettext("已删除正文及关联评论和私有处理记录。"),
+        }.get(action, gettext("操作完成。")),
     )
     return redirect("community:mine")
 
@@ -218,7 +222,7 @@ def moderate(request, kind, pk):
     services.require_moderator(request.user)
     form = forms.ModerationForm(request.POST)
     if not form.is_valid():
-        return HttpResponse("请填写有效的审核决定和处理说明。", status=400)
+        return HttpResponse(gettext("请填写有效的审核决定和处理说明。"), status=400)
     item = services.moderate(
         request.user,
         kind,
@@ -227,7 +231,7 @@ def moderate(request, kind, pk):
         form.cleaned_data["revision"],
         form.cleaned_data["note"],
     )
-    messages.success(request, "审核决定已保存。")
+    messages.success(request, gettext("审核决定已保存。"))
     return redirect(writing_url(kind, item))
 
 
@@ -247,7 +251,7 @@ def report_create(request, kind, pk):
     return render(
         request,
         "community/edit.html",
-        {"form": form, "heading": "私有举报", "private_case": True},
+        {"form": form, "heading": gettext("私有举报"), "private_case": True},
         status=400 if request.method == "POST" else 200,
     )
 
@@ -270,7 +274,7 @@ def appeal_create(request, kind, pk):
     return render(
         request,
         "community/edit.html",
-        {"form": form, "heading": "私有申诉", "private_case": True},
+        {"form": form, "heading": gettext("私有申诉"), "private_case": True},
         status=400 if request.method == "POST" else 200,
     )
 
@@ -341,10 +345,10 @@ def resolve_case(request, kind, pk):
     form_type = forms.ReportDecisionForm if kind == "report" else forms.AppealDecisionForm
     form = form_type(request.POST)
     if not form.is_valid():
-        return HttpResponse("请填写有效的处理决定和说明。", status=400)
+        return HttpResponse(gettext("请填写有效的处理决定和说明。"), status=400)
     resolve = services.resolve_report if kind == "report" else services.resolve_appeal
     resolve(request.user, pk, form.cleaned_data["decision"], form.cleaned_data["note"])
-    messages.success(request, "处理结果已保存，仅本人及审核者可以查看。")
+    messages.success(request, gettext("处理结果已保存，仅本人及审核者可以查看。"))
     return redirect("community:" + kind + "_detail", pk=pk)
 
 

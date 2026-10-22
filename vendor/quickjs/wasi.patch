@@ -1,0 +1,40 @@
+--- a/quickjs.c
++++ b/quickjs.c
+@@ -34,7 +34,7 @@
+ #include <math.h>
+ #if defined(__APPLE__)
+ #include <malloc/malloc.h>
+-#elif defined(__linux__) || defined(__GLIBC__)
++#elif defined(__linux__) || defined(__GLIBC__) || defined(__wasi__)
+ #include <malloc.h>
+ #elif defined(__FreeBSD__)
+ #include <malloc_np.h>
+@@ -49,7 +49,7 @@
+ 
+ #define OPTIMIZE         1
+ #define SHORT_OPCODES    1
+-#if defined(__EMSCRIPTEN__)
++#if defined(__EMSCRIPTEN__) || defined(__wasi__)
+ #define DIRECT_DISPATCH  0
+ #else
+ #define DIRECT_DISPATCH  1
+@@ -68,7 +68,7 @@
+ 
+ /* define to include Atomics.* operations which depend on the OS
+    threads */
+-#if !defined(__EMSCRIPTEN__)
++#if !defined(__EMSCRIPTEN__) && !defined(__wasi__)
+ #define CONFIG_ATOMICS
+ #endif
+ 
+--- a/dtoa.c
++++ b/dtoa.c
+@@ -30,7 +30,7 @@
+ #include <ctype.h>
+ #include <sys/time.h>
+ #include <math.h>
+-#include <setjmp.h>
++/* No setjmp/longjmp call in dtoa.c; omit unused WASI-incompatible header. */
+ 
+ #include "cutils.h"
+ #include "dtoa.h"

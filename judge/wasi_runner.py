@@ -1,10 +1,11 @@
-"""Trusted child driver. User Python runs exclusively inside the Wasm interpreter.
+"""Trusted child driver. User code runs exclusively inside fixed Wasm interpreters.
 
 This executable receives only the source/current arguments, never expected
 answers or database credentials. Guest stdout is data, not this host protocol.
 """
 
 import ctypes
+import json
 import os
 import resource
 import signal
@@ -16,13 +17,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from judge.sandbox import GUEST  # noqa: E402
+from judge.stdio import COMPILE_GUEST, PROGRAM_GUEST  # noqa: E402
 from judge.wasi_policy import (  # noqa: E402
     FUEL,
     HOST_CPU_SECONDS,
     HOST_MEMORY,
     INPUT,
+    JAVASCRIPT_FUEL,
     MEMORY,
     OUTPUT,
+    PYTHON_VERSION,
     WALL_SECONDS,
     engine_config,
 )
@@ -51,6 +55,10 @@ def main():
     import wasmtime
 
     bundle = Path(sys.argv[1])
+    language = sys.argv[3]
+    if language not in {"python", "javascript", "python-compile", "python-stdio"}:
+        return 70
+    module_name = "quickjs.cwasm" if language == "javascript" else "python.cwasm"
     request = sys.stdin.buffer.read(INPUT + 1)
     if len(request) > INPUT:
         return 70
@@ -68,23 +76,52 @@ def main():
             output.extend(data)
         return len(data)
 
+    guest_input = request
+    program_source = None
+    if language == "python-stdio":
+        program = json.loads(request)
+        if set(program) != {"source", "stdin"} or not all(
+            isinstance(value, str) for value in program.values()
+        ):
+            return 70
+        program_source = program["source"]
+        guest_input = program["stdin"].encode("utf-8")
     with tempfile.TemporaryFile() as stdin:
-        stdin.write(request)
+        stdin.write(guest_input)
         stdin.seek(0)
         with wasmtime.Engine(engine_config()) as engine:
             # This native cache is produced from the fixed interpreter by our
             # trusted build, included in the pinned manifest, and verified by
             # the parent. NEVER deserialize a user-provided artifact.
-            with wasmtime.Module.deserialize_file(engine, str(bundle / "python.cwasm")) as module:
+            with wasmtime.Module.deserialize_file(engine, str(bundle / module_name)) as module:
                 with wasmtime.Store(engine) as store:
                     store.set_limits(
                         memory_size=MEMORY, table_elements=20000, instances=1, tables=1, memories=1
                     )
-                    store.set_fuel(FUEL)
+                    store.set_fuel(JAVASCRIPT_FUEL if language == "javascript" else FUEL)
                     wasi = wasmtime.WasiConfig()
-                    wasi.argv = ["/python/bin/python3", "-I", "-B", "-c", GUEST]
                     wasi.env = []
-                    wasi.preopen_dir(str(bundle / "stdlib"), "/python/lib", fs_mutable=False)
+                    if language != "javascript":
+                        wrapper = {
+                            "python": GUEST,
+                            "python-compile": COMPILE_GUEST,
+                            "python-stdio": PROGRAM_GUEST,
+                        }[language]
+                        wasi.argv = ["/python/bin/python3", "-I", "-B", "-c", wrapper] + (
+                            [program_source] if program_source is not None else []
+                        )
+                        wasi.preopen_dir(str(bundle / "stdlib"), "/python/lib", fs_mutable=False)
+                        # CPython searches this fixed directory at startup. Map
+                        # only the same already-readable library bytes, read-only,
+                        # so its missing-path warning does not consume user output.
+                        version = ".".join(PYTHON_VERSION.split(".")[:2])
+                        wasi.preopen_dir(
+                            str(bundle / "stdlib"),
+                            f"/python/lib/python{version}/lib-dynload",
+                            fs_mutable=False,
+                        )
+                    else:
+                        wasi.argv = ["quickjs-function"]
                     wasi.stdin_file = f"/proc/self/fd/{stdin.fileno()}"
                     wasi.stdout_custom = lambda data: capture(data, True)
                     wasi.stderr_custom = lambda data: capture(data, False)
@@ -97,6 +134,12 @@ def main():
                             instance.exports(store)["_start"](store)
                         except wasmtime.ExitTrap as exc:
                             if exc.code:
+                                if language == "python-stdio":
+                                    return 75  # ALL nonzero learner exits are runtime errors.
+                                if language == "python-compile":
+                                    return {3: 73, 4: 74}.get(exc.code, 70)
+                                if language == "javascript":
+                                    return {3: 73, 4: 74, 5: 72, 70: 70}.get(exc.code, 75)
                                 return {3: 73, 4: 74}.get(exc.code, 75)
                         except wasmtime.Trap as exc:
                             if exc.trap_code == wasmtime.TrapCode.OUT_OF_FUEL:
@@ -115,4 +158,8 @@ if __name__ == "__main__":
         # Runtime/asset/transport failures are platform failures. Never expose
         # raw stderr (which can include private input) or call them wrong answers.
         code = 70
-    sys.exit(code)
+    # Native WASI callbacks may still own Python references on runtime threads.
+    # The driver owns no persistent state; flush the bounded protocol, then end
+    # the entire process before interpreter-finalization can race those threads.
+    sys.stdout.buffer.flush()
+    os._exit(code)

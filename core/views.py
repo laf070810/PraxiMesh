@@ -10,22 +10,28 @@ from django.core.paginator import Paginator
 from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.translation import gettext
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from community.services import export_user_data as export_community
-from core.content import digest, public_problem
+from core.content import digest
 from core.forms import ProfileForm, RecoveryForm, RegisterForm, SourceForm
 from core.limits import consume
 from core.models import AccountProfile, Draft, Enrollment, KnowledgeNode, Problem, Submission
 from core.queue import AdmissionError, available, enqueue
 from judge.backends import result_environment_label
-from judge.results import LABELS
 from learning.models import Bookmark, TutorialReading
 from learning.services import export_user_data as export_learning
+from localization.presentation import VERDICTS as LABELS
+from localization.presentation import localized_node, localized_public_cases
+from localization.presentation import localized_problem as public_problem
+from practice_api.models import AccessToken
+from practice_api.services import export_user_data as export_practice_api
+from showcase.services import export_user_data as export_showcase
 
 
 def graph():
-    return {node.id: node.data for node in KnowledgeNode.objects.filter(published=True)}
+    return {node.id: localized_node(node) for node in KnowledgeNode.objects.filter(published=True)}
 
 
 def states(user):
@@ -77,7 +83,7 @@ def node_detail(request, slug):
     node = get_object_or_404(KnowledgeNode, id=slug, published=True)
     nodes = graph()
     cards = problem_cards(request.user)
-    data = node.data
+    data = localized_node(node)
     related_nodes = [
         n for n in nodes.values() if slug in n["domains"] + n["topics"] + n["concepts"]
     ]
@@ -122,7 +128,7 @@ def node_detail(request, slug):
             "completed": completed,
             "enrolled": enrolled,
             "reading": reading,
-            "reading_current": reading is not None and reading.content_digest == digest(data),
+            "reading_current": reading is not None and reading.content_digest == digest(node.data),
         },
     )
 
@@ -150,6 +156,9 @@ def practice(request):
     difficulty = request.GET.get("difficulty", "")
     state = request.GET.get("state", "")
     language = request.GET.get("language", "")
+    evaluator = request.GET.get("evaluator", "")
+    if evaluator:
+        cards = [p for p in cards if p["evaluator"] == evaluator]
     for key, value in [("difficulty", difficulty), ("state", state), ("language", language)]:
         if value:
             cards = [p for p in cards if p[key] == value]
@@ -159,7 +168,13 @@ def practice(request):
             for p in cards
             if query
             in " ".join(
-                [p["title"], p["summary"], *p["tags"], *[nodes[c]["title"] for c in p["concepts"]]]
+                [
+                    p["title"],
+                    p["summary"],
+                    p["source_search"],
+                    *p["tags"],
+                    *[nodes[c]["title"] + " " + nodes[c]["source_search"] for c in p["concepts"]],
+                ]
             ).casefold()
         ]
     if concept:
@@ -194,7 +209,7 @@ def current_problem(slug):
 
 @require_GET
 def problem_detail(request, slug):
-    from judge.backends import configured_runtime_description
+    from localization.presentation import runtime_description
 
     problem = current_problem(slug)
     data = public_problem(problem.current)
@@ -212,8 +227,8 @@ def problem_detail(request, slug):
             "version_id": problem.current_id,
             "source": source,
             "concepts": [nodes[c] for c in data["concepts"]],
-            "judge_available": available(),
-            "runtime_description": configured_runtime_description(),
+            "judge_available": available(problem.current),
+            "runtime_description": runtime_description(problem.current),
             "bookmarked": request.user.is_authenticated
             and Bookmark.objects.filter(user=request.user, problem=problem).exists(),
         },
@@ -226,17 +241,19 @@ def save_draft(request, slug):
     problem = current_problem(slug)
     source = request.POST.get("source", "")
     if request.POST.get("version") != str(problem.current_id):
-        return JsonResponse({"error": "题目已更新，请刷新页面。旧版本草稿仍保留。"}, status=409)
+        return JsonResponse(
+            {"error": gettext("题目已更新，请刷新页面。旧版本草稿仍保留。")}, status=409
+        )
     if len(source) > 20000:
-        return JsonResponse({"error": "代码不能超过 20000 字符。"}, status=400)
+        return JsonResponse({"error": gettext("代码不能超过 20000 字符。")}, status=400)
     if not consume("draft", str(request.user.pk), 60, 60):
-        return JsonResponse({"error": "保存过于频繁，请稍后重试。"}, status=429)
+        return JsonResponse({"error": gettext("保存过于频繁，请稍后重试。")}, status=429)
     Draft.objects.update_or_create(
         user=request.user, version=problem.current, defaults={"source": source}
     )
     if request.headers.get("Accept") == "application/json":
         return JsonResponse({"saved": True})
-    messages.success(request, "草稿已私密保存。")
+    messages.success(request, gettext("草稿已私密保存。"))
     return redirect("problem", slug=slug)
 
 
@@ -266,12 +283,13 @@ def submit(request, slug):
     form = SourceForm(request.POST)
     if not form.is_valid():
         return JsonResponse(
-            {"error": "请提供不超过 20000 字符的 Python 代码及有效的提交方式。"}, status=400
+            {"error": gettext("请提供不超过 20000 字符的源代码及有效的提交方式。")},
+            status=400,
         )
     if request.POST.get("version") != str(problem.current_id):
-        return JsonResponse({"error": "题目版本已更新，请刷新后重试。"}, status=409)
+        return JsonResponse({"error": gettext("题目版本已更新，请刷新后重试。")}, status=409)
     if not consume("submit", str(request.user.pk), 12, 60):
-        return JsonResponse({"error": "提交过于频繁，请稍后再试。"}, status=429)
+        return JsonResponse({"error": gettext("提交过于频繁，请稍后再试。")}, status=429)
     try:
         job = enqueue(
             request.user, problem.current, form.cleaned_data["source"], form.cleaned_data["mode"]
@@ -305,6 +323,7 @@ def submission_detail(request, job_id):
             "verdict_label": LABELS.get(job.verdict, ""),
             "pending": job.status != "finished",
             "evaluation_image": result_environment_label(job.environment),
+            "public_cases": localized_public_cases(job.version, job.result),
         },
     )
 
@@ -353,7 +372,10 @@ def register(request):
         return render(
             request,
             "message.html",
-            {"title": "注册暂未开放", "body": "本站暂不接受新账号。公开知识和题目仍可浏览。"},
+            {
+                "title": gettext("注册暂未开放"),
+                "body": gettext("本站暂不接受新账号。公开知识和题目仍可浏览。"),
+            },
             status=403,
         )
     form = RegisterForm(request.POST or None)
@@ -369,9 +391,9 @@ def register(request):
         "account_form.html",
         {
             "form": form,
-            "title": "创建学习账号",
-            "button": "注册",
-            "intro": "只需要用户名与密码。代码和学习记录默认仅你可见。",
+            "title": gettext("创建学习账号"),
+            "button": gettext("注册"),
+            "intro": gettext("只需要用户名与密码。代码和学习记录默认仅你可见。"),
         },
     )
 
@@ -398,20 +420,25 @@ def recover(request):
                 user = profile.user
                 user.set_password(form.cleaned_data["password"])
                 user.save(update_fields=["password"])
+                from django.utils import timezone
+
+                AccessToken.objects.filter(user=user, revoked_at=None).update(
+                    revoked_at=timezone.now()
+                )
                 code = secrets.token_urlsafe(32)
                 profile.recovery_hash = make_password(code)
                 profile.save(update_fields=["recovery_hash"])
                 login(request, user)
                 return render(request, "recovery_code.html", {"code": code})
-        form.add_error(None, "用户名或恢复码无效。")
+        form.add_error(None, gettext("用户名或恢复码无效。"))
     return render(
         request,
         "account_form.html",
         {
             "form": form,
-            "title": "恢复账号",
-            "button": "重置密码",
-            "intro": "使用注册时保存的恢复码。成功后旧码作废，原登录会话失效。",
+            "title": gettext("恢复账号"),
+            "button": gettext("重置密码"),
+            "intro": gettext("使用注册时保存的恢复码。成功后旧码作废，原登录会话失效。"),
         },
     )
 
@@ -426,7 +453,7 @@ def account(request):
     if request.method == "POST" and form.is_valid():
         profile.display_name = form.cleaned_data["display_name"]
         profile.save(update_fields=["display_name"])
-        messages.success(request, "个人资料已保存。")
+        messages.success(request, gettext("个人资料已保存。"))
         return redirect("account")
     return render(request, "account.html", {"form": form})
 
@@ -435,7 +462,7 @@ def account(request):
 @login_required
 def rotate_recovery(request):
     if not request.user.check_password(request.POST.get("password", "")):
-        return HttpResponse("密码不正确。", status=400)
+        return HttpResponse(gettext("密码不正确。"), status=400)
     code = secrets.token_urlsafe(32)
     AccountProfile.objects.update_or_create(
         user=request.user, defaults={"recovery_hash": make_password(code)}
@@ -478,6 +505,8 @@ def export_account(request):
         ),
         "learning": export_learning(request.user),
         "community": export_community(request.user),
+        "practice_api": export_practice_api(request.user),
+        "showcase": export_showcase(request.user),
     }
     response = HttpResponse(
         json.dumps(data, ensure_ascii=False, indent=2), content_type="application/json"
@@ -493,7 +522,7 @@ def delete_account(request):
         not request.user.check_password(request.POST.get("password", ""))
         or request.POST.get("confirm") != "DELETE"
     ):
-        return HttpResponse("请输入当前密码，并输入 DELETE 确认删除。", status=400)
+        return HttpResponse(gettext("请输入当前密码，并输入 DELETE 确认删除。"), status=400)
     user = request.user
     logout(request)
     user.delete()
@@ -501,9 +530,11 @@ def delete_account(request):
         request,
         "message.html",
         {
-            "title": "账号已删除",
-            "body": "账号、草稿、提交、学习记录及你发布的社区内容已从当前数据库删除。"
-            "审核事件只保留不含正文的操作记录，操作者关联已清除。备份按站点保留周期清除。",
+            "title": gettext("账号已删除"),
+            "body": gettext(
+                "账号、草稿、提交、学习记录及你发布的社区内容已从当前数据库删除。"
+                "审核事件只保留不含正文的操作记录，操作者关联已清除。备份按站点保留周期清除。"
+            ),
         },
     )
 

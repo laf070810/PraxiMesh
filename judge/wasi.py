@@ -1,4 +1,4 @@
-"""Capability-limited CPython/WASI. This is never a host-Python fallback."""
+"""Capability-limited Python and JavaScript/WASI. This is never a host-Python fallback."""
 
 import hashlib
 import importlib.metadata
@@ -18,9 +18,11 @@ from judge.sandbox import Execution, SandboxUnavailable, policy_digest
 from judge.wasi_policy import (
     BUNDLE_FILES,
     INPUT,
+    LANGUAGES,
     OUTPUT,
     POLICY_VERSION,
     PYTHON_VERSION,
+    QUICKJS_VERSION,
     TARGET,
     WALL_SECONDS,
     WASMTIME_VERSION,
@@ -45,7 +47,12 @@ class WasiSandbox:
             if hashlib.sha256(data).hexdigest() != self.digest:
                 raise ValueError("Manifest digest mismatch")
             info = json.loads(data)
-            if info["format"] != 2 or info["python"] != PYTHON_VERSION:
+            if (
+                info["format"] != 3
+                or info["python"] != PYTHON_VERSION
+                or info["quickjs"] != QUICKJS_VERSION
+                or info["languages"] != list(LANGUAGES)
+            ):
                 raise ValueError("Unsupported artifact")
             if info["wasmtime"] != WASMTIME_VERSION or info["architecture"] != "x86_64":
                 raise ValueError("Compiled artifact runtime mismatch")
@@ -54,6 +61,13 @@ class WasiSandbox:
             policy = Path(__file__).with_name("wasi_policy.py").read_bytes()
             if info["engine_policy"] != hashlib.sha256(policy).hexdigest():
                 raise ValueError("Rebuild the interpreter cache after engine policy changes")
+            root = Path(__file__).resolve().parent.parent
+            for field, relative in (
+                ("javascript_bridge", "judge/javascript_bridge.c"),
+                ("quickjs_patch", "vendor/quickjs/wasi.patch"),
+            ):
+                if info[field] != hashlib.sha256((root / relative).read_bytes()).hexdigest():
+                    raise ValueError("JavaScript source identity differs from the reviewed build")
             expected = set(BUNDLE_FILES)
             if set(info["files"]) != expected:
                 raise ValueError("Unexpected artifact files")
@@ -100,6 +114,9 @@ class WasiSandbox:
             "policy_digest": policy_digest(),
             "bundle": self.digest,
             "python": PYTHON_VERSION,
+            "quickjs": QUICKJS_VERSION,
+            "languages": list(LANGUAGES),
+            "evaluators": ["python-function-v1", "javascript-function-v1", "python-stdio-v1"],
             "wasmtime": version,
             "wasmtime_library": self.runtime_digest,
             "driver_python": platform.python_version(),
@@ -109,17 +126,53 @@ class WasiSandbox:
         }
 
     def execute(self, source, function, args):
+        return self._execute(source, function, args, "python")
+
+    def execute_javascript(self, source, function, args):
+        from judge.javascript import validate_request
+
+        try:
+            validate_request(source, function, args)
+        except (ValueError, OverflowError, RecursionError) as exc:
+            raise SandboxUnavailable("Invalid JavaScript function request.") from exc
+        return self._execute(source, function, args, "javascript")
+
+    def execute_program(self, source, stdin):
+        from judge.stdio import validate_request
+
+        try:
+            validate_request(source, stdin)
+            program_payload = json.dumps(
+                {"source": source, "stdin": stdin}, ensure_ascii=False
+            ).encode()
+        except (ValueError, UnicodeError) as exc:
+            raise SandboxUnavailable("Invalid Python program request.") from exc
+        if len(program_payload) > INPUT:
+            raise SandboxUnavailable("Input exceeds judge protocol limit.")
+        compiled = self._run_payload(
+            json.dumps({"source": source}, ensure_ascii=False).encode(), "python-compile"
+        )
+        if compiled.verdict != "ok":
+            return compiled
+        executed = self._run_payload(program_payload, "python-stdio")
+        executed.elapsed_ms += compiled.elapsed_ms
+        return executed
+
+    def _execute(self, source, function, args, language):
+        payload = json.dumps(
+            {"source": source, "function": function, "args": args},
+            allow_nan=False,
+            ensure_ascii=language == "javascript",
+        ).encode()
+        return self._run_payload(payload, language)
+
+    def _run_payload(self, payload, language):
         self.verify_bundle()
         if not hasattr(self, "runtime_digest"):
             raise SandboxUnavailable("WASI preflight is required before execution.")
         with self.runtime_file.open("rb") as library:
             if hashlib.file_digest(library, "sha256").hexdigest() != self.runtime_digest:
                 raise SandboxUnavailable("Wasmtime changed while the worker was running.")
-        payload = json.dumps(
-            {"source": source, "function": function, "args": args},
-            allow_nan=False,
-            ensure_ascii=False,
-        ).encode()
         if len(payload) > INPUT:
             raise SandboxUnavailable("Input exceeds judge protocol limit.")
         started = time.monotonic()
@@ -132,6 +185,7 @@ class WasiSandbox:
                     str(Path(__file__).with_name("wasi_runner.py")),
                     str(self.bundle),
                     str(os.getpid()),
+                    language,
                 ],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
@@ -212,12 +266,12 @@ class WasiSandbox:
         if process.returncode != 0:
             raise SandboxUnavailable("WASI driver failed; execution is unavailable.")
         try:
-            envelope = json.loads(output)
-            if not isinstance(envelope, dict) or set(envelope) != {"value"}:
-                raise ValueError("Invalid envelope")
-        except (ValueError, UnicodeDecodeError, RecursionError):
+            from judge.stdio import parse_output
+
+            value = parse_output(output, envelope=language != "python-stdio")
+        except (ValueError, RecursionError, OverflowError):
             return Execution("runtime_error", elapsed_ms=elapsed)
-        return Execution("ok", envelope["value"], elapsed)
+        return Execution("ok", value, elapsed)
 
     @staticmethod
     def _kill(process):

@@ -1,9 +1,15 @@
 from django.contrib.auth import views as auth_views
 from django.urls import include, path
+from django.views.i18n import JavaScriptCatalog
 
 from core import views
 
 urlpatterns = [
+    path("projects/", include("projects.urls")),
+    path("showcase/", include("showcase.urls")),
+    path("", include("practice_api.urls")),
+    path("i18n/", include("django.conf.urls.i18n")),
+    path("jsi18n/", JavaScriptCatalog.as_view(), name="javascript-catalog"),
     path("learning/", include("learning.urls")),
     path("community/", include("community.urls")),
     path("", views.home, name="home"),

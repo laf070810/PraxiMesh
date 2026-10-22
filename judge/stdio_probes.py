@@ -1,0 +1,78 @@
+"""Real complete-program probes; source is compiled/executed exclusively in WASI."""
+
+PROBES = [
+    ("exit-float-zero", "import sys\nprint(42)\nsys.exit(0.0)", "", "runtime_error", None),
+    ("exit-false", "import sys\nprint(42)\nsys.exit(False)", "", "ok", 42),
+    ("invalid-utf8", 'import os\nos.write(1,b"\\xff")', "", "runtime_error", None),
+    (
+        "json",
+        'import json,sys\nprint(json.dumps({"value":json.load(sys.stdin)["x"]+1}))',
+        '{"x":4}',
+        "ok",
+        {"value": 5},
+    ),
+    (
+        "unicode",
+        "import json,sys\nprint(json.dumps(sys.stdin.read(),ensure_ascii=False))",
+        "中😀\n",
+        "ok",
+        "中😀\n",
+    ),
+    (
+        "byte-stdin",
+        'import json,sys\nprint(json.dumps(sys.stdin.buffer.read().decode("utf-8")))',
+        "input\x00bytes",
+        "ok",
+        "input\x00bytes",
+    ),
+    (
+        "fd-stdin",
+        "import json,os\nprint(json.dumps(os.read(0,100).decode()))",
+        "fd input",
+        "ok",
+        "fd input",
+    ),
+    ("syntax", "if :\n pass", "", "syntax_error", None),
+    ("nul-source", "\x00", "", "syntax_error", None),
+    ("exception", 'raise ValueError("private")', "", "runtime_error", None),
+    ("exit-zero", "import sys\nprint(42)\nsys.exit(0)", "", "ok", 42),
+    ("exit-none", "import sys\nprint(42)\nsys.exit()", "", "ok", 42),
+    ("exit-nonzero", "import sys\nprint(42)\nsys.exit(1)", "", "runtime_error", None),
+    ("raw-exit-zero", "import os,sys\nprint(42,flush=True)\nos._exit(0)", "", "ok", 42),
+    ("no-output", "import sys\nsys.exit(0)", "", "runtime_error", None),
+    ("invalid-json", 'print("not JSON")', "", "runtime_error", None),
+    ("trailing-text", 'print("42\\nextra")', "", "runtime_error", None),
+    ("duplicate-key", 'print(\'{"a":1,"a":2}\')', "", "runtime_error", None),
+    ("nan", 'print("NaN")', "", "runtime_error", None),
+    ("infinity", 'print("1e999")', "", "runtime_error", None),
+    ("deep", 'print("["*34+"0"+"]"*34)', "", "runtime_error", None),
+    ("output", 'print("x"*100000)', "", "output_limit", None),
+    (
+        "stderr-output",
+        'import sys\nsys.stderr.write("x"*100000)\nprint(42)',
+        "",
+        "output_limit",
+        None,
+    ),
+    ("memory-error-is-nonzero", "bytearray(512*1024*1024)", "", "runtime_error", None),
+    ("fuel", "while True: pass", "", "time_limit", None),
+    ("wall", "import time\ntime.sleep(60)\nprint(1)", "", "time_limit", None),
+    ("no-environment", "import os,json\nprint(json.dumps(dict(os.environ)))", "", "ok", {}),
+    ("instance-write", 'import builtins\nbuiltins.private_probe=1\nprint("true")', "", "ok", True),
+    (
+        "instance-read",
+        'import builtins,json\nprint(json.dumps(not hasattr(builtins,"private_probe")))',
+        "",
+        "ok",
+        True,
+    ),
+] + [
+    (
+        f"raw-exit-{code}",
+        f"import os\nprint(42,flush=True)\nos._exit({code})",
+        "",
+        "runtime_error",
+        None,
+    )
+    for code in (2, 3, 4, 70, 71, 72, 73, 74, 75)
+]

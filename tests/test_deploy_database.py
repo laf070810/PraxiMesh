@@ -195,6 +195,37 @@ def test_web_role_fails_closed_when_feature_schema_disagrees_with_migrations(rec
         deploy_database.web_write_tables(Connection())
 
 
+@pytest.mark.parametrize("installed", [(), tuple(deploy_database.FEATURE_READ_TABLES)])
+def test_translations_are_read_only_and_optional_for_old_generations(installed):
+    tables = set(deploy_database.BASE_WEB_READ)
+    for migration in installed:
+        tables.update(deploy_database.FEATURE_READ_TABLES[migration])
+
+    class Connection:
+        def execute(self, statement):
+            rows = installed if "django_migrations" in statement else [(table,) for table in tables]
+            return SimpleNamespace(fetchall=lambda: rows)
+
+    granted = set(deploy_database.web_read_tables(Connection()))
+    assert granted == tables
+    assert not granted.intersection(WEB_WRITE)
+    assert not any(name.startswith("localization_") for name in WORKER_PRIVILEGES)
+
+
+@pytest.mark.parametrize("recorded", [True, False])
+def test_partial_translation_schema_fails_closed(recorded):
+    installed = [("localization", "0001_initial")] if recorded else []
+    tables = [*deploy_database.BASE_WEB_READ, "localization_knowledgesnapshot"]
+
+    class Connection:
+        def execute(self, statement):
+            rows = installed if "django_migrations" in statement else [(table,) for table in tables]
+            return SimpleNamespace(fetchall=lambda: rows)
+
+    with pytest.raises(DeploymentDatabaseError):
+        deploy_database.web_read_tables(Connection())
+
+
 @pytest.mark.parametrize(
     "metadata",
     [

@@ -1,1 +1,1 @@
-{% extends 'base.html' %}{% block title %}社区操作未完成 · PraxiMesh{% endblock %}{% block content %}{% include 'community/nav.html' %}<h1>操作未完成</h1><p role="alert">{{ error }}</p><a href="{% url 'community:mine' %}">返回我的内容并刷新状态</a>{% endblock %}
+{% extends 'base.html' %}{% load i18n localized %}{% block title %}{% translate "社区操作未完成 · PraxiMesh" %}{% endblock %}{% block content %}{% include 'community/nav.html' %}<h1>{% translate "操作未完成" %}</h1><p role="alert">{{ error }}</p><a href="{% url 'community:mine' %}">{% translate "返回我的内容并刷新状态" %}</a>{% endblock %}

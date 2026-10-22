@@ -30,6 +30,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack, closing
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 
 import psycopg
@@ -38,7 +39,11 @@ from psycopg import sql
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from scripts.browser_acceptance import bootstrap_moderator  # noqa: E402
-from scripts.deploy_database import WEB_READ, WORKER_PRIVILEGES, web_write_tables  # noqa: E402
+from scripts.deploy_database import (  # noqa: E402
+    WORKER_PRIVILEGES,
+    web_read_tables,
+    web_write_tables,
+)
 
 POSTGRES = (
     "postgres:17-alpine@sha256:e4cb93687b062cd25a0e8f672d85a7708235009d70d31f8a7698d9370092a9c4"
@@ -48,16 +53,16 @@ READ_CONCURRENCY = 8
 JOB_SAMPLES = 6
 
 
-def run(*command, env=None, **kwargs):
+def run(*command, env=None, timeout=120, **kwargs):
     try:
         return subprocess.run(
-            command, cwd=ROOT, env=env, check=True, capture_output=True, timeout=120, **kwargs
+            command, cwd=ROOT, env=env, check=True, capture_output=True, timeout=timeout, **kwargs
         ).stdout
-    except subprocess.CalledProcessError as error:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
         # These commands never place credentials in argv or normal output.
         (ROOT / "test-results").mkdir(exist_ok=True)
         (ROOT / "test-results/production-command-failure.log").write_bytes(
-            error.stdout + error.stderr
+            (error.stdout or b"") + (error.stderr or b"")
         )
         raise
 
@@ -158,13 +163,31 @@ def pki(directory):
     return cert, key, pin, context
 
 
+class SourceHTTPSHandler(urllib.request.HTTPSHandler):
+    """Bind actual loopback clients without trusting a caller-supplied IP header."""
+
+    def __init__(self, context, address):
+        super().__init__(context=context)
+        self.address = address
+
+    def https_open(self, request):
+        return self.do_open(
+            partial(http.client.HTTPSConnection, source_address=(self.address, 0)),
+            request,
+            context=self._context,
+            check_hostname=self._check_hostname,
+        )
+
+
 class Client:
-    def __init__(self, base, context):
+    def __init__(self, base, context, *, source_address=None):
         self.base = base
         self.cookies = http.cookiejar.CookieJar()
         self.opener = urllib.request.build_opener(
             urllib.request.ProxyHandler({}),
-            urllib.request.HTTPSHandler(context=context),
+            SourceHTTPSHandler(context, source_address)
+            if source_address
+            else urllib.request.HTTPSHandler(context=context),
             urllib.request.HTTPCookieProcessor(self.cookies),
         )
 
@@ -234,7 +257,7 @@ def database_roles(owner_url, web_password, worker_password):
             )
         connection.execute(
             sql.SQL("GRANT SELECT ON {} TO acceptance_web").format(
-                sql.SQL(", ").join(map(sql.Identifier, WEB_READ))
+                sql.SQL(", ").join(map(sql.Identifier, web_read_tables(connection)))
             )
         )
         connection.execute(
@@ -368,7 +391,9 @@ def browse(base, context):
 
 
 def load_jobs(base, context, password, owner_url):
-    clients = [Client(base, context) for _ in range(JOB_SAMPLES)]
+    # Browser journeys share 127.0.0.1. Use another real client address for the
+    # load cohort so account setup does not exhaust that cohort's existing quota.
+    clients = [Client(base, context, source_address="127.0.0.2") for _ in range(JOB_SAMPLES)]
     for index, client in enumerate(clients):
         client.login(f"acceptance-load-{index}", password)
     source = "def solve(values):\n    return sum(x for x in values if x > 0)\n"
@@ -514,7 +539,8 @@ def main():
         )
         for command in [
             ["migrate", "--noinput"],
-            ["content_import"],
+            ["content_import", "--translations", str(ROOT / "content/en.json")],
+            ["project_import", str(ROOT / "content/projects.json")],
             ["collectstatic", "--noinput"],
             ["check", "--deploy", "--fail-level", "WARNING"],
         ]:
@@ -541,6 +567,14 @@ def main():
         denied(worker_url, "SELECT * FROM auth_user LIMIT 1")
         denied(worker_url, "SELECT * FROM learning_note LIMIT 1")
         denied(worker_url, "SELECT * FROM community_report LIMIT 1")
+        denied(worker_url, "SELECT * FROM practice_api_accesstoken LIMIT 1")
+        denied(worker_url, "SELECT * FROM showcase_sharedresult LIMIT 1")
+        denied(worker_url, "SELECT * FROM localization_problemtranslation LIMIT 1")
+        denied(worker_url, "SELECT * FROM projects_projectstage LIMIT 1")
+        denied(
+            web_url, "UPDATE localization_problemtranslation SET published=published WHERE false"
+        )
+        denied(web_url, "UPDATE projects_project SET published=published WHERE false")
         web_env = dict(env, DATABASE_URL=web_url)
         worker_env = dict(env, DATABASE_URL=worker_url, APP_SECRET_KEY=secrets.token_urlsafe(48))
         proxy_env = dict(
@@ -548,7 +582,9 @@ def main():
         )
         print("Running the real sandbox probes with the restricted worker role", flush=True)
         with (artifacts / "production-sandbox.log").open("wb") as log:
-            log.write(run(sys.executable, "manage.py", "sandbox_check", env=worker_env))
+            log.write(
+                run(sys.executable, "manage.py", "sandbox_check", env=worker_env, timeout=300)
+            )
         config = temporary / "Caddyfile"
         config.write_text(
             "{\n admin off\n auto_https disable_redirects\n skip_install_trust\n}\n"
@@ -615,6 +651,17 @@ def main():
             env=dict(web_env, **moderator_credentials),
         )
         (artifacts / "production-community-browser.log").write_bytes(output)
+        output = run(sys.executable, "tests/browser_i18n.py", env=web_env)
+        (artifacts / "production-i18n-browser.log").write_bytes(output)
+        output = run(sys.executable, "tests/browser_projects_i18n.py", env=web_env)
+        (artifacts / "production-projects-i18n-browser.log").write_bytes(output)
+        output = run(
+            sys.executable,
+            "tests/browser_practice.py",
+            env=dict(web_env, BROWSER_CA_FILE=str(temporary / "ca.pem")),
+            timeout=300,
+        )
+        (artifacts / "production-practice-browser.log").write_bytes(output)
         print("Measuring eight-client browsing and a six-account real submission burst", flush=True)
         baseline = browse(base, context)
         jobs, during_judge, signed_in, source = load_jobs(base, context, password, owner_url)
@@ -648,7 +695,7 @@ def main():
         )
         # All attempts share one real client address despite distinct forged headers.
         limited = [
-            Client(base, context).request(
+            Client(base, context, source_address="127.0.0.3").request(
                 "/accounts/login/", {"username": f"unknown-{i}"}, {"X-Real-IP": f"192.0.2.{i + 1}"}
             )[0]
             for i in range(65)
@@ -677,12 +724,16 @@ def main():
             "database_roles": {
                 "worker_auth_read_denied": True,
                 "worker_learning_and_community_read_denied": True,
+                "worker_api_showcase_translations_projects_read_denied": True,
+                "web_translations_projects_write_denied": True,
                 "web_ddl_denied": True,
                 "web_content_and_health_write_denied": True,
             },
             "browser": {
                 "real_judge": True,
                 "community_moderation_workflow": True,
+                "english_workflow": True,
+                "local_cli_api_projects_and_public_results": True,
                 "hsts": True,
                 "secure_cookies": True,
                 "certificate_exception": "ephemeral leaf SPKI only",

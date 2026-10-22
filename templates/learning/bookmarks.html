@@ -1,8 +1,8 @@
-{% extends 'base.html' %}{% block title %}我的收藏 · PraxiMesh{% endblock %}
+{% extends 'base.html' %}{% load i18n localized %}{% block title %}{% translate "我的收藏 · PraxiMesh" %}{% endblock %}
 {% block content %}
-<section class="page-heading"><p class="eyebrow">仅自己可见</p><h1>我的收藏</h1><p>收藏跟随题目，更新后可打开当前版本。</p>{% include 'learning/nav.html' %}</section>
+<section class="page-heading"><p class="eyebrow">{% translate "仅自己可见" %}</p><h1>{% translate "我的收藏" %}</h1><p>{% translate "收藏跟随题目，更新后可打开当前版本。" %}</p>{% include 'learning/nav.html' %}</section>
 <section class="section compact">
-{% for item in page %}<article class="card"><h2>{% if item.problem.published and item.problem.current %}<a href="{% url 'problem' item.problem_id %}">{{ item.problem.current.data.title }} →</a>{% else %}{{ item.problem.current.data.title|default:item.problem_id }} · 已下线{% endif %}</h2><form action="{% url 'learning:bookmark' item.problem_id %}" method="post">{% csrf_token %}<button class="secondary" name="action" value="remove">取消收藏</button></form></article>
-{% empty %}<p>尚未收藏题目。可以在题目页添加收藏。</p><a href="{% url 'practice' %}">浏览练习 →</a>{% endfor %}
+{% for item in page %}<article class="card"><h2>{% if item.problem.published and item.problem.current %}<a href="{% url 'problem' item.problem_id %}">{% problem_field item.problem.current "title" %} →</a>{% else %}{% blocktranslate with value1=item.problem.current|problem_title|default:item.problem_id %}{{ value1 }} · 已下线{% endblocktranslate %}{% endif %}</h2><form action="{% url 'learning:bookmark' item.problem_id %}" method="post">{% csrf_token %}<button class="secondary" name="action" value="remove">{% translate "取消收藏" %}</button></form></article>
+{% empty %}<p>{% translate "尚未收藏题目。可以在题目页添加收藏。" %}</p><a href="{% url 'practice' %}">{% translate "浏览练习 →" %}</a>{% endfor %}
 {% include 'learning/pagination.html' %}</section>
 {% endblock %}

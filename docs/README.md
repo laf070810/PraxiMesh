@@ -5,6 +5,10 @@
 - [阶段计划与安全发布门槛](plan.md)
 - [完整 PRD 需求追踪](requirements.md) — 阶段 A/B/C 全目标实施中
 - [RFC-006：阶段 B/C 的完整产品实施](rfcs/006-complete-product.md) — 实施中
+- [RFC-007：多语言练习、本地工具、中英界面与公开作品](rfcs/007-b2-practice-and-sharing.md) — B2 本地验收通过
+- [本地公开测试、访问令牌与提交工具](local-practice.md)
+- [中英界面、内容译文与版本回退](localization.md)
+- [多阶段项目发布与版本进度](../projects/README.md)
 - [RFC-001：阶段 A 的架构、内容和可信评测](rfcs/001-phase-a.md) — 接受，2026-10-22
 - [ADR-001：应用和数据边界](adr/001-application.md) — 接受
 - [ADR-002：评测隔离与结果信任边界](adr/002-evaluation.md) — 接受，运行环境待验证
@@ -19,6 +23,7 @@
 - [ADR-007：暂停入口与策略绑定](adr/007-admission-coordination.md) — 接受
 - [ADR-008：维护窗口发布与保留数据的恢复](adr/008-deployment-generations.md) — 接受
 - [ADR-009：学习记录和社区公开边界](adr/009-learning-community.md) — 接受
+- [ADR-010：多语言练习、版本项目和自愿公开成果](adr/010-practice-projects-sharing.md) — 接受，联合本地验收通过
 - [学习记录和社区维护](community.md)
 - [威胁模型](security.md)
 - [内容贡献规范](content.md)
@@ -29,5 +34,6 @@
 - [单主机发布协调、排空与恢复](deployment-coordination.md)
 - [阶段 A 验收记录](acceptance.md)
 - [B1 学习与社区验收](acceptance-b1.md)
+- [B2 多语言练习、项目与公开成果验收](acceptance-b2.md)
 
 修改核心边界时，先更新 RFC 的候选方案/风险，再追加或替代 ADR；保留旧决策及替代链接。验收记录必须区分单元测试、真实沙箱测试、本地体验和公开部署。

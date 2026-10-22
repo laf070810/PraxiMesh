@@ -1,4 +1,5 @@
 from django import forms
+from django.utils.translation import gettext_lazy as _
 
 from community.models import Appeal, Post, Report
 from core.models import ProblemVersion
@@ -10,12 +11,12 @@ class VersionChoice(forms.ModelChoiceField):
 
 
 class PostForm(forms.Form):
-    kind = forms.ChoiceField(choices=Post.Kind.choices, label="内容类型")
-    title = forms.CharField(max_length=160, label="标题")
+    kind = forms.ChoiceField(choices=Post.Kind.choices, label=_("内容类型"))
+    title = forms.CharField(max_length=160, label=_("标题"))
     version = VersionChoice(
-        queryset=ProblemVersion.objects.none(), required=False, label="关联题目版本（题解必选）"
+        queryset=ProblemVersion.objects.none(), required=False, label=_("关联题目版本（题解必选）")
     )
-    body = forms.CharField(max_length=20000, widget=forms.Textarea, label="正文（纯文本）")
+    body = forms.CharField(max_length=20000, widget=forms.Textarea, label=_("正文（纯文本）"))
     revision = forms.IntegerField(min_value=1, required=False, widget=forms.HiddenInput)
 
     def __init__(self, *args, **kwargs):
@@ -27,12 +28,12 @@ class PostForm(forms.Form):
     def clean(self):
         data = super().clean()
         if data.get("kind") == Post.Kind.SOLUTION and not data.get("version"):
-            self.add_error("version", "题解必须选择明确的题目版本。")
+            self.add_error("version", _("题解必须选择明确的题目版本。"))
         return data
 
 
 class CommentForm(forms.Form):
-    body = forms.CharField(max_length=5000, widget=forms.Textarea, label="评论（纯文本）")
+    body = forms.CharField(max_length=5000, widget=forms.Textarea, label=_("评论（纯文本）"))
     revision = forms.IntegerField(min_value=1, required=False, widget=forms.HiddenInput)
 
 
@@ -42,30 +43,30 @@ class RevisionForm(forms.Form):
 
 class ModerationForm(RevisionForm):
     action = forms.ChoiceField(
-        choices=[("publish", "审核通过"), ("reject", "不通过"), ("hide", "隐藏已公开内容")]
+        choices=[("publish", _("审核通过")), ("reject", _("不通过")), ("hide", _("隐藏已公开内容"))]
     )
-    note = forms.CharField(max_length=1000, widget=forms.Textarea, label="给作者的处理说明")
+    note = forms.CharField(max_length=1000, widget=forms.Textarea, label=_("给作者的处理说明"))
 
 
 class ReasonForm(forms.Form):
     reason = forms.CharField(
-        max_length=2000, widget=forms.Textarea, label="说明（仅本人及审核者可见）"
+        max_length=2000, widget=forms.Textarea, label=_("说明（仅本人及审核者可见）")
     )
     revision = forms.IntegerField(min_value=1, required=False, widget=forms.HiddenInput)
 
 
 class ReportDecisionForm(forms.Form):
     decision = forms.ChoiceField(
-        choices=[(Report.Status.RESOLVED, "已处理"), (Report.Status.DISMISSED, "未采纳")]
+        choices=[(Report.Status.RESOLVED, _("已处理")), (Report.Status.DISMISSED, _("未采纳"))]
     )
-    note = forms.CharField(max_length=1000, widget=forms.Textarea, label="给举报人的处理说明")
+    note = forms.CharField(max_length=1000, widget=forms.Textarea, label=_("给举报人的处理说明"))
 
 
 class AppealDecisionForm(forms.Form):
     decision = forms.ChoiceField(
         choices=[
-            (Appeal.Status.REOPENED, "接受申诉，重新送审"),
-            (Appeal.Status.UPHELD, "维持原决定"),
+            (Appeal.Status.REOPENED, _("接受申诉，重新送审")),
+            (Appeal.Status.UPHELD, _("维持原决定")),
         ]
     )
-    note = forms.CharField(max_length=1000, widget=forms.Textarea, label="给申诉人的处理说明")
+    note = forms.CharField(max_length=1000, widget=forms.Textarea, label=_("给申诉人的处理说明"))

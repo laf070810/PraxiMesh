@@ -2,6 +2,7 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 
 class KnowledgeNode(models.Model):
@@ -70,13 +71,13 @@ class Enrollment(models.Model):
 
 class Submission(models.Model):
     class Status(models.TextChoices):
-        QUEUED = "queued", "排队中"
-        RUNNING = "running", "正在评测"
-        FINISHED = "finished", "评测结束"
+        QUEUED = "queued", _("排队中")
+        RUNNING = "running", _("正在评测")
+        FINISHED = "finished", _("评测结束")
 
     class Mode(models.TextChoices):
-        RUN = "run", "公开样例"
-        SUBMIT = "submit", "正式提交"
+        RUN = "run", _("公开样例")
+        SUBMIT = "submit", _("正式提交")
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)

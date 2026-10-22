@@ -1,0 +1,525 @@
+{
+  "schema_version": 1,
+  "locale": "en",
+  "nodes": [
+    {
+      "id": "programming",
+      "source_digest": "4aa9a2fec39cfce41bda309fdb5e765aec56c118a85016de33526e0a41d58f54",
+      "revision": 1,
+      "fields": {
+        "title": "Programming languages and foundations",
+        "summary": "Turn ideas into clear, reusable programs.",
+        "body": "",
+        "outcomes": [],
+        "aliases": []
+      }
+    },
+    {
+      "id": "algorithms",
+      "source_digest": "74fab18dfb0adcf69c88c333bad94c6dcb02691804c39a6434783c1eebdd42f3",
+      "revision": 1,
+      "fields": {
+        "title": "Data structures and algorithms",
+        "summary": "Choose useful representations and reliable ways to solve problems.",
+        "body": "",
+        "outcomes": [],
+        "aliases": []
+      }
+    },
+    {
+      "id": "numerical",
+      "source_digest": "9a004b483c95e84e44938a1c3c99b19b1c82c7ad6babb41b46f7528beb1cc49b",
+      "revision": 1,
+      "fields": {
+        "title": "Mathematics and numerical computation",
+        "summary": "Understand data through vectors and matrices, including numerical limits on computers.",
+        "body": "",
+        "outcomes": [],
+        "aliases": []
+      }
+    },
+    {
+      "id": "machine-learning",
+      "source_digest": "6a06cdfe2d071309a0647fa64ff14add223e9616c0675a2641446c5e0fd1c50d",
+      "revision": 1,
+      "fields": {
+        "title": "Machine learning foundations",
+        "summary": "Connect mathematics and models through data representations and probability distributions.",
+        "body": "",
+        "outcomes": [],
+        "aliases": []
+      }
+    },
+    {
+      "id": "python-basics",
+      "source_digest": "516d3b8a2943f56a744565f86dc3d54321e7fe289e25bb0d0edd7a066b9ca61b",
+      "revision": 1,
+      "fields": {
+        "title": "Getting started with Python",
+        "summary": "Functions, sequences and mappings form a small programming toolkit.",
+        "body": "",
+        "outcomes": [],
+        "aliases": []
+      }
+    },
+    {
+      "id": "search-data",
+      "source_digest": "cb1159c1ba3086ea34c255ef45560119a1b79012d034c094f0bc985285990366",
+      "revision": 1,
+      "fields": {
+        "title": "Organizing and finding data",
+        "summary": "From deduplication and counting to binary search.",
+        "body": "",
+        "outcomes": [],
+        "aliases": []
+      }
+    },
+    {
+      "id": "linear-algebra",
+      "source_digest": "db6d1de6ca6c17c102259368d55954ffcc2c1a1f92946a1b1ca18af259e84ab2",
+      "revision": 1,
+      "fields": {
+        "title": "Vectors and matrices",
+        "summary": "Represent mathematical structures with lists and reason about dimensions and operations.",
+        "body": "",
+        "outcomes": [],
+        "aliases": []
+      }
+    },
+    {
+      "id": "functions",
+      "source_digest": "cc894757eaf1f96fb73c0bbd60b6d5949f4c316db35ea84523ada550a7259973",
+      "revision": 1,
+      "fields": {
+        "title": "Functions and return values",
+        "summary": "Transform inputs into testable outputs.",
+        "body": "A function encapsulates a specific task. Parameters provide input and return provides the result; print produces text, which is not a return value.\n\ndef add(a, b):\n    return a + b\n\nCalling add(2, 3) produces the integer 5. A function that does not execute return returns None by default.\nWhen designing a function, ask: what are the input types? Is empty input allowed? Is the return type consistent?\nThe practice workspace calls your function directly. You do not need input() or manual JSON parsing.",
+        "outcomes": [
+          "Choose parameters and return types from a function contract.",
+          "Distinguish return values from printed output."
+        ],
+        "aliases": [
+          "Function"
+        ]
+      }
+    },
+    {
+      "id": "sequences",
+      "source_digest": "14a67c0a0c408e1d09000c5a9185a1cde7a858f20c4396237370bbecdf39350d",
+      "revision": 1,
+      "fields": {
+        "title": "Sequences and iteration",
+        "summary": "Process elements in order and define what happens for an empty sequence.",
+        "body": "Python lists preserve element order. Use for value in values to iterate; enumerate also supplies positions when indices are needed.\nStart an accumulator at the identity of its operation: addition starts at 0. This gives an empty list a clear result without a special branch.\nDo not assume input is nonempty merely because it usually is. The problem constraints define the contract your implementation must follow.",
+        "outcomes": [
+          "Implement a list transformation or reduction in one pass.",
+          "Handle empty lists and zero correctly."
+        ],
+        "aliases": [
+          "Sequence"
+        ]
+      }
+    },
+    {
+      "id": "mappings",
+      "source_digest": "b823339bef329248d4fc6d3c19b9045716e1902fd93aaae0e9c3f575403b5435",
+      "revision": 1,
+      "fields": {
+        "title": "Mappings and frequency counts",
+        "summary": "Find values by key and summarize data with counts.",
+        "body": "A dictionary maps unique keys to values. In a word count, each word maps to its number of occurrences.\ncounts[word] = counts.get(word, 0) + 1\n\nStrings can be keys, and you do not need to enumerate keys in advance. Processing n words usually takes O(n) time; additional space depends on the number of distinct words.\nA set records whether an item has been seen. A dictionary can record how often it has been seen. These are different kinds of information.",
+        "outcomes": [
+          "Choose a set or dictionary to represent seen elements and frequencies.",
+          "Preserve the required order and original letter case."
+        ],
+        "aliases": [
+          "Mapping",
+          "Hash map"
+        ]
+      }
+    },
+    {
+      "id": "binary-search",
+      "source_digest": "3b449fe4349c2303655563e04836db198fab259e4649233fa0b381e9f91c0ccc",
+      "revision": 1,
+      "fields": {
+        "title": "Binary search and interval invariants",
+        "summary": "Discard half the interval while keeping the answer within the candidate range.",
+        "body": "For a nondecreasing array, lower_bound is the first position whose value is at least the target. Return the array length if there is no such position.\nUse a half-open interval [lo, hi), initially lo=0 and hi=len(values). Compute mid=(lo+hi)//2. If values[mid] < target, set lo=mid+1; otherwise set hi=mid.\nMaintain this invariant: every value to the left of lo is below target, and every value at or to the right of hi is at least target. When lo==hi, the meeting point is the insertion position.\nDuplicates are an important boundary case: finding an equal element does not justify returning immediately, because it may not be the first.",
+        "outcomes": [
+          "Implement lower_bound with a half-open interval.",
+          "Explain empty arrays, repeated values and boundary insertion positions."
+        ],
+        "aliases": [
+          "Binary search",
+          "Lower bound"
+        ]
+      }
+    },
+    {
+      "id": "vectors",
+      "source_digest": "2f33a06d9348dac8f1c2f4472f73697806a871d0390565bf9f4a916ed0d3e245",
+      "revision": 1,
+      "fields": {
+        "title": "Vectors and the dot product",
+        "summary": "Multiply corresponding elements of equal-length sequences and sum the products.",
+        "body": "A vector can represent coordinates, features or weights. The dot product of equal-length vectors a and b is sum(a[i] * b[i]).\nFor example, [1, 2] · [3, 4] = 1×3 + 2×4 = 11. A dot product reduces two vectors to one scalar; it is not elementwise multiplication.\nIn this introductory material, the dot product of empty vectors is defined as 0. Unequal lengths are outside the problem contract. A practical API should provide explicit feedback for shape errors.",
+        "outcomes": [
+          "Distinguish scalars, vectors and elementwise operations.",
+          "Implement a dot product for equal-length vectors."
+        ],
+        "aliases": [
+          "Dot product",
+          "Inner product"
+        ]
+      }
+    },
+    {
+      "id": "matrices",
+      "source_digest": "3b9347044ac88995569baedbcf4678ffcef60e60fc9de56f4b1afcffdfea42bd",
+      "revision": 1,
+      "fields": {
+        "title": "Matrix shapes and transposition",
+        "summary": "Understand rows and columns before memorizing indices.",
+        "body": "An m-by-n matrix can be represented by m lists of length n. Transposition swaps rows and columns, producing n rows and m columns with result[j][i] = matrix[i][j].\nFor example, [[1, 2, 3], [4, 5, 6]] transposes to [[1, 4], [2, 5], [3, 6]].\nSquare matrices can hide row/column mistakes. Test nonsquare matrices, single rows and single columns. Here, the transpose of [] is []; each row of a nonempty matrix has at least one column.\n[[]] and [] do not carry the same shape information. Do not treat them as interchangeable without an explicit convention.",
+        "outcomes": [
+          "State the shape of a transposed matrix.",
+          "Handle nonsquare matrices and the empty-matrix convention."
+        ],
+        "aliases": [
+          "Matrix transpose"
+        ]
+      }
+    },
+    {
+      "id": "normalization",
+      "source_digest": "c57ebcb34b95b9a0391eb423bd75e76242bc63287c6cb7398345764123f4dec3",
+      "revision": 1,
+      "fields": {
+        "title": "Normalization and zero denominators",
+        "summary": "Specify what is summed and what happens when division is undefined.",
+        "body": "Dividing nonnegative values by their sum gives proportions summing to 1. Row normalization computes a separate sum for each row, not one sum for the entire matrix.\nAn all-zero row has sum 0. The problem must define its behavior; here it stays a zero row. This does not represent a uniform probability distribution.\nNumeric comparison needs tolerances because decimal fractions often have no exact binary floating-point representation. Check structure and finiteness before applying the stated error criterion.",
+        "outcomes": [
+          "Distinguish global normalization from row normalization.",
+          "Handle zero denominators according to the contract."
+        ],
+        "aliases": [
+          "Normalization"
+        ]
+      }
+    },
+    {
+      "id": "softmax",
+      "source_digest": "fa747e4dc6c4bbb8457288cffde2c73578b2ebccbe4d3692d395a9b50e71bb7e",
+      "revision": 1,
+      "fields": {
+        "title": "Numerically stable softmax",
+        "summary": "Map scores to probabilities while avoiding exponential overflow.",
+        "body": "The i-th softmax component is exp(x[i]) / sum(exp(x[j])). Exponentiating large numbers directly can overflow; exp(1000) is an example.\nSubtracting the same constant from all scores leaves the result unchanged. Subtract their maximum m before computing exp(x[i]-m). Each exponential is at most 1, and their sum is at least 1.\n[1000, 1000] gives [0.5, 0.5]. Equal scores give a uniform distribution, and adding a common offset leaves the output unchanged.\nSoftmax is used for class probabilities and attention weights. This material covers stable computation, not model training.",
+        "outcomes": [
+          "Explain why subtracting the maximum preserves softmax.",
+          "Return finite probabilities for extreme scores."
+        ],
+        "aliases": [
+          "Stable softmax"
+        ]
+      }
+    },
+    {
+      "id": "tutorial-functions",
+      "source_digest": "7093a21db36ed527d4fa886f4efac8b9f25a2e805cdcbe77f086f2c56bf79966",
+      "revision": 1,
+      "fields": {
+        "title": "Turn a problem into a function contract",
+        "summary": "Identify inputs, outputs and boundaries before writing the loop.",
+        "body": "1. Read the contract\nSuppose the task is to sum the positive integers in a list. The input is a list of integers and the output is an integer. Zero is not positive; an empty list should return 0.\n\n2. Work through an example\nFor [-3, 2, 0, 5], add only 2 and 5 to get 7. Testing for “not equal to zero” would incorrectly include negative values.\n\n3. Write a minimal structure\ndef solve(values):\n    total = 0\n    # Iterate through the input and update total when the condition holds.\n    return total\n\n4. Check boundaries\nTry an empty list, all-negative values, only zeros and mixed signs. One positive example does not establish correctness.\n\n5. Continue\nPublic examples help you understand the interface; official submissions also include boundary tests. After a failure, check the return value and type before reviewing the algorithm. You can open the exercises without completing this tutorial.",
+        "outcomes": [
+          "Turn natural-language requirements into testable function behavior."
+        ],
+        "aliases": []
+      }
+    },
+    {
+      "id": "tutorial-data",
+      "source_digest": "5bb3d8eb3fd2c44b7659a7fab9238f076b4ed64bd11e9d13385d737989edc957",
+      "revision": 1,
+      "fields": {
+        "title": "From repeated data to search boundaries",
+        "summary": "Choose a state representation and maintain invariants.",
+        "body": "Deduplication and counting both begin with “what have I already seen?”\n\nTo retain first-occurrence order, maintain both an output list and a set of seen elements. Converting a set back to a list loses the ordering guarantee. Repeatedly searching a linear list can make the total cost O(n²).\n\nFor frequency counting, dictionary values are counts. Increment the word count on each occurrence. Follow the original input for case, empty strings and Unicode words; do not clean it automatically.\n\nSearch can exploit ordering. Binary search maintains [lo, hi) and narrows the candidate interval each round. In [1, 2, 2, 4], lower_bound for 2 is 1; for 3 it is 3.\n\nState what each piece of state means before writing update rules. This is more reliable than memorizing a code template.",
+        "outcomes": [
+          "Choose a set, dictionary or interval state to suit the required output."
+        ],
+        "aliases": []
+      }
+    },
+    {
+      "id": "tutorial-shapes",
+      "source_digest": "e91eb9aad79c487f2ce8f757b52cb60c361d1943cf7aca47641595f39b63caee",
+      "revision": 1,
+      "fields": {
+        "title": "From lists to linear algebra",
+        "summary": "Write down the shapes before implementing the operation.",
+        "body": "A one-dimensional list is a vector; nested lists can represent a matrix. Mark lengths and row/column counts on paper before writing loops.\n\nDot product: (n,) and (n,) → one scalar.\nTranspose: (m, n) → (n, m).\nRow normalization: (m, n) → (m, n).\n\nShape changes help detect errors: a dot product should not return n values; transposition is not just reversing row order; normalization should not change row lengths.\n\nStart matrix tests with a nonsquare shape, such as two rows and three columns, then try a single row and a single column. Empty input carries limited shape information, so read the problem convention.\n\nThese exercises need only the Python standard library. Shape reasoning remains useful when you later use NumPy.",
+        "outcomes": [
+          "Check implementations using input and output shapes."
+        ],
+        "aliases": []
+      }
+    },
+    {
+      "id": "tutorial-stability",
+      "source_digest": "5287f992ecc8f1b77c8ed084df5e7b945a2fdb07578b9de842b054d53895fb54",
+      "revision": 1,
+      "fields": {
+        "title": "Adapt mathematical formulas to floating point",
+        "summary": "Use an equivalent transformation to avoid exponential overflow.",
+        "body": "A correct formula does not guarantee that its direct implementation is stable. Softmax is a useful example.\n\nExponentiating [1000, 1001] directly may overflow. Subtracting 1001 first produces exponential inputs [-1, 0] without changing the final ratios.\n\nCheck these properties:\n1. All outputs are finite and nonnegative.\n2. Their sum is close to 1.\n3. Adding a common constant to all inputs leaves the result unchanged.\n4. Equal scores receive equal probabilities.\n\nSmall floating-point errors are expected. Explicit absolute and relative tolerances reject clear errors without demanding meaningless bitwise equality. Returning NaN does not solve overflow.\n\nAfter these foundations, tensor dimensions, matrix multiplication and attention mechanisms will build on stronger numerical intuition.",
+        "outcomes": [
+          "Design numerical boundary tests using mathematical properties."
+        ],
+        "aliases": []
+      }
+    },
+    {
+      "id": "python-to-numerical",
+      "source_digest": "3e3716a96670736ceb27dc8106948dc01414b5b04170d4ce934b14cc4ad0a6b5",
+      "revision": 1,
+      "fields": {
+        "title": "From Python foundations to numerical computation",
+        "summary": "8 exercises and 4 tutorials connect functions, data structures and numerical intuition.",
+        "body": "This path is for learners who know variables and want to start programming independently. Each problem takes roughly 5–30 minutes; jump freely to the steps that interest you.\nProgress counts accepted official submissions on current problem versions. Reading is not treated as evidence of ability.",
+        "outcomes": [],
+        "aliases": []
+      }
+    }
+  ],
+  "problems": [
+    {
+      "id": "sum-positive",
+      "source_revision": 3,
+      "source_digest": "61ecfb32e25e010f7cd43fc7eb55409c22f847a72bbf636248ca536c481adfb3",
+      "revision": 1,
+      "fields": {
+        "title": "Sum only positive values",
+        "summary": "Start with boundary conventions and make one pass.",
+        "statement": "Implement solve(values) to return the sum of all integers strictly greater than 0 in the list.",
+        "constraints": "values is a list of 0–1000 integers, each in [-10000, 10000]. Zero is not positive; an empty list returns integer 0. Preserving the input list is recommended. Evaluation checks only the return value, not whether the input object was mutated.",
+        "outcomes": [
+          "Choose parameters and return types from a function contract.",
+          "Implement a list transformation or reduction in one pass."
+        ],
+        "hints": [
+          "Start the accumulator at 0, then test whether each value is strictly positive."
+        ],
+        "changelog": "v3: Clarifies that preserving the input is a recommendation; evaluation checks only the return value and does not inspect input mutation. The reference implementation and tests are unchanged. v2: Adds a real evaluation case at the declared input limit.",
+        "tags": [
+          "Functions",
+          "Iteration"
+        ],
+        "examples": [
+          "Mixed signs",
+          "Empty list"
+        ]
+      }
+    },
+    {
+      "id": "unique-stable",
+      "source_revision": 3,
+      "source_digest": "a313796aeef91c621694a2fc32c19f389a072f6d079ca7c324f7039b441e138c",
+      "revision": 1,
+      "fields": {
+        "title": "Keep the first occurrence",
+        "summary": "Remove duplicates without changing their original order.",
+        "statement": "Implement solve(values) to return a list retaining each integer in order of its first occurrence.",
+        "constraints": "values has length 0–1000 and integer elements in [-10000, 10000]. Return values in first-occurrence order; empty input returns []. Using a new list to preserve the input is recommended. Evaluation checks only the return value, not input mutation or whether the returned object is new.",
+        "outcomes": [
+          "Implement a list transformation or reduction in one pass.",
+          "Choose a set or dictionary to represent seen elements and frequencies."
+        ],
+        "hints": [
+          "Use a list to retain order and a set to check quickly whether a value was seen."
+        ],
+        "changelog": "v3: Makes the task and constraints consistent: using a new list to preserve input is a recommendation. Evaluation checks the return value, not object identity. Reference implementation and tests are unchanged. v2: Adds a real evaluation case at the declared input limit and clarifies that only return values are checked.",
+        "tags": [
+          "Lists",
+          "Deduplication"
+        ],
+        "examples": [
+          "Retain order",
+          "Empty input"
+        ]
+      }
+    },
+    {
+      "id": "word-count",
+      "source_revision": 2,
+      "source_digest": "20045ccd1d36ee4aaf5daa015bc97214bb37c096a0fe386ea721b0e91e1a6b10",
+      "revision": 1,
+      "fields": {
+        "title": "Count each word",
+        "summary": "Store frequencies in a mapping.",
+        "statement": "Implement solve(words) to return a dictionary mapping each input string to its occurrence count. Key order does not affect evaluation.",
+        "constraints": "words has length 0–1000; each word has 0–100 characters and the total length of all words is at most 1000 characters. Preserve case and original Unicode text; do not split or clean words. An empty string is a valid word. An empty list returns {}.",
+        "outcomes": [
+          "Choose a set or dictionary to represent seen elements and frequencies."
+        ],
+        "hints": [
+          "Start a new word count at 0."
+        ],
+        "changelog": "v2: Adds an input-limit test and caps total word length to keep input and output within the evaluation budget.",
+        "tags": [
+          "Dictionaries",
+          "Counting"
+        ],
+        "examples": [
+          "Repeated words",
+          "Empty list"
+        ]
+      }
+    },
+    {
+      "id": "lower-bound",
+      "source_revision": 2,
+      "source_digest": "1ed5ad9bf89a18733cfcf5be4b68fbe7570a4733b53ae4b6587230d91036541a",
+      "revision": 1,
+      "fields": {
+        "title": "Find the insertion position",
+        "summary": "Binary search with repeated values.",
+        "statement": "Implement solve(values, target) to return the index of the first element at least target. If every element is smaller, return len(values).",
+        "constraints": "values is nondecreasing and has length 0–10000. Elements and target are integers in [-1000000, 1000000]. Expected time is O(log n) with O(1) additional space. Tests check correctness; they do not certify asymptotic complexity.",
+        "outcomes": [
+          "Implement a list transformation or reduction in one pass.",
+          "Implement lower_bound with a half-open interval."
+        ],
+        "hints": [
+          "Even after finding an equal value, the answer may be farther left.",
+          "Maintain [lo, hi) to avoid indexing an empty list."
+        ],
+        "changelog": "v2: Adds a real evaluation case at the declared input limit. The other input/output requirements are unchanged.",
+        "tags": [
+          "Search",
+          "Intervals"
+        ],
+        "examples": [
+          "Repeated values",
+          "Insertion at the right"
+        ]
+      }
+    },
+    {
+      "id": "dot-product",
+      "source_revision": 2,
+      "source_digest": "3b9ba64c2c251969a4016d47cff6f143364e71f5f223157547c491a4e58a8b4e",
+      "revision": 1,
+      "fields": {
+        "title": "The dot product of vectors",
+        "summary": "Reduce corresponding products to a scalar.",
+        "statement": "Implement solve(a, b) to return the dot product of two equal-length vectors.",
+        "constraints": "a and b are equal-length integer lists of length 0–1000, with elements in [-1000, 1000]. Return an integer; the dot product of empty vectors is defined as 0.",
+        "outcomes": [
+          "Distinguish scalars, vectors and elementwise operations.",
+          "Implement a list transformation or reduction in one pass."
+        ],
+        "hints": [
+          "Multiply corresponding elements, then sum. Do not multiply the two separate vector sums."
+        ],
+        "changelog": "v2: Adds a real evaluation case at the declared input limit. The other input/output requirements are unchanged.",
+        "tags": [
+          "Vectors",
+          "Reduction"
+        ],
+        "examples": [
+          "Two-dimensional vectors",
+          "Empty vectors"
+        ]
+      }
+    },
+    {
+      "id": "transpose",
+      "source_revision": 2,
+      "source_digest": "6210e104c2c7b0c16f5610e3af5ae0ffdd696eaf1735e4e54540335b3bbf3263",
+      "revision": 1,
+      "fields": {
+        "title": "Swap matrix rows and columns",
+        "summary": "Correct shapes make values meaningful.",
+        "statement": "Implement solve(matrix) to return its transpose as a list of lists.",
+        "constraints": "matrix is a rectangular integer matrix with at most 30 rows and 30 columns. A nonempty matrix has at least one column per row. Elements are in [-1000, 1000]. Empty input [] returns []. Using new lists to preserve input is recommended; evaluation checks only the return value, not input mutation.",
+        "outcomes": [
+          "State the shape of a transposed matrix.",
+          "Distinguish scalars, vectors and elementwise operations."
+        ],
+        "hints": [
+          "Row j of the result is column j of the original matrix."
+        ],
+        "changelog": "v2: Adds a real evaluation case at the declared input limit. Clarifies that preserving input is a recommendation and only the return value is checked.",
+        "tags": [
+          "Matrices",
+          "Shapes"
+        ],
+        "examples": [
+          "Two rows and three columns",
+          "Empty matrix"
+        ]
+      }
+    },
+    {
+      "id": "normalize-rows",
+      "source_revision": 3,
+      "source_digest": "a0c1c325ed6b20d65bd8a9aab9e7594dec5340c6f40244dbbe1679a79c65ae64",
+      "revision": 1,
+      "fields": {
+        "title": "Make each row sum to one",
+        "summary": "Normalize rows while handling zero rows.",
+        "statement": "Implement solve(matrix) to divide each row by its own element sum and return the resulting matrix. Keep all-zero rows as zeros.",
+        "constraints": "matrix is a rectangular matrix of nonnegative integers, with at most 30 rows and 30 columns and elements at most 10000. Rows are nonempty when the matrix is nonempty. An empty matrix returns []. Integers or floats are accepted with the declared numeric tolerances. Using a new matrix to preserve input is recommended. Evaluation checks return values, not input mutation or whether the returned object is new.",
+        "outcomes": [
+          "State the shape of a transposed matrix.",
+          "Distinguish global normalization from row normalization."
+        ],
+        "hints": [
+          "Compute a separate denominator for each row.",
+          "Do not divide when the sum is zero."
+        ],
+        "changelog": "v3: Clarifies that using a new matrix to preserve input is a recommendation. Evaluation checks only return values, not mutation or object identity. Reference implementation and tests are unchanged. v2: Adds a real evaluation case at the declared input limit.",
+        "tags": [
+          "Matrices",
+          "Probability"
+        ],
+        "examples": [
+          "Normalize each row",
+          "Zero row"
+        ]
+      }
+    },
+    {
+      "id": "stable-softmax",
+      "source_revision": 2,
+      "source_digest": "786846c1ae12ef6fe0db16ac76bdf623601634ac1c290d4ffc27cadbf398d72d",
+      "revision": 1,
+      "fields": {
+        "title": "Stable softmax",
+        "summary": "Turn scores into probabilities without overflow.",
+        "statement": "Implement solve(scores) to return softmax probabilities. Component i is exp(scores[i]) divided by the sum of all exponentials. Results must not contain NaN or infinities.",
+        "constraints": "scores is a nonempty list of 1–100 finite numbers in [-10000, 10000]. You may use the math standard library. Preserve element order. Results are compared with the declared absolute and relative tolerances.",
+        "outcomes": [
+          "Explain why subtracting the maximum preserves softmax.",
+          "Distinguish scalars, vectors and elementwise operations."
+        ],
+        "hints": [
+          "Subtracting the same constant from every input leaves softmax unchanged.",
+          "Choose the maximum as that constant so every exponential input is at most 0."
+        ],
+        "changelog": "v2: Adds a real evaluation case at the declared input limit. The other input/output requirements are unchanged.",
+        "tags": [
+          "Numerical stability",
+          "Machine learning"
+        ],
+        "examples": [
+          "Equal scores",
+          "Large inputs"
+        ]
+      }
+    }
+  ]
+}

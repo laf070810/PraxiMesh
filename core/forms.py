@@ -2,6 +2,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm, UsernameField
 from django.contrib.auth.password_validation import validate_password
+from django.utils.translation import gettext_lazy as _
 
 
 class RegisterForm(UserCreationForm):
@@ -11,9 +12,9 @@ class RegisterForm(UserCreationForm):
 
 
 class RecoveryForm(forms.Form):
-    username = UsernameField(max_length=150, label="用户名")
-    recovery_code = forms.CharField(max_length=100, label="恢复码", widget=forms.PasswordInput)
-    password = forms.CharField(label="新密码", widget=forms.PasswordInput, max_length=256)
+    username = UsernameField(max_length=150, label=_("用户名"))
+    recovery_code = forms.CharField(max_length=100, label=_("恢复码"), widget=forms.PasswordInput)
+    password = forms.CharField(label=_("新密码"), widget=forms.PasswordInput, max_length=256)
 
     def clean_password(self):
         password = self.cleaned_data["password"]
@@ -24,10 +25,18 @@ class RecoveryForm(forms.Form):
 
 class SourceForm(forms.Form):
     source = forms.CharField(
-        max_length=20000, strip=False, widget=forms.Textarea, label="Python 代码"
+        max_length=20000, strip=False, widget=forms.Textarea, label=_("源代码")
     )
-    mode = forms.ChoiceField(choices=[("run", "公开样例"), ("submit", "正式提交")])
+    mode = forms.ChoiceField(choices=[("run", _("公开样例")), ("submit", _("正式提交"))])
+
+    def clean_source(self):
+        source = self.cleaned_data["source"]
+        try:
+            source.encode("utf-8")
+        except UnicodeError:
+            raise forms.ValidationError(_("源代码必须是有效的 UTF-8 文本。")) from None
+        return source
 
 
 class ProfileForm(forms.Form):
-    display_name = forms.CharField(max_length=80, required=False, label="显示名称（仅自己可见）")
+    display_name = forms.CharField(max_length=80, required=False, label=_("显示名称（仅自己可见）"))

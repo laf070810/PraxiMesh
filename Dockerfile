@@ -12,7 +12,13 @@ COPY praximesh ./praximesh
 COPY core ./core
 COPY learning ./learning
 COPY community ./community
+COPY practice_api ./practice_api
+COPY showcase ./showcase
+COPY localization ./localization
+COPY projects ./projects
+COPY locale ./locale
 COPY judge ./judge
+COPY vendor/quickjs ./vendor/quickjs
 COPY content ./content
 COPY templates ./templates
 COPY static ./static

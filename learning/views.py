@@ -7,6 +7,7 @@ from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.translation import gettext
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from core.content import digest
@@ -21,7 +22,7 @@ def limit_writes(view):
     @wraps(view)
     def limited(request, *args, **kwargs):
         if request.method == "POST" and not consume("learning-write", str(request.user.pk), 60, 60):
-            response = HttpResponse("保存操作过于频繁，请一分钟后重试。", status=429)
+            response = HttpResponse(gettext("保存操作过于频繁，请一分钟后重试。"), status=429)
             response["Retry-After"] = "60"
             return response
         return view(request, *args, **kwargs)
@@ -56,12 +57,12 @@ def bookmark(request, slug):
     if action == "save":
         problem = get_object_or_404(Problem, pk=slug, published=True, current__isnull=False)
         Bookmark.objects.get_or_create(user=request.user, problem=problem)
-        messages.success(request, "题目已加入私有收藏。")
+        messages.success(request, gettext("题目已加入私有收藏。"))
     elif action == "remove":
         Bookmark.objects.filter(user=request.user, problem_id=slug).delete()
-        messages.success(request, "已取消收藏。")
+        messages.success(request, gettext("已取消收藏。"))
     else:
-        return HttpResponse("请选择收藏或取消收藏。", status=400)
+        return HttpResponse(gettext("请选择收藏或取消收藏。"), status=400)
     return redirect("learning:bookmarks")
 
 
@@ -126,7 +127,7 @@ def note_edit(request, pk):
 @limit_writes
 def note_delete(request, pk):
     get_object_or_404(Note, pk=pk, user=request.user).delete()
-    messages.success(request, "笔记已删除。")
+    messages.success(request, gettext("笔记已删除。"))
     return redirect("learning:notes")
 
 
@@ -167,10 +168,10 @@ def reading_mark(request, slug):
             tutorial=tutorial,
             defaults={"completed_at": timezone.now(), "content_digest": digest(tutorial.data)},
         )
-        messages.success(request, "已记录你自述的阅读完成状态。")
+        messages.success(request, gettext("已记录你自述的阅读完成状态。"))
     elif action == "reset":
         TutorialReading.objects.filter(user=request.user, tutorial_id=slug).delete()
-        messages.success(request, "已取消阅读标记。")
+        messages.success(request, gettext("已取消阅读标记。"))
     else:
-        return HttpResponse("请选择阅读完成或取消标记。", status=400)
+        return HttpResponse(gettext("请选择阅读完成或取消标记。"), status=400)
     return redirect("learning:reading")

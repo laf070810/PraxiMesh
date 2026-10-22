@@ -1,0 +1,2080 @@
+# English interface for PraxiMesh.
+# Copyright PraxiMesh contributors.
+msgid ""
+msgstr "Project-Id-Version: PraxiMesh\nReport-Msgid-Bugs-To: \nPOT-Creation-Date: 2026-10-22 20:42+0000\nPO-Revision-Date: 2026-10-23 00:00+0000\nLast-Translator: PraxiMesh contributors\nLanguage-Team: English\nLanguage: en\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nPlural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "内容类型"
+msgstr "Content type"
+
+msgid "标题"
+msgstr "Title"
+
+msgid "关联题目版本（题解必选）"
+msgstr "Linked problem version (required for solutions)"
+
+msgid "正文（纯文本）"
+msgstr "Body (plain text)"
+
+msgid "题解必须选择明确的题目版本。"
+msgstr "Solutions must select a specific problem version."
+
+msgid "评论（纯文本）"
+msgstr "Comment (plain text)"
+
+msgid "审核通过"
+msgstr "Approve"
+
+msgid "不通过"
+msgstr "Reject"
+
+msgid "隐藏已公开内容"
+msgstr "Hide published content"
+
+msgid "给作者的处理说明"
+msgstr "Response to the author"
+
+msgid "说明（仅本人及审核者可见）"
+msgstr "Explanation (visible only to you and moderators)"
+
+msgid "已处理"
+msgstr "Resolved"
+
+msgid "未采纳"
+msgstr "Dismissed"
+
+msgid "给举报人的处理说明"
+msgstr "Response to the reporter"
+
+msgid "接受申诉，重新送审"
+msgstr "Accept appeal and resubmit for review"
+
+msgid "维持原决定"
+msgstr "Original decision upheld"
+
+msgid "给申诉人的处理说明"
+msgstr "Response to the appellant"
+
+msgid "私有草稿"
+msgstr "Private draft"
+
+msgid "等待审核"
+msgstr "Awaiting review"
+
+msgid "已公开"
+msgstr "Published"
+
+msgid "审核未通过"
+msgstr "Rejected"
+
+msgid "已隐藏"
+msgstr "Hidden"
+
+msgid "已撤回"
+msgstr "Withdrawn"
+
+msgid "讨论"
+msgstr "Discussions"
+
+msgid "提问"
+msgstr "Questions"
+
+msgid "题解"
+msgstr "Solution"
+
+msgid "待处理"
+msgstr "Open"
+
+msgid "已重新送审"
+msgstr "Resubmitted for review"
+
+msgid "内容已修订或撤回"
+msgstr "Content revised or withdrawn"
+
+msgid "内容已改变，请刷新页面后重试。"
+msgstr "The content changed. Refresh the page and try again."
+
+msgid "关联题目已经下线，不能提交或公开这篇内容。"
+msgstr "The linked problem was withdrawn. This content cannot be submitted for review or published."
+
+msgid "正文或说明为空，或超过长度限制。"
+msgstr "The text or explanation is empty or exceeds the length limit."
+
+msgid "这篇内容已送审或公开。"
+msgstr "This content is already pending review or published."
+
+msgid "讨论当前未公开，评论不能送审。"
+msgstr "The discussion is not public; its comments cannot be submitted for review."
+
+msgid "不能审核自己的内容。"
+msgstr "You cannot moderate your own content."
+
+msgid "请先处理父讨论；未公开讨论的评论不能公开。"
+msgstr "Handle the parent discussion first; comments on unpublished discussions cannot be published."
+
+msgid "内容状态已经改变，此审核操作不适用。"
+msgstr "The content status changed; this moderation action no longer applies."
+
+msgid "你已经提交过这个内容的举报，请等待处理。"
+msgstr "You have already reported this content. Please wait for a response."
+
+msgid "只有未通过审核或被隐藏的内容可以申诉。"
+msgstr "Only rejected or hidden content can be appealed."
+
+msgid "这个版本已经提交过申诉；处理结果可在我的申诉中查看。"
+msgstr "This revision has already been appealed. View the response in My appeals."
+
+msgid "不能处理自己发起或涉及自己内容的举报。"
+msgstr "You cannot handle a report you filed or one concerning your own content."
+
+msgid "这条举报已经处理。"
+msgstr "This report has already been handled."
+
+msgid "无效的举报决定。"
+msgstr "Invalid report decision."
+
+msgid "不能处理自己的申诉。"
+msgstr "You cannot handle your own appeal."
+
+msgid "这条申诉已经处理。"
+msgstr "This appeal has already been handled."
+
+msgid "被申诉内容已经改变，请刷新页面。"
+msgstr "The appealed content changed. Please refresh the page."
+
+msgid "申诉已接受，等待重新审核。"
+msgstr "Appeal accepted; awaiting another review."
+
+msgid "无效的申诉决定。"
+msgstr "Invalid appeal decision."
+
+msgid "操作过于频繁，请稍后重试。"
+msgstr "Too many requests. Please try again later."
+
+msgid "内容格式或长度不符合要求。"
+msgstr "The content format or length is invalid."
+
+msgid "内容已保存。私有草稿需主动送审；已送审内容的编辑会重新等待审核。"
+msgstr "Content saved. Private drafts must be submitted for review explicitly. Editing submitted content requires another review."
+
+msgid "编辑内容"
+msgstr "Edit content"
+
+msgid "写讨论、提问或题解"
+msgstr "Write a discussion, question or solution"
+
+msgid "评论已保存，需主动送审后才可能公开。"
+msgstr "Comment saved. Submit it for review before it can become public."
+
+msgid "编辑评论"
+msgstr "Edit comment"
+
+msgid "请刷新页面后重试。"
+msgstr "Refresh the page and try again."
+
+msgid "已提交审核，尚未公开。"
+msgstr "Submitted for review; not public yet."
+
+msgid "已撤回，不再公开。"
+msgstr "Withdrawn; no longer public."
+
+msgid "已删除正文及关联评论和私有处理记录。"
+msgstr "Text, related comments and private case records deleted."
+
+msgid "操作完成。"
+msgstr "Done."
+
+msgid "请填写有效的审核决定和处理说明。"
+msgstr "Provide a valid moderation decision and explanation."
+
+msgid "审核决定已保存。"
+msgstr "Moderation decision saved."
+
+msgid "私有举报"
+msgstr "Private report"
+
+msgid "私有申诉"
+msgstr "Private appeal"
+
+msgid "请填写有效的处理决定和说明。"
+msgstr "Provide a valid decision and explanation."
+
+msgid "处理结果已保存，仅本人及审核者可以查看。"
+msgstr "Response saved. Only you and moderators can view it."
+
+msgid "用户名"
+msgstr "Username"
+
+msgid "恢复码"
+msgstr "Recovery code"
+
+msgid "新密码"
+msgstr "New password"
+
+msgid "Python 代码"
+msgstr "Python code"
+
+msgid "公开样例"
+msgstr "Public examples"
+
+msgid "正式提交"
+msgstr "Official submission"
+
+msgid "显示名称（仅自己可见）"
+msgstr "Display name (visible only to you)"
+
+msgid "操作过于频繁，请 15 分钟后重试。"
+msgstr "Too many requests. Try again in 15 minutes."
+
+msgid "排队中"
+msgstr "Queued"
+
+msgid "正在评测"
+msgstr "Judging"
+
+msgid "评测结束"
+msgstr "Finished"
+
+msgid "评测暂不可用。你仍可阅读题目和保存草稿。"
+msgstr "Judging is temporarily unavailable. You can still read problems and save drafts."
+
+msgid "题目已更新或下线，请刷新后重新提交。"
+msgstr "The problem changed or was withdrawn. Refresh before submitting again."
+
+msgid "你已有待处理任务，请等待结果后继续。"
+msgstr "You already have a pending task. Wait for its result before continuing."
+
+msgid "评测队列已满，请稍后重试。"
+msgstr "The judging queue is full. Please try again later."
+
+msgid "题目已更新，请刷新页面。旧版本草稿仍保留。"
+msgstr "The problem changed. Refresh the page; your old draft is retained."
+
+msgid "代码不能超过 20000 字符。"
+msgstr "Code cannot exceed 20000 characters."
+
+msgid "保存过于频繁，请稍后重试。"
+msgstr "Too many save requests. Please try again later."
+
+msgid "草稿已私密保存。"
+msgstr "Draft saved privately."
+
+msgid "请提供不超过 20000 字符的 Python 代码及有效的提交方式。"
+msgstr "Provide Python code of at most 20000 characters and a valid submission mode."
+
+msgid "题目版本已更新，请刷新后重试。"
+msgstr "The problem version changed. Refresh and try again."
+
+msgid "提交过于频繁，请稍后再试。"
+msgstr "Too many submissions. Please try again later."
+
+msgid "注册暂未开放"
+msgstr "Registration is closed"
+
+msgid "本站暂不接受新账号。公开知识和题目仍可浏览。"
+msgstr "This site is not accepting new accounts. Public knowledge and problems remain available."
+
+msgid "创建学习账号"
+msgstr "Create a learning account"
+
+msgid "注册"
+msgstr "Register"
+
+msgid "只需要用户名与密码。代码和学习记录默认仅你可见。"
+msgstr "Only a username and password are required. Your code and learning records are private by default."
+
+msgid "用户名或恢复码无效。"
+msgstr "Invalid username or recovery code."
+
+msgid "恢复账号"
+msgstr "Recover account"
+
+msgid "重置密码"
+msgstr "Reset password"
+
+msgid "使用注册时保存的恢复码。成功后旧码作废，原登录会话失效。"
+msgstr "Use the recovery code saved when you registered. A successful reset invalidates the old code and previous login sessions."
+
+msgid "个人资料已保存。"
+msgstr "Profile saved."
+
+msgid "密码不正确。"
+msgstr "Incorrect password."
+
+msgid "请输入当前密码，并输入 DELETE 确认删除。"
+msgstr "Enter your current password and type DELETE to confirm."
+
+msgid "账号已删除"
+msgstr "Account deleted"
+
+msgid "账号、草稿、提交、学习记录及你发布的社区内容已从当前数据库删除。审核事件只保留不含正文的操作记录，操作者关联已清除。备份按站点保留周期清除。"
+msgstr "Your account, drafts, submissions, learning records and community content were deleted from the current database. Moderation events retain action records without text, and the actor link was cleared. Backups expire according to the site's retention policy."
+
+msgid "源代码"
+msgstr "Source code"
+
+msgid "源代码必须是有效的 UTF-8 文本。"
+msgstr "Source code must be valid UTF-8 text."
+
+msgid "请提供不超过 20000 字符的源代码及有效的提交方式。"
+msgstr "Provide source code of at most 20000 characters and a valid submission action."
+
+msgid "通过"
+msgstr "Accepted"
+
+msgid "答案有误"
+msgstr "Wrong answer"
+
+msgid "语法错误"
+msgstr "Syntax error"
+
+msgid "运行错误"
+msgstr "Runtime error"
+
+msgid "超过时间限制"
+msgstr "Time limit exceeded"
+
+msgid "超过内存限制"
+msgstr "Memory limit exceeded"
+
+msgid "输出过多"
+msgstr "Output limit exceeded"
+
+msgid "评测服务故障，请稍后重试"
+msgstr "Judge service failure. Please try again later."
+
+msgid "入门"
+msgstr "Introductory"
+
+msgid "基础"
+msgstr "Foundational"
+
+msgid "进阶"
+msgstr "Advanced"
+
+msgid "当前评测环境不支持这道题的运行方式；仍可阅读、编辑和保存草稿。"
+msgstr "The current evaluation environment does not support this problem’s execution mode. You can still read the problem, edit code, and save drafts."
+
+msgid "JavaScript / QuickJS 2026-06-04；只支持同步 JSON 函数，不提供 Node.js、DOM、网络或模块导入。每用例 128 MiB 线性内存、15 秒总等待、32 KiB 输出；运算量超限也会终止。"
+msgstr "JavaScript / QuickJS 2026-06-04; synchronous JSON functions only. Node.js, the DOM, networking, and module imports are unavailable. Each case allows 128 MiB of linear memory, 15 seconds of total waiting time, and 32 KiB of output. Execution also stops when the operation limit is exceeded."
+
+msgid "Python 3.14.9 / WASI 完整程序；从标准输入读取文本，标准输出须恰为一个 JSON 值。编译检查与运行分别限 15 秒、128 MiB 线性内存；输出上限 32 KiB。没有网络、文件写入、进程、线程或第三方扩展。"
+msgstr "Python 3.14.9 / WASI complete program; read text from standard input and write exactly one JSON value to standard output. Compilation checks and execution each allow 15 seconds and 128 MiB of linear memory; output is limited to 32 KiB. Networking, file writes, processes, threads, and third-party extensions are unavailable."
+
+msgid "Python 3.14.9 / WASI 基础标准库；不支持网络、文件写入、进程、线程和第三方扩展。每用例 128 MiB 线性内存、15 秒总等待、32 KiB 输出；运算量超限也会终止。"
+msgstr "Python 3.14.9 / WASI basic standard library; no network, file writes, processes, threads or third-party extensions. Each case has 128 MiB linear memory, 15 seconds total wait and 32 KiB output; exceeding the instruction budget also terminates execution."
+
+msgid "Python 3.11.15 标准库；每用例 128 MiB 内存、2 秒 CPU、8 秒总等待、32 KiB 输出。"
+msgstr "Python 3.11.15 standard library; each case has 128 MiB memory, 2 seconds CPU, 8 seconds total wait and 32 KiB output."
+
+msgid "等待评测超时，请稍后重新提交。"
+msgstr "The wait for judging timed out. Please submit again later."
+
+msgid "账号与隐私 · PraxiMesh"
+msgstr "Account and privacy · PraxiMesh"
+
+msgid "ACCOUNT / 账号与隐私"
+msgstr "ACCOUNT / Privacy and settings"
+
+msgid "你的代码，属于你。"
+msgstr "Your code belongs to you."
+
+msgid "源代码、草稿、收藏、笔记与学习记录仅自己可见。社区内容只有主动送审并通过后，正文和用户名才会公开。公开主页与评测结果须另行主动分享。基本资料中的显示名称仍是私密资料。"
+msgstr "Your code, drafts, bookmarks, notes and learning records are private. Community text and your username become public only after you request review and receive approval. Public profiles and results require separate, explicit sharing. Your profile display name remains private."
+
+msgid "基本资料"
+msgstr "Profile"
+
+msgid "保存"
+msgstr "Save"
+
+msgid "管理本地工具访问令牌 →"
+msgstr "Manage local tool access tokens →"
+
+msgid "管理公开主页与作品 →"
+msgstr "Manage public profile and portfolio →"
+
+msgid "导出我的数据"
+msgstr "Export my data"
+
+msgid "包含账号资料、源代码、草稿、提交结果、路径、收藏、笔记、阅读记录、本人社区内容、公开主页设置和分享选择；包含访问令牌用途和到期时间，不包含令牌密钥、密码、恢复码或他人的私密信息。"
+msgstr "Includes your account details, code, drafts, results, paths, bookmarks, notes, reading records, community content, public profile settings and sharing choices, plus token purposes and expiry times. Excludes token secrets, passwords, recovery codes and other people's private information."
+
+msgid "下载 JSON"
+msgstr "Download JSON"
+
+msgid "换发恢复码"
+msgstr "Replace recovery code"
+
+msgid "当前密码"
+msgstr "Current password"
+
+msgid "换发后原恢复码失效。"
+msgstr "Replacing the code invalidates the previous one."
+
+msgid "生成新恢复码"
+msgstr "Generate new recovery code"
+
+msgid "删除账号"
+msgstr "Delete account"
+
+msgid "此操作删除账号、草稿、提交、学习记录、访问令牌、公开主页、分享成绩和你发布的社区内容。不能撤销。审核事件仅保留不含正文的操作记录，并清除操作者关联。备份按站点保留周期清除。"
+msgstr "This permanently deletes your account, drafts, submissions, learning records, access tokens, public profile, shared results and community content. Moderation events retain action records without text, and the actor link is cleared. Backups expire according to the site's retention policy."
+
+msgid "输入 DELETE 确认"
+msgstr "Type DELETE to confirm"
+
+msgid "永久删除当前账号"
+msgstr "Permanently delete this account"
+
+msgid "PraxiMesh · 用代码理解知识"
+msgstr "PraxiMesh · Understand through code"
+
+msgid "从结构化知识到亲手编程，沿路径学习，也可以直接开始练习。"
+msgstr "Explore structured knowledge and put it into practice. Follow a path or start with an exercise."
+
+msgid "跳到主要内容"
+msgstr "Skip to main content"
+
+msgid "主导航"
+msgstr "Main navigation"
+
+msgid "知识与路径"
+msgstr "Knowledge and paths"
+
+msgid "直接练习"
+msgstr "Start practising"
+
+msgid "社区"
+msgstr "Community"
+
+msgid "工程项目"
+msgstr "Engineering projects"
+
+msgid "作品与榜单"
+msgstr "Showcase and leaderboards"
+
+msgid "我的学习"
+msgstr "My learning"
+
+msgid "退出"
+msgstr "Log out"
+
+msgid "登录"
+msgstr "Log in"
+
+msgid "开始学习 ↗"
+msgstr "Start learning ↗"
+
+msgid "界面语言"
+msgstr "Interface language"
+
+msgid "切换"
+msgstr "Switch"
+
+msgid "理解一个概念，亲手验证一次。"
+msgstr "Understand a concept. Test it yourself."
+
+msgid "中文内容 · Learn Anything by Coding."
+msgstr "Learn Anything by Coding. · Chinese and English"
+
+msgid "去写一段代码 →"
+msgstr "Write some code →"
+
+msgid "练习题库 · PraxiMesh"
+msgstr "Problem library · PraxiMesh"
+
+msgid "PRACTICE / 练习题库"
+msgstr "PRACTICE / Problem library"
+
+msgid "选一个问题，动手解决。"
+msgstr "Choose a problem. Solve it yourself."
+
+msgid "从题目直接开始。需要时，再回到知识。"
+msgstr "Start with a problem. Return to the knowledge when you need it."
+
+msgid "筛选题目"
+msgstr "Filter problems"
+
+msgid "搜索"
+msgstr "Search"
+
+msgid "题目、知识点或标签"
+msgstr "Problem, concept or tag"
+
+msgid "领域"
+msgstr "Domain"
+
+msgid "所有领域"
+msgstr "All domains"
+
+msgid "中文原文"
+msgstr "Chinese original"
+
+msgid "知识点"
+msgstr "Concept"
+
+msgid "所有知识点"
+msgstr "All concepts"
+
+msgid "主题"
+msgstr "Topics"
+
+msgid "所有主题"
+msgstr "All topics"
+
+msgid "路径"
+msgstr "Paths"
+
+msgid "所有路径"
+msgstr "All paths"
+
+msgid "难度"
+msgstr "Difficulty"
+
+msgid "所有难度"
+msgstr "All difficulties"
+
+msgid "语言"
+msgstr "Language"
+
+msgid "所有语言"
+msgstr "All languages"
+
+msgid "题型"
+msgstr "Problem type"
+
+msgid "所有题型"
+msgstr "All problem types"
+
+msgid "函数"
+msgstr "Function"
+
+msgid "完整程序"
+msgstr "Complete program"
+
+msgid "我的状态"
+msgstr "My status"
+
+msgid "全部状态"
+msgstr "All statuses"
+
+msgid "未开始"
+msgstr "Not started"
+
+msgid "已尝试"
+msgstr "Attempted"
+
+msgid "已通过"
+msgstr "Passed"
+
+msgid "筛选"
+msgstr "Filter"
+
+msgid "重置"
+msgstr "Reset"
+
+#, python-format
+msgid "找到 %(value1)s 道练习"
+msgstr "%(value1)s exercises found"
+
+msgid "公开成绩榜单"
+msgstr "Public results leaderboard"
+
+msgid "没有找到匹配的练习"
+msgstr "No matching exercises"
+
+msgid "试试更短的关键词，或减少筛选条件。"
+msgstr "Try a shorter search or fewer filters."
+
+msgid "查看所有练习 →"
+msgstr "View all exercises →"
+
+msgid "题库分页"
+msgstr "Problem library pagination"
+
+msgid "← 上一页"
+msgstr "← Previous"
+
+msgid "下一页 →"
+msgstr "Next →"
+
+msgid "← 练习题库"
+msgstr "← Problem library"
+
+msgid "题目工具"
+msgstr "Problem tools"
+
+msgid "取消收藏"
+msgstr "Remove bookmark"
+
+msgid "收藏题目"
+msgstr "Bookmark problem"
+
+msgid "写私人笔记"
+msgstr "Write a private note"
+
+msgid "写题解"
+msgstr "Write a solution"
+
+msgid "相关讨论与题解"
+msgstr "Related discussions and solutions"
+
+msgid "你的任务"
+msgstr "Your task"
+
+msgid "输入与约束"
+msgstr "Input and constraints"
+
+msgid "标准输入："
+msgstr "Standard input:"
+
+msgid "JSON 输出："
+msgstr "JSON output:"
+
+#, python-format
+msgid "调用：%(value1)s\n返回结果：%(value2)s"
+msgstr "Call: %(value1)s\nReturn value: %(value2)s"
+
+msgid "评测标准"
+msgstr "Evaluation rules"
+
+#, python-format
+msgid "数值结果按绝对容差 %(value1)s、相对容差 %(value2)s 比较，拒绝 NaN 与无穷值。"
+msgstr "Numeric results use absolute tolerance %(value1)s and relative tolerance %(value2)s. NaN and infinities are rejected."
+
+msgid "返回值的类型、结构和内容必须严格一致。"
+msgstr "Return values must match exactly in type, structure and content."
+
+msgid "每个用例在独立的程序实例中运行。"
+msgstr "Each case runs in a separate program instance."
+
+msgid "使用 return 返回结果。测试状态在每个用例之间重置。"
+msgstr "Use return to return the result. Test state is reset between cases."
+
+msgid "练习目标"
+msgstr "Practice goals"
+
+#, python-format
+msgid "提示 %(value1)s"
+msgstr "Hint %(value1)s"
+
+msgid "相关知识"
+msgstr "Related knowledge"
+
+msgid "版本说明"
+msgstr "Version notes"
+
+msgid "编写解法"
+msgstr "Write your solution"
+
+msgid "评测暂不可用。你可以继续阅读、编辑和保存草稿。"
+msgstr "Judging is temporarily unavailable. You can still read, edit and save drafts."
+
+msgid "读取标准输入并输出 JSON · Tab 可离开编辑区 · 草稿仅自己可见"
+msgstr "Read standard input and write JSON · Tab leaves the editor · Drafts are private"
+
+#, python-format
+msgid "定义 %(value1)s 函数 · Tab 可离开编辑区 · 草稿仅自己可见"
+msgstr "Define %(value1)s · Tab leaves the editor · Drafts are private"
+
+msgid "保存草稿"
+msgstr "Save draft"
+
+msgid "运行样例"
+msgstr "Run examples"
+
+msgid "提交评测 ↗"
+msgstr "Submit for judging ↗"
+
+msgid "登录后保存与提交"
+msgstr "Log in to save and submit"
+
+msgid "先运行样例，再提交全部测试。"
+msgstr "Run the public examples before submitting against all tests."
+
+msgid "样例通过只表示公开用例通过，不计为题目完成。"
+msgstr "Passing examples only means the public cases passed. It does not mark the problem as complete."
+
+#, python-format
+msgid "提交结果 · %(value1)s"
+msgstr "Submission result · %(value1)s"
+
+msgid "← 我的学习"
+msgstr "← My learning"
+
+#, python-format
+msgid "%(value1)s · 题目 v%(value2)s · %(value3)s UTC"
+msgstr "%(value1)s · Problem v%(value2)s · %(value3)s UTC"
+
+msgid "请稍候，结果会自动更新。"
+msgstr "Please wait. The result will update automatically."
+
+#, python-format
+msgid "%(value1)s / %(value2)s 个用例通过 · 总等待 %(value3)s ms（包括启动，不是性能成绩）"
+msgstr "%(value1)s / %(value2)s cases passed · Total wait: %(value3)s ms (includes startup; not a performance score)"
+
+msgid "本次只运行公开样例，不计入正式完成状态。"
+msgstr "This run used public examples only and does not count towards official completion."
+
+msgid "继续编辑 →"
+msgstr "Continue editing →"
+
+msgid "选择公开这条评测结果"
+msgstr "Choose to share this evaluation result"
+
+msgid "本次提交的代码（仅你可见）"
+msgstr "Code from this submission (visible only to you)"
+
+msgid "本次题意与版本"
+msgstr "Statement and version for this submission"
+
+msgid "内容摘要："
+msgstr "Content hash:"
+
+msgid "代码摘要："
+msgstr "Content hash of code:"
+
+msgid "评测环境："
+msgstr "Evaluation environment:"
+
+msgid "复习"
+msgstr "Review"
+
+#, python-format
+msgid "当前版本最近一次正式结果为「%(verdict)s」，可复查边界与约束。"
+msgstr "Your latest official result on this version was “%(verdict)s”. Review the boundaries and constraints."
+
+msgid "前置练习"
+msgstr "Prerequisite practice"
+
+#, python-format
+msgid "「%(problem)s」涉及「%(concept)s」；其前置「%(target)s」尚无当前题正式通过记录。可先练习，也可以跳过。"
+msgstr "“%(problem)s” involves “%(concept)s”. Its prerequisite “%(target)s” has no accepted submission on a current problem version. Try it first, or skip this suggestion."
+
+#, python-format
+msgid "当前版本已有 %(attempts)s 次正式结果，尚无通过记录。"
+msgstr "This version has %(attempts)s official results and no accepted answer yet."
+
+msgid "当前版本尚无正式评测记录，可以从公开样例开始。"
+msgstr "No official result on this version yet. Start with the public examples."
+
+msgid "继续练习"
+msgstr "Continue practising"
+
+msgid "间隔复习"
+msgstr "Spaced review"
+
+#, python-format
+msgid "当前版本已有通过记录，最近正式结果距今超过 %(days)s 天；可尝试独立重做。"
+msgstr "You have passed this version, but your latest official result is more than %(days)s days old. Try solving it independently again."
+
+msgid "关联题目版本"
+msgstr "Linked problem version"
+
+msgid "关联知识节点"
+msgstr "Linked knowledge node"
+
+msgid "笔记正文"
+msgstr "Note body"
+
+msgid "最多 120 个字符。"
+msgstr "At most 120 characters."
+
+msgid "最多 10,000 个字符，按纯文本保存，仅你可见。"
+msgstr "At most 10,000 characters, stored as plain text and visible only to you."
+
+msgid "一份笔记只能关联一个题目版本或知识节点。"
+msgstr "A note can link to one problem version or one knowledge node, not both."
+
+msgid "保存操作过于频繁，请一分钟后重试。"
+msgstr "Too many save requests. Try again in a minute."
+
+msgid "题目已加入私有收藏。"
+msgstr "Problem added to private bookmarks."
+
+msgid "已取消收藏。"
+msgstr "Bookmark removed."
+
+msgid "请选择收藏或取消收藏。"
+msgstr "Choose whether to add or remove a bookmark."
+
+msgid "笔记已删除。"
+msgstr "Note deleted."
+
+msgid "已记录你自述的阅读完成状态。"
+msgstr "Your self-reported reading completion was recorded."
+
+msgid "已取消阅读标记。"
+msgstr "Reading mark cleared."
+
+msgid "请选择阅读完成或取消标记。"
+msgstr "Choose whether to mark as read or clear the mark."
+
+msgid "用途名称"
+msgstr "Purpose label"
+
+msgid "有效天数"
+msgstr "Validity in days"
+
+msgid "提交本人的练习"
+msgstr "Submit my exercises"
+
+msgid "读取本人的结果"
+msgstr "Read my results"
+
+msgid "请至少选择一个权限。"
+msgstr "Select at least one permission."
+
+msgid "无法创建令牌，请检查有效期、权限和十个有效令牌的上限。"
+msgstr "Cannot create a token. Check its validity, permissions and the limit of ten active tokens."
+
+msgid "公开名称"
+msgstr "Public name"
+
+msgid "公开简介"
+msgstr "Public bio"
+
+msgid "开启公开主页"
+msgstr "Enable public profile"
+
+msgid "我确认公开用户名、公开名称和简介；仅主动分享的评测结果进入作品和榜单。"
+msgstr "I agree to publish my username, public name and bio. Only results I explicitly share will appear in my portfolio and leaderboards."
+
+msgid "开启公开主页前请填写独立的公开名称。"
+msgstr "Enter a separate public name before enabling your public profile."
+
+msgid "请明确确认上述公开范围。"
+msgstr "Explicitly confirm the public information listed above."
+
+msgid "我确认公开用户名及这次正式结果，并参与同题目版本、同策略的测试进度榜。"
+msgstr "I agree to publish my username and this official result, and join the test-progress leaderboard for this exact problem version and policy."
+
+msgid "这条记录缺少可核对的正式评测结果，暂不能公开。"
+msgstr "This record lacks a verifiable official result and cannot be published."
+
+msgid "公开状态已经改变，请刷新页面后重试。"
+msgstr "The public status changed. Refresh the page and try again."
+
+msgid "公开需要独立名称和明确确认。"
+msgstr "Publication requires a separate public name and explicit confirmation."
+
+msgid "请先明确开启公开主页。"
+msgstr "Explicitly enable your public profile first."
+
+msgid "公开结果需要明确确认。"
+msgstr "Sharing a result requires explicit confirmation."
+
+msgid "题目已经下线，不能公开这条结果。"
+msgstr "The problem was withdrawn. This result cannot be published."
+
+msgid "操作过于频繁，请一分钟后重试。"
+msgstr "Too many requests. Try again in a minute."
+
+msgid "填写内容或公开确认不符合要求。"
+msgstr "The entered content or publication confirmation is invalid."
+
+msgid "公开主页设置已保存。评测结果需要逐条主动分享。"
+msgstr "Public profile settings saved. Each result must be shared separately."
+
+msgid "主页已关闭，作品和榜单条目已撤回。独立公开的社区正文保持原状态。"
+msgstr "Profile closed; portfolio and leaderboard entries withdrawn. Independently published community posts keep their current status."
+
+msgid "题目已下线，不能公开这条结果。"
+msgstr "The problem was withdrawn. This result cannot be published."
+
+msgid "这条评测结果已从公开作品和榜单撤回。"
+msgstr "This result was withdrawn from the public portfolio and leaderboard."
+
+msgid "这次操作未获授权。"
+msgstr "This action was not authorized."
+
+msgid "请刷新页面并重新登录后重试。"
+msgstr "Refresh the page and log in again before retrying."
+
+msgid "前往登录 →"
+msgstr "Go to login →"
+
+msgid "没有找到这个页面。"
+msgstr "Page not found."
+
+msgid "内容可能已下线，或你没有访问权限。"
+msgstr "This content may have been withdrawn, or you may not have access."
+
+msgid "返回题库 →"
+msgstr "Return to the problem library →"
+
+msgid "服务暂不可用"
+msgstr "Service temporarily unavailable"
+
+msgid "请稍后重试。如果你正在编辑，请先保留代码。"
+msgstr "Please try again later. If you are editing, save a copy of your code first."
+
+msgid "返回首页"
+msgstr "Return home"
+
+msgid "不收集邮箱。请在下一步保存你的账号恢复码。"
+msgstr "We do not collect an email address. Save your account recovery code on the next page."
+
+msgid "已有账号？登录 →"
+msgstr "Already have an account? Log in →"
+
+msgid "作者操作"
+msgstr "Author actions"
+
+msgid "管理自己的内容"
+msgstr "Manage your content"
+
+msgid "编辑"
+msgstr "Edit"
+
+msgid "提交即表示你希望这份正文及作者用户名在审核通过后公开；不会自动附带私有提交源码。你可随时撤回或删除。"
+msgstr "Submitting requests publication of this text and your username after approval. Private submission code is never attached automatically. You can withdraw or delete the content at any time."
+
+msgid "主动提交公开审核"
+msgstr "Submit for public review"
+
+msgid "撤回公开内容"
+msgstr "Withdraw public content"
+
+msgid "删除正文及关联评论"
+msgstr "Delete text and related comments"
+
+msgid "对本次决定提出私有申诉"
+msgstr "Appeal this decision privately"
+
+msgid "删除内容或账号会删除正文与关联的评论、举报和申诉。审核记录仅保留目标编号、决定及时间，不保留正文或用户名；审核者删除账号后其关联置空。"
+msgstr "Deleting content or your account removes its text and related comments, reports and appeals. Moderation logs retain only target IDs, decisions and times, without text or usernames; a moderator's account link is cleared when that account is deleted."
+
+msgid "审核操作"
+msgstr "Moderation actions"
+
+msgid "审核处理"
+msgstr "Moderation"
+
+msgid "请先阅读当前修订。处理说明只向作者及审核者显示。"
+msgstr "Read the current revision first. Your explanation is visible only to the author and moderators."
+
+msgid "保存审核决定"
+msgstr "Save moderation decision"
+
+msgid "私有处理记录 · 社区"
+msgstr "Private case record · Community"
+
+#, python-format
+msgid "内容目标编号：%(value1)s。本页不复制目标正文或透露其他人的私有记录。"
+msgstr "Target content ID: %(value1)s. This page does not reproduce the target text or disclose other people's private records."
+
+msgid "处理结果"
+msgstr "Response"
+
+msgid "查看有权审核的目标内容"
+msgstr "View target content you may moderate"
+
+msgid "查看有权审核的目标评论"
+msgstr "View target comment you may moderate"
+
+msgid "保存处理结果"
+msgstr "Save response"
+
+msgid "我的处理记录 · 社区"
+msgstr "My case records · Community"
+
+msgid "我的举报"
+msgstr "My reports"
+
+msgid "我的申诉"
+msgstr "My appeals"
+
+msgid "只有本人和具备审核权限的审核者可见。"
+msgstr "Visible only to you and authorized moderators."
+
+msgid "查看举报说明与处理结果"
+msgstr "View report and response"
+
+msgid "查看申诉说明与处理结果"
+msgstr "View appeal and response"
+
+msgid "暂无记录。"
+msgstr "No records yet."
+
+msgid "评论 · 社区"
+msgstr "Comment · Community"
+
+msgid "评论"
+msgstr "Comments"
+
+msgid "返回讨论"
+msgstr "Return to discussion"
+
+msgid "父讨论当前不可查看，此页仅显示可审核的评论。"
+msgstr "The parent discussion is unavailable. This page shows only the comment you may review."
+
+#, python-format
+msgid "· %(value1)s · 修订 %(value2)s"
+msgstr "· %(value1)s · Revision %(value2)s"
+
+#, python-format
+msgid "处理说明：%(value1)s"
+msgstr "Response: %(value1)s"
+
+#, python-format
+msgid "%(value1)s · 社区"
+msgstr "%(value1)s · Community"
+
+#, python-format
+msgid "%(value1)s · %(value2)s · 修订 %(value3)s"
+msgstr "%(value1)s · %(value2)s · Revision %(value3)s"
+
+#, python-format
+msgid "关联 %(value1)s v%(value2)s"
+msgstr "Linked to %(value1)s v%(value2)s"
+
+msgid "（题目已下线，本文停止公开）"
+msgstr "(The problem was withdrawn; this post is no longer public)"
+
+msgid "这份内容当前未公开。私有草稿和撤回内容仅作者可见；待审、未通过和隐藏内容还可由审核者处理。"
+msgstr "This content is not public. Private drafts and withdrawn content are visible only to their author. Moderators may also handle pending, rejected and hidden content."
+
+msgid "以下题解包含解题思路或答案。"
+msgstr "The following solution contains an approach or answers."
+
+msgid "写评论草稿"
+msgstr "Write a comment draft"
+
+msgid "评论详情与操作"
+msgstr "Comment details and actions"
+
+msgid "暂无可见评论。"
+msgstr "No visible comments yet."
+
+msgid "说明仅本人和具有社区审核权限的审核者可见。请勿填写密码、恢复码或不必要的个人资料。"
+msgstr "Visible only to you and authorized community moderators. Do not include passwords, recovery codes or unnecessary personal information."
+
+msgid "新内容先保存为私有草稿，需要再主动提交审核。审核通过后，正文及你的用户名将公开；原有私有提交代码不会自动附带。你可以撤回或删除。修改已公开或已送审的内容会立即停止公开并重新等待审核。"
+msgstr "New content is saved as a private draft and requires an explicit review request. After approval, its text and your username become public; private submission code is never attached automatically. You can withdraw or delete it. Editing published or submitted content immediately removes public access and requires another review."
+
+msgid "只支持纯文本，不执行或渲染投稿 HTML。题解必须绑定明确的题目版本；题目下线时关联内容停止公开。"
+msgstr "Plain text only: submitted HTML is neither executed nor rendered. Solutions must link to a specific problem version. Linked content stops being public when the problem is withdrawn."
+
+msgid "提交说明"
+msgstr "Submit explanation"
+
+msgid "保存内容"
+msgstr "Save content"
+
+msgid "社区操作未完成 · PraxiMesh"
+msgstr "Community operation incomplete · PraxiMesh"
+
+msgid "操作未完成"
+msgstr "Operation incomplete"
+
+msgid "返回我的内容并刷新状态"
+msgstr "Return to my content and refresh its status"
+
+msgid "社区 · PraxiMesh"
+msgstr "Community · PraxiMesh"
+
+msgid "一起讨论，分享理解"
+msgstr "Discuss ideas and share understanding"
+
+msgid "讨论、提问与题解由作者主动送审，审核通过后公开。题解会明确标注对应题目版本。"
+msgstr "Authors submit discussions, questions and solutions for review before publication. Solutions identify the exact problem version."
+
+#, python-format
+msgid "关联题目：%(value1)s ·"
+msgstr "Linked problem: %(value1)s ·"
+
+msgid "查看全部题目的社区内容"
+msgstr "View community content for all problems"
+
+msgid "全部"
+msgstr "All"
+
+msgid "题解（含答案）"
+msgstr "Solutions (contain answers)"
+
+msgid "这个分类暂时没有公开内容。可以先写一份私有草稿。"
+msgstr "No public content in this category yet. Start by writing a private draft."
+
+msgid "我的社区内容 · PraxiMesh"
+msgstr "My community content · PraxiMesh"
+
+msgid "我的社区内容"
+msgstr "My community content"
+
+msgid "讨论、提问与题解"
+msgstr "Discussions, questions and solutions"
+
+#, python-format
+msgid "%(value1)s · 修订 %(value2)s"
+msgstr "%(value1)s · Revision %(value2)s"
+
+msgid "编辑我的评论"
+msgstr "Edit my comment"
+
+msgid "父讨论若未公开，其他人不能通过评论查看它。"
+msgstr "An unpublished parent discussion cannot be accessed by other people through its comments."
+
+msgid "撤回"
+msgstr "Withdraw"
+
+msgid "删除"
+msgstr "Delete"
+
+msgid "还没有内容。"
+msgstr "No content yet."
+
+msgid "社区审核队列 · PraxiMesh"
+msgstr "Community moderation queue · PraxiMesh"
+
+msgid "审核队列"
+msgstr "Moderation queue"
+
+msgid "此入口要求显式社区审核权限；不能审核自己的内容、举报或申诉。"
+msgstr "This page requires explicit community moderation permission. You cannot moderate your own content, reports or appeals."
+
+msgid "队列类型"
+msgstr "Queue type"
+
+msgid "待审内容"
+msgstr "Pending posts"
+
+msgid "待审评论"
+msgstr "Pending comments"
+
+msgid "举报"
+msgstr "Reports"
+
+msgid "申诉"
+msgstr "Appeals"
+
+msgid "查看待审评论"
+msgstr "View pending comment"
+
+msgid "查看私有举报"
+msgstr "View private report"
+
+msgid "查看私有申诉"
+msgstr "View private appeal"
+
+msgid "队列为空。"
+msgstr "The queue is empty."
+
+msgid "社区导航"
+msgstr "Community navigation"
+
+msgid "写内容"
+msgstr "Write content"
+
+msgid "我的内容"
+msgstr "My content"
+
+msgid "分页"
+msgstr "Pagination"
+
+msgid "上一页"
+msgstr "Previous"
+
+#, python-format
+msgid "第 %(value1)s / %(value2)s 页"
+msgstr "Page %(value1)s / %(value2)s"
+
+msgid "下一页"
+msgstr "Next"
+
+msgid "我的学习 · PraxiMesh"
+msgstr "My learning · PraxiMesh"
+
+msgid "YOUR WORKSPACE / 仅自己可见"
+msgstr "YOUR WORKSPACE / Visible only to you"
+
+msgid "每一次尝试，都向前一步。"
+msgstr "Every attempt moves you forward."
+
+#, python-format
+msgid "已通过 %(value1)s 道当前版本练习。这是实践记录，不是知识掌握认证。"
+msgstr "Passed %(value1)s current exercises. This is a practice record, not a certification of mastery."
+
+msgid "我的路径"
+msgstr "My paths"
+
+msgid "还没有加入路径。你可以直接练习，也可以选择一个学习方向。"
+msgstr "You have not joined a path yet. Start practising directly or choose a learning direction."
+
+msgid "探索路径 →"
+msgstr "Explore paths →"
+
+msgid "我的草稿"
+msgstr "My drafts"
+
+#, python-format
+msgid "草稿 v%(value1)s"
+msgstr "Draft v%(value1)s"
+
+msgid "保存的草稿会出现在这里。"
+msgstr "Your saved drafts will appear here."
+
+msgid "开始练习 →"
+msgstr "Start practising →"
+
+msgid "草稿分页"
+msgstr "Draft pagination"
+
+msgid "学习工具"
+msgstr "Learning tools"
+
+msgid "知识与实践证据"
+msgstr "Knowledge and practice evidence"
+
+msgid "我的收藏"
+msgstr "My bookmarks"
+
+msgid "私人笔记"
+msgstr "Private notes"
+
+msgid "教程阅读记录"
+msgstr "Tutorial reading records"
+
+msgid "提交历史"
+msgstr "Submission history"
+
+msgid "题目 / 版本"
+msgstr "Problem / Version"
+
+msgid "方式"
+msgstr "Mode"
+
+msgid "状态 / 结果"
+msgstr "Status / Result"
+
+msgid "时间（UTC）"
+msgstr "Time (UTC)"
+
+msgid "还没有提交。选择一道题，从第一次尝试开始。"
+msgstr "No submissions yet. Choose a problem and make your first attempt."
+
+msgid "历史分页"
+msgstr "History pagination"
+
+#, python-format
+msgid "私有草稿 · %(value1)s"
+msgstr "Private draft · %(value1)s"
+
+#, python-format
+msgid "私有草稿 · 题目 v%(value1)s · 保存于 %(value2)s UTC"
+msgstr "Private draft · Problem v%(value1)s · Saved %(value2)s UTC"
+
+msgid "题目已有新版本。这份草稿保留原版本的代码和题意；你可以复制代码，在阅读新题意后继续练习。"
+msgstr "A newer problem version is available. This draft retains its original code and statement. Copy the code and review the new statement before continuing."
+
+msgid "查看当前题目 →"
+msgstr "View current problem →"
+
+msgid "题目已下线。这份私有草稿仍可查看和复制。"
+msgstr "This problem was withdrawn. You can still view and copy your private draft."
+
+msgid "保存的代码（仅你可见）"
+msgstr "Saved code (visible only to you)"
+
+msgid "保存时的题意与版本"
+msgstr "Problem statement and version when saved"
+
+msgid "把“我懂了”"
+msgstr "Turn “I understand”"
+
+msgid "变成"
+msgstr "into"
+
+msgid "“我做到了”。"
+msgstr "“I made it work.”"
+
+msgid "从一个概念，到一段能解决问题的代码。"
+msgstr "From a concept to code that solves a problem."
+
+msgid "沿着知识路径探索，也可以直接挑一道题开始。"
+msgstr "Explore a knowledge path, or choose a problem and begin."
+
+msgid "打开练习台 ↗"
+msgstr "Open the workspace ↗"
+
+msgid "探索知识地图 →"
+msgstr "Explore the knowledge map →"
+
+msgid "Python 起步 · 自由跳转 · 私有学习记录"
+msgstr "Start with Python · Choose your path · Private learning records"
+
+msgid "从基础，走向更远"
+msgstr "Build from the foundations"
+
+msgid "写出第一个函数"
+msgstr "Write your first function"
+
+msgid "输入、返回值与边界情况"
+msgstr "Inputs, return values and edge cases"
+
+msgid "用数据结构组织问题"
+msgstr "Organize problems with data structures"
+
+msgid "列表、映射与二分查找"
+msgstr "Lists, mappings and binary search"
+
+msgid "理解向量与数值计算"
+msgstr "Understand vectors and numerical computation"
+
+msgid "点积、矩阵与稳定 Softmax"
+msgstr "Dot products, matrices and stable softmax"
+
+msgid "# 每个抽象概念，都值得一次实践"
+msgstr "# Every abstract concept deserves a practical test"
+
+msgid "从你感兴趣的地方开始"
+msgstr "Start with what interests you"
+
+msgid "浏览所有知识 →"
+msgstr "Browse all knowledge →"
+
+#, python-format
+msgid "0%(value1)s / 领域"
+msgstr "0%(value1)s / DOMAIN"
+
+msgid "内容正在准备，请稍后回来。"
+msgstr "Content is being prepared. Please return later."
+
+msgid "有方向，也有选择"
+msgstr "Direction, with freedom to choose"
+
+msgid "推荐学习路径"
+msgstr "Suggested learning paths"
+
+#, python-format
+msgid "%(value1)s 道基础练习。无需先读教程，也不必按固定顺序完成。"
+msgstr "%(value1)s introductory exercises. Read tutorials when useful and choose your own order."
+
+msgid "知识与路径 · PraxiMesh"
+msgstr "Knowledge and paths · PraxiMesh"
+
+msgid "LEARN / 知识导航"
+msgstr "LEARN / Knowledge explorer"
+
+msgid "找到知识之间的联系。"
+msgstr "Discover connections between ideas."
+
+msgid "从领域向下探索，从概念横向连接。学习路径只是一个建议。"
+msgstr "Explore domains and connections between concepts. Learning paths are suggestions."
+
+msgid "领域与主题"
+msgstr "Domains and topics"
+
+msgid "推荐路径"
+msgstr "Suggested path"
+
+msgid "概念与教程"
+msgstr "Concepts and tutorials"
+
+msgid "教程"
+msgstr "Tutorials"
+
+msgid "我的收藏 · PraxiMesh"
+msgstr "My bookmarks · PraxiMesh"
+
+msgid "仅自己可见"
+msgstr "Visible only to you"
+
+msgid "收藏跟随题目，更新后可打开当前版本。"
+msgstr "Bookmarks follow a problem and open its current version after updates."
+
+#, python-format
+msgid "%(value1)s · 已下线"
+msgstr "%(value1)s · Withdrawn"
+
+msgid "尚未收藏题目。可以在题目页添加收藏。"
+msgstr "No bookmarks yet. Add one from a problem page."
+
+msgid "浏览练习 →"
+msgstr "Browse exercises →"
+
+msgid "当前练习通过 / 题数"
+msgstr "Current problems passed / Total"
+
+msgid "尝试题数 / 正式结果次数"
+msgstr "Problems attempted / Official results"
+
+msgid "通过次数 / 难度分布"
+msgstr "Accepted results / Difficulty distribution"
+
+#, python-format
+msgid "近 %(value1)s 天的错误结果"
+msgstr "Error results in the last %(value1)s days"
+
+#, python-format
+msgid "%(value1)s 次"
+msgstr "%(value1)s results"
+
+#, python-format
+msgid "%(value1)s：%(value2)s 题"
+msgstr "%(value1)s: %(value2)s problems"
+
+#, python-format
+msgid "%(value1)s %(value2)s 次"
+msgstr "%(value1)s: %(value2)s results"
+
+msgid "无"
+msgstr "None"
+
+msgid "实践证据与建议 · PraxiMesh"
+msgstr "Practice evidence and suggestions · PraxiMesh"
+
+msgid "实践证据与建议"
+msgstr "Practice evidence and suggestions"
+
+#, python-format
+msgid "当前版本通过 %(value1)s / %(value2)s 道题；尝试 %(value3)s 道，得到 %(value4)s 次正式结果。"
+msgstr "Passed %(value1)s / %(value2)s current problems; attempted %(value3)s with %(value4)s official results."
+
+msgid "一次通过不等于掌握。这里按当前题目版本汇总你的正式结果，展示不同题目、难度与重复练习证据；不推断掌握百分比。公开样例 Run、排队中的任务和评测服务故障不计入。错误次数描述提交结果，不判断你的能力。"
+msgstr "One accepted answer does not establish mastery. This page summarizes your official results on current problem versions, showing breadth, difficulty and repeated practice without inferring a mastery percentage. Sample runs, queued tasks and judge service failures are excluded. Error counts describe results, not your ability."
+
+#, python-format
+msgid "旧版或下线题目的 %(value1)s 次正式结果保留在"
+msgstr "The %(value1)s official results on old or withdrawn problems remain in "
+
+msgid "，不计为当前版本通过。跨领域题目会出现在相关领域中，同一领域内不重复计题。"
+msgstr ", but do not count as passing current versions. A cross-domain problem appears in each relevant domain and is counted once within each domain."
+
+msgid "可以接着做什么"
+msgstr "What you could do next"
+
+#, python-format
+msgid "建议依据你的记录与已发布的前置关系生成，可以自由跳过。超过 %(value1)s 天未练习时会提示间隔复习。"
+msgstr "Suggestions use your records and published prerequisites; you can skip any of them. A review is suggested after %(value1)s days without practice."
+
+msgid "当前没有待练习或到期复习建议，可以自行选择题目重做。"
+msgstr "No pending practice or review suggestions. Choose any problem to try again."
+
+msgid "按领域查看"
+msgstr "By domain"
+
+msgid "按概念查看"
+msgstr "By concept"
+
+msgid "概念"
+msgstr "Concepts"
+
+msgid "近期错误结果"
+msgstr "Recent error results"
+
+#, python-format
+msgid "仅列本人当前版本正式提交，最近 %(value1)s 天内的最新 10 条。"
+msgstr "Your latest 10 official results on current problem versions within the last %(value1)s days."
+
+msgid "没有符合条件的结果。"
+msgstr "No matching results."
+
+msgid "私有学习空间"
+msgstr "Private learning workspace"
+
+msgid "我的笔记"
+msgstr "My notes"
+
+msgid "阅读记录"
+msgstr "Reading records"
+
+msgid "草稿与提交历史"
+msgstr "Drafts and submission history"
+
+#, python-format
+msgid "%(value1)s · 私有笔记"
+msgstr "%(value1)s · Private note"
+
+#, python-format
+msgid "更新于 %(value1)s UTC"
+msgstr "Updated %(value1)s UTC"
+
+#, python-format
+msgid "关联题目：%(value1)s · v%(value2)s"
+msgstr "Linked problem: %(value1)s · v%(value2)s"
+
+msgid "（笔记关联旧版本，请先核对新题意）"
+msgstr "(Note linked to an older version; check the new statement first)"
+
+msgid "题目已下线，笔记仍然保留。"
+msgstr "This problem was withdrawn; your note is retained."
+
+msgid "关联版本的题意"
+msgstr "Statement of the linked version"
+
+msgid "关联知识："
+msgstr "Linked knowledge:"
+
+#, python-format
+msgid "%(value1)s（已下线）"
+msgstr "%(value1)s (withdrawn)"
+
+msgid "编辑笔记"
+msgstr "Edit note"
+
+msgid "删除这份笔记"
+msgstr "Delete this note"
+
+msgid "删除后无法恢复。"
+msgstr "Deletion cannot be undone."
+
+msgid "删除笔记"
+msgstr "Delete note"
+
+msgid "新建笔记"
+msgstr "New note"
+
+msgid "笔记仅你可见。可关联一个题目版本或知识节点，也可以独立保存。"
+msgstr "Notes are visible only to you. Link one to a problem version or knowledge node, or save it independently."
+
+msgid "保存笔记"
+msgstr "Save note"
+
+msgid "取消编辑"
+msgstr "Cancel editing"
+
+msgid "我的笔记 · PraxiMesh"
+msgstr "My notes · PraxiMesh"
+
+msgid "写一份笔记"
+msgstr "Write a note"
+
+msgid "独立笔记"
+msgstr "Standalone note"
+
+msgid "这里可以记录思路、错误原因和待复习的问题。"
+msgstr "Record your ideas, reasons for errors and questions to revisit here."
+
+msgid "阅读记录 · PraxiMesh"
+msgstr "Reading records · PraxiMesh"
+
+msgid "阅读完成由你自行标记，不代表掌握。你可以随时练习，无需先阅读教程。"
+msgstr "Reading completion is self-reported and does not establish mastery. You can practise at any time without first reading the tutorials."
+
+#, python-format
+msgid "自述已读 · %(value1)s UTC"
+msgstr "Self-reported as read · %(value1)s UTC"
+
+msgid "· 教程内容已更新，可重新阅读后更新标记。"
+msgstr "· This tutorial has changed. Read it again before updating your mark."
+
+msgid "尚未标记阅读完成。"
+msgstr "Not marked as read yet."
+
+msgid "更新阅读标记"
+msgstr "Update reading mark"
+
+msgid "标记已读"
+msgstr "Mark as read"
+
+msgid "取消标记"
+msgstr "Clear mark"
+
+msgid "暂无教程。"
+msgstr "No tutorials yet."
+
+msgid "此版本暂无英文译文，以下显示中文原文。"
+msgstr "No English translation is available for this version. The Chinese original is shown below."
+
+msgid "登录 · PraxiMesh"
+msgstr "Log in · PraxiMesh"
+
+msgid "继续你的探索。"
+msgstr "Continue exploring."
+
+msgid "草稿、提交记录和你的下一步，都在这里。"
+msgstr "Your drafts, submissions and next steps are all here."
+
+msgid "创建账号"
+msgstr "Create an account"
+
+msgid "使用恢复码"
+msgstr "Use a recovery code"
+
+msgid "返回首页 →"
+msgstr "Return home →"
+
+msgid "← 知识导航"
+msgstr "← Knowledge explorer"
+
+msgid "你将能够"
+msgstr "You will be able to"
+
+msgid "撤销已读标记"
+msgstr "Undo reading mark"
+
+msgid "标记为已读"
+msgstr "Mark as read"
+
+msgid "你已将当前教程标记为已读。"
+msgstr "You marked the current tutorial as read."
+
+msgid "教程内容已更新，可在阅读后重新标记。"
+msgstr "This tutorial changed. Mark it again after reading."
+
+msgid "阅读标记由你自行记录，不代表练习通过或知识掌握。"
+msgstr "Reading marks are your own records. They do not mean you passed an exercise or mastered the topic."
+
+msgid "学习路线"
+msgstr "Learning path"
+
+msgid "退出路径追踪"
+msgstr "Leave path tracking"
+
+msgid "加入我的路径"
+msgstr "Join this path"
+
+msgid "登录以记录进度"
+msgstr "Log in to track progress"
+
+#, python-format
+msgid "%(value1)s / %(value2)s 道当前版本练习已通过。教程自由阅读，不计入完成比例。"
+msgstr "%(value1)s / %(value2)s current exercises passed. Tutorials are optional and do not count towards completion."
+
+msgid "练习 ·"
+msgstr "Exercise ·"
+
+msgid "教程 · 随时可读，可跳过"
+msgstr "Tutorial · Read or skip at any time"
+
+msgid "用练习验证理解"
+msgstr "Test your understanding with practice"
+
+msgid "继续探索"
+msgstr "Explore further"
+
+msgid "知识连接"
+msgstr "Knowledge connections"
+
+msgid "必要前置"
+msgstr "Required prerequisite"
+
+msgid "建议前置"
+msgstr "Recommended prerequisite"
+
+msgid "相关概念"
+msgstr "Related concept"
+
+msgid "从这里开始，自由选择下一步。"
+msgstr "Start here and choose your next step."
+
+msgid "关联到此知识的概念"
+msgstr "Concepts linked to this knowledge"
+
+msgid "通过一道题提供了一次实践证据，并不代表完全掌握了一个知识点。"
+msgstr "Passing a problem provides one piece of practical evidence. It does not establish complete mastery of a concept."
+
+msgid "Python · 函数实现"
+msgstr "Python · Function implementation"
+
+msgid "本地工具访问令牌"
+msgstr "Local tool access tokens"
+
+msgid "令牌只授权本人练习的提交或结果读取，不允许管理账号、公开内容或读取他人数据。请将令牌保存在私密环境变量中，勿提交到代码仓库。"
+msgstr "Tokens authorize only your own submissions or result reads. They cannot manage accounts, publish content or read other people's data. Store tokens in private environment variables, never in a code repository."
+
+msgid "返回账号与隐私"
+msgstr "Return to account and privacy"
+
+msgid "请现在保存，只显示一次"
+msgstr "Save this token now; it is shown only once"
+
+msgid "遗失后请撤销并重新创建。服务器只保存令牌摘要。"
+msgstr "If lost, revoke it and create a new one. The server stores only a token hash."
+
+msgid "创建令牌"
+msgstr "Create token"
+
+msgid "我的令牌"
+msgstr "My tokens"
+
+msgid "到期时间"
+msgstr "Expires"
+
+msgid "已撤销"
+msgstr "Revoked"
+
+msgid "已到期"
+msgstr "Expired"
+
+msgid "有效"
+msgstr "Active"
+
+msgid "提交练习"
+msgstr "Submit exercises"
+
+msgid "读取本人结果"
+msgstr "Read my results"
+
+msgid "撤销令牌"
+msgstr "Revoke token"
+
+msgid "尚未创建令牌。"
+msgstr "No tokens created yet."
+
+msgid "令牌分页"
+msgstr "Token pagination"
+
+#, python-format
+msgid "%(value1)s使用 return 返回结果。测试状态在每个用例之间重置。"
+msgstr "%(value1)s Use return to return your answer. Test state resets between cases."
+
+msgid "Python / 函数"
+msgstr "Python / Function"
+
+msgid "Python 源代码"
+msgstr "Python source code"
+
+#, python-format
+msgid "%(value1)s · 多阶段项目"
+msgstr "%(value1)s · Multi-stage projects"
+
+msgid "← 多阶段项目"
+msgstr "← Multi-stage projects"
+
+#, python-format
+msgid "%(value1)s · 项目 v%(value2)s"
+msgstr "%(value1)s · Project v%(value2)s"
+
+msgid "（历史修订）"
+msgstr "(historical revision)"
+
+msgid "最终要交付什么"
+msgstr "What you will deliver"
+
+msgid "每个阶段固定绑定下列题目版本。只有本人对该版本的正式通过结果计入；Run、未结束记录和服务错误均不计入。当前题目更新不会抹掉这个项目修订的历史通过，新版题目的通过也不会代替固定版本。推荐前置不限制跳转。"
+msgstr "Each stage is pinned to the problem version shown below. Only your own accepted formal submissions for that version count; Run results, unfinished records, and service errors do not. Updating the current problem does not erase accepted results for this project revision, and results for newer problem versions do not replace results for the pinned version. Recommended prerequisites do not restrict navigation."
+
+#, python-format
+msgid "仅本人可见：固定版本阶段通过 %(value1)s / %(value2)s。"
+msgstr "Visible only to you: accepted stages for pinned versions %(value1)s / %(value2)s."
+
+msgid "全部阶段已有正式通过记录。"
+msgstr "Every stage has an accepted formal submission."
+
+msgid "通过记录不等于知识掌握度。"
+msgstr "An accepted submission is not a measure of knowledge mastery."
+
+msgid "登录后查看本人的项目进度"
+msgstr "Sign in to see your project progress"
+
+msgid "查看当前项目修订"
+msgstr "View the current project revision"
+
+msgid "；历史进度按本修订的绑定单独计算。"
+msgstr "; historical progress is calculated separately using this revision’s pinned versions."
+
+msgid "· 最终集成任务"
+msgstr "· Final integration task"
+
+#, python-format
+msgid "固定题目：%(value1)s v%(value2)s"
+msgstr "Pinned problem: %(value1)s v%(value2)s"
+
+msgid "（已归档版本）"
+msgstr "(archived version)"
+
+msgid "进入这个阶段 →"
+msgstr "Open this stage →"
+
+msgid "绑定题目当前已下线，阶段内容暂停访问；本人历史通过仍保留。"
+msgstr "The pinned problem is currently withdrawn, so its stage content is unavailable. Your historical accepted results are retained."
+
+msgid "固定版本已通过 ·"
+msgstr "Pinned version accepted ·"
+
+msgid "查看本人的正式结果"
+msgstr "View your formal result"
+
+msgid "固定版本尚无正式通过记录"
+msgstr "No accepted formal submission for this pinned version yet"
+
+msgid "建议先练："
+msgstr "Recommended practice:"
+
+#, python-format
+msgid "%(value1)s（暂不可访问）"
+msgstr "%(value1)s (currently unavailable)"
+
+msgid "。可以跳过。"
+msgstr ". You may skip these suggestions."
+
+msgid "项目修订"
+msgstr "Project revisions"
+
+#, python-format
+msgid "项目 v%(value1)s"
+msgstr "Project v%(value1)s"
+
+msgid "多阶段项目 · PraxiMesh"
+msgstr "Multi-stage projects · PraxiMesh"
+
+msgid "多阶段项目"
+msgstr "Multi-stage projects"
+
+msgid "先分解组件，再完成实际集成任务。阶段顺序是建议，可以自由跳转；项目修订固定绑定题目版本。"
+msgstr "Build individual components, then complete an integration task. The stage order is a suggestion: you can navigate freely. Each project revision is pinned to specific problem versions."
+
+msgid "暂未发布项目。"
+msgstr "No projects have been published yet."
+
+msgid "项目计划和阶段说明目前提供中文原文；英文界面不会自动翻译这些内容。"
+msgstr "Project plans and stage descriptions are currently available in the Chinese original. The English interface does not translate this content automatically."
+
+#, python-format
+msgid "← %(value1)s · 项目 v%(value2)s"
+msgstr "← %(value1)s · Project v%(value2)s"
+
+#, python-format
+msgid "%(value1)s · 固定题目 v%(value2)s"
+msgstr "%(value1)s · Pinned problem v%(value2)s"
+
+msgid "这个固定版本已有正式通过记录。"
+msgstr "This pinned version has an accepted formal submission."
+
+msgid "查看本人结果"
+msgstr "View your result"
+
+msgid "这个固定版本尚无本人正式通过记录。"
+msgstr "You have no accepted formal submission for this pinned version yet."
+
+msgid "此阶段绑定的题目版本已归档，历史通过仍保留。归档版本不再接受提交；"
+msgstr "The problem version pinned to this stage is archived. Historical accepted results are retained, but archived versions no longer accept submissions. "
+
+msgid "可以练习当前题目版本"
+msgstr "You can practice the current problem version"
+
+msgid "，其结果不计入本阶段。维护者可发布新的项目修订更新绑定。"
+msgstr ", whose results do not count toward this stage. Maintainers can publish a new project revision with updated version bindings."
+
+#, python-format
+msgid "进入练习与提交 · v%(value1)s"
+msgstr "Practice and submit · v%(value1)s"
+
+msgid "建议前置："
+msgstr "Recommended prerequisites:"
+
+msgid "。这些建议不会阻止直接完成当前阶段。"
+msgstr ". These suggestions do not prevent you from completing this stage directly."
+
+msgid "任务"
+msgstr "Task"
+
+msgid "公开测试"
+msgstr "Public tests"
+
+#, python-format
+msgid "输入 / 调用：%(value1)s\n预期结果：%(value2)s"
+msgstr "Input / call: %(value1)s\nExpected result: %(value2)s"
+
+msgid "评测条件"
+msgstr "Evaluation conditions"
+
+#, python-format
+msgid "绝对容差 %(value1)s，相对容差 %(value2)s。"
+msgstr "Absolute tolerance %(value1)s; relative tolerance %(value2)s."
+
+msgid "类型、结构和内容必须严格相同。"
+msgstr "Types, structure, and contents must match exactly."
+
+msgid "保存你的恢复码。"
+msgstr "Save your recovery code."
+
+msgid "忘记密码时，它是恢复账号的凭据。本站不收集邮箱。"
+msgstr "Use this code to recover your account if you forget your password. This site does not collect email addresses."
+
+msgid "此码只显示一次"
+msgstr "This code is shown only once"
+
+msgid "将它保存到密码管理器。使用后会换发新码，旧码立即失效。"
+msgstr "Save it in your password manager. Using it generates a replacement and immediately invalidates the old code."
+
+msgid "以后可在账号设置中验证密码后换发。不要与他人分享。"
+msgstr "You can replace this code in account settings after verifying your password. Do not share it."
+
+msgid "我已保存，继续 →"
+msgstr "I saved it. Continue →"
+
+#, python-format
+msgid "%(value1)s · 分组测试进度榜"
+msgstr "%(value1)s · Grouped test-progress leaderboard"
+
+msgid "（历史版本）"
+msgstr "(Historical version)"
+
+#, python-format
+msgid "%(value1)s · 策略与制品标识："
+msgstr "%(value1)s · Policy and artifact fingerprint:"
+
+msgid "本分组只包含这一历史版本，不与当前版本合并。"
+msgstr "This group contains only this historical version. It is not merged with the current version."
+
+msgid "名次"
+msgstr "Rank"
+
+msgid "参与者（公开名称 / 用户名）"
+msgstr "Participant (public name / username)"
+
+msgid "顺序测试通过"
+msgstr "Sequential tests passed"
+
+msgid "正式结果"
+msgstr "Official result"
+
+msgid "分组测试进度榜 · PraxiMesh"
+msgstr "Grouped test-progress leaderboards · PraxiMesh"
+
+msgid "分组测试进度榜"
+msgstr "Grouped test-progress leaderboards"
+
+#, python-format
+msgid "%(value1)s 位主动参与者 · %(value2)s 个顺序测试"
+msgstr "Opt-in participants: %(value1)s · Sequential tests: %(value2)s"
+
+msgid "还没有主动分享形成的分组。"
+msgstr "No groups formed from explicitly shared results yet."
+
+#, python-format
+msgid "%(value1)s · 公开结果"
+msgstr "%(value1)s · Public result"
+
+#, python-format
+msgid "· 用户名 %(value1)s"
+msgstr "· Username %(value1)s"
+
+#, python-format
+msgid "%(value1)s · 顺序测试通过 %(value2)s / %(value3)s"
+msgstr "%(value1)s · Sequential tests passed: %(value2)s / %(value3)s"
+
+#, python-format
+msgid "隔离策略：%(value1)s；策略与制品标识："
+msgstr "Isolation policy: %(value1)s; policy and artifact fingerprint:"
+
+msgid "查看此版本与策略分组"
+msgstr "View this version and policy group"
+
+msgid "查看当前题目"
+msgstr "View current problem"
+
+msgid "这是历史版本的结果，不代表当前题目已经通过。"
+msgstr "This is a historical result. It does not establish that the current problem version was passed."
+
+msgid "分享状态未改变 · PraxiMesh"
+msgstr "Sharing status unchanged · PraxiMesh"
+
+msgid "分享状态未改变"
+msgstr "Sharing status unchanged"
+
+msgid "管理我的分享 · PraxiMesh"
+msgstr "Manage my shares · PraxiMesh"
+
+msgid "管理我的分享"
+msgstr "Manage my shares"
+
+msgid "这里列出本人的已结束正式提交，仍然仅自己可见。公开样例 Run 不参与分享。每次分享前会展示公开范围并要求确认。"
+msgstr "These are your completed official submissions, still visible only to you. Public example runs cannot be shared. Each share requires a preview of the public information and explicit confirmation."
+
+msgid "请先在"
+msgstr "First, "
+
+msgid "设置中开启公开主页"
+msgstr "enable your public profile in settings"
+
+msgid "这条记录不满足可验证正式结果的分享条件。"
+msgstr "This record does not meet the requirements for sharing a verifiable official result."
+
+msgid "已主动分享"
+msgstr "Explicitly shared"
+
+msgid "未公开"
+msgstr "Not public"
+
+msgid "预览并确认分享"
+msgstr "Preview and confirm sharing"
+
+msgid "题目已下线或记录不满足分享条件。"
+msgstr "The problem is withdrawn or the record is not eligible for sharing."
+
+msgid "撤回这条分享"
+msgstr "Withdraw this share"
+
+msgid "尚无已结束的正式提交。"
+msgstr "No completed official submissions yet."
+
+msgid "公开作品导航"
+msgstr "Public portfolio navigation"
+
+msgid "公开主页设置"
+msgstr "Public profile settings"
+
+#, python-format
+msgid "%(value1)s · 公开主页"
+msgstr "%(value1)s · Public profile"
+
+#, python-format
+msgid "用户名：%(value1)s"
+msgstr "Username: %(value1)s"
+
+msgid "主动分享的作品结果"
+msgstr "Explicitly shared results"
+
+msgid "只展示该用户逐条同意公开的正式结果，不包含其他学习记录或源码。"
+msgstr "Only official results this user individually agreed to publish are shown. Other learning records and source code are excluded."
+
+msgid "尚未主动分享评测结果。"
+msgstr "No results explicitly shared yet."
+
+msgid "只比较同一题目版本、同一评测策略与制品标识下主动分享的正式结果。当前评测在首个失败处停止；通过数量表示此前顺序测试的完成情况，尚未运行的测试不等于失败。每位参与者仅取已分享的最好结果，同分同名次。不按运行耗时排序，不做跨题总榜，也不据此判断知识掌握程度。"
+msgstr "Only explicitly shared official results for the same problem version, evaluation policy and artifact fingerprint are compared. Evaluation currently stops at the first failure: the count records preceding sequential tests passed; unexecuted tests are not failures. Each participant contributes only their best shared result; ties share a rank. Runtime is not ranked. There is no cross-problem overall leaderboard, and these results do not establish mastery."
+
+msgid "公开主页设置 · PraxiMesh"
+msgstr "Public profile settings · PraxiMesh"
+
+#, python-format
+msgid "默认关闭。这里的公开名称和简介独立填写，不读取私有显示名称。开启后会展示用户名 %(value1)s；评测结果需要逐条主动选择。"
+msgstr "Off by default. Your public name and bio are entered separately from your private display name. Enabling this profile publishes username %(value1)s; results must be selected individually."
+
+msgid "保存公开设置"
+msgstr "Save public settings"
+
+msgid "查看我的公开主页"
+msgstr "View my public profile"
+
+msgid "关闭主页并撤回全部分享"
+msgstr "Close profile and withdraw all shares"
+
+msgid "主页当前关闭，作品和榜单均不可公开访问。"
+msgstr "Your profile is closed. The portfolio and leaderboard entries are not publicly accessible."
+
+msgid "关闭会撤回全部作品和榜单条目；重新开启不会自动重新分享。此前独立提交公开的社区正文不受影响，需在社区中单独撤回。"
+msgstr "Closing withdraws every portfolio and leaderboard entry. Reopening does not reshare them automatically. Community text you independently published is unaffected; withdraw it separately in the community."
+
+msgid "确认公开评测结果 · PraxiMesh"
+msgstr "Confirm public result · PraxiMesh"
+
+msgid "确认公开这次正式结果"
+msgstr "Confirm sharing this official result"
+
+msgid "尚未设置"
+msgstr "Not set"
+
+#, python-format
+msgid "用户名：%(value1)s · 公开名称：%(value2)s"
+msgstr "Username: %(value1)s · Public name: %(value2)s"
+
+msgid "策略标识："
+msgstr "Policy fingerprint:"
+
+msgid "确认后公开上述信息并进入对应分组榜单。不会公开源码、笔记、隐藏测试内容、私有案件或主机信息。运行耗时不参与排名。"
+msgstr "Confirming publishes the information above and adds it to the corresponding leaderboard group. Source code, notes, hidden tests, private cases and host details remain private. Runtime does not affect ranking."
+
+msgid "明确分享这次结果"
+msgstr "Explicitly share this result"
+
+msgid "先开启公开主页"
+msgstr "Enable your public profile first"
+
+msgid "，之后回来确认分享。"
+msgstr ", then return to confirm sharing."
+

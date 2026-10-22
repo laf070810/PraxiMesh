@@ -5,6 +5,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.http import Http404
 from django.utils import timezone
+from django.utils.translation import gettext
 
 from community.models import Appeal, Comment, ModerationEvent, Post, Report, State
 
@@ -86,7 +87,7 @@ def own_writing(user, kind, pk):
 
 def expected_revision(item, revision):
     if item.revision != revision:
-        raise CommunityError("内容已改变，请刷新页面后重试。")
+        raise CommunityError(gettext("内容已改变，请刷新页面后重试。"))
 
 
 def close_appeals(kind, item):
@@ -99,12 +100,12 @@ def validate_version(post):
     if post.version_id and (
         not post.version.problem.published or post.version.problem.current_id is None
     ):
-        raise CommunityError("关联题目已经下线，不能提交或公开这篇内容。")
+        raise CommunityError(gettext("关联题目已经下线，不能提交或公开这篇内容。"))
 
 
 def validate_text(value, limit):
     if not isinstance(value, str) or not value.strip() or len(value) > limit:
-        raise ValidationError("正文或说明为空，或超过长度限制。")
+        raise ValidationError(gettext("正文或说明为空，或超过长度限制。"))
 
 
 @transaction.atomic
@@ -164,11 +165,11 @@ def author_action(user, kind, pk, action, revision):
         return
     if action == "submit":
         if item.state in (State.PENDING, State.PUBLISHED):
-            raise CommunityError("这篇内容已送审或公开。")
+            raise CommunityError(gettext("这篇内容已送审或公开。"))
         if kind == "post":
             validate_version(item)
         elif not post_is_public(item.post):
-            raise CommunityError("讨论当前未公开，评论不能送审。")
+            raise CommunityError(gettext("讨论当前未公开，评论不能送审。"))
         item.state = State.PENDING
         item.moderation_note = ""
     elif action == "withdraw":
@@ -194,19 +195,19 @@ def moderate(user, kind, pk, action, revision, note):
     require_moderator(user)
     item = get_writing(kind, pk, lock=True)
     if item.author_id == user.pk:
-        raise PermissionDenied("不能审核自己的内容。")
+        raise PermissionDenied(gettext("不能审核自己的内容。"))
     expected_revision(item, revision)
     if action in ("publish", "reject") and item.state == State.PENDING:
         if action == "publish":
             if kind == "post":
                 validate_version(item)
             elif not post_is_public(item.post):
-                raise CommunityError("请先处理父讨论；未公开讨论的评论不能公开。")
+                raise CommunityError(gettext("请先处理父讨论；未公开讨论的评论不能公开。"))
         item.state = State.PUBLISHED if action == "publish" else State.REJECTED
     elif action == "hide" and item.state == State.PUBLISHED:
         item.state = State.HIDDEN
     else:
-        raise CommunityError("内容状态已经改变，此审核操作不适用。")
+        raise CommunityError(gettext("内容状态已经改变，此审核操作不适用。"))
     validate_text(note, 1000)
     item.moderation_note = note.strip()
     item.save(update_fields=["state", "moderation_note", "updated_at"])
@@ -232,7 +233,7 @@ def create_report(user, kind, pk, reason):
     item = public_target(kind, pk)
     validate_text(reason, 2000)
     if Report.objects.filter(reporter=user, status=Report.Status.OPEN, **{kind: item}).exists():
-        raise CommunityError("你已经提交过这个内容的举报，请等待处理。")
+        raise CommunityError(gettext("你已经提交过这个内容的举报，请等待处理。"))
     report = Report(reporter=user, reason=reason, **{kind: item})
     report.full_clean()
     report.save()
@@ -245,9 +246,9 @@ def create_appeal(user, kind, pk, reason, revision):
     expected_revision(item, revision)
     validate_text(reason, 2000)
     if item.state not in (State.REJECTED, State.HIDDEN):
-        raise CommunityError("只有未通过审核或被隐藏的内容可以申诉。")
+        raise CommunityError(gettext("只有未通过审核或被隐藏的内容可以申诉。"))
     if Appeal.objects.filter(author=user, target_revision=item.revision, **{kind: item}).exists():
-        raise CommunityError("这个版本已经提交过申诉；处理结果可在我的申诉中查看。")
+        raise CommunityError(gettext("这个版本已经提交过申诉；处理结果可在我的申诉中查看。"))
     appeal = Appeal(author=user, target_revision=item.revision, reason=reason, **{kind: item})
     appeal.full_clean()
     appeal.save()
@@ -264,11 +265,11 @@ def resolve_report(user, pk, decision, note):
         raise Http404 from None
     target = report.post or report.comment
     if report.reporter_id == user.pk or target.author_id == user.pk:
-        raise PermissionDenied("不能处理自己发起或涉及自己内容的举报。")
+        raise PermissionDenied(gettext("不能处理自己发起或涉及自己内容的举报。"))
     if report.status != Report.Status.OPEN:
-        raise CommunityError("这条举报已经处理。")
+        raise CommunityError(gettext("这条举报已经处理。"))
     if decision not in (Report.Status.RESOLVED, Report.Status.DISMISSED):
-        raise CommunityError("无效的举报决定。", 400)
+        raise CommunityError(gettext("无效的举报决定。"), 400)
     report.status, report.resolution, report.resolved_by = decision, note, user
     report.full_clean()
     report.save()
@@ -292,20 +293,20 @@ def resolve_appeal(user, pk, decision, note):
     except Appeal.DoesNotExist:
         raise Http404 from None
     if appeal.author_id == user.pk:
-        raise PermissionDenied("不能处理自己的申诉。")
+        raise PermissionDenied(gettext("不能处理自己的申诉。"))
     if appeal.status != Appeal.Status.OPEN:
-        raise CommunityError("这条申诉已经处理。")
+        raise CommunityError(gettext("这条申诉已经处理。"))
     if target.revision != appeal.target_revision or target.state not in (
         State.REJECTED,
         State.HIDDEN,
     ):
-        raise CommunityError("被申诉内容已经改变，请刷新页面。")
+        raise CommunityError(gettext("被申诉内容已经改变，请刷新页面。"))
     if decision == Appeal.Status.REOPENED:
         target.state = State.PENDING
-        target.moderation_note = "申诉已接受，等待重新审核。"
+        target.moderation_note = gettext("申诉已接受，等待重新审核。")
         target.save(update_fields=["state", "moderation_note", "updated_at"])
     elif decision != Appeal.Status.UPHELD:
-        raise CommunityError("无效的申诉决定。", 400)
+        raise CommunityError(gettext("无效的申诉决定。"), 400)
     appeal.status, appeal.resolution, appeal.resolved_by = decision, note, user
     appeal.full_clean()
     appeal.save()

@@ -41,6 +41,17 @@ def test_direct_practice_filters(catalog, client):
     assert "没有找到匹配" in client.get("/practice/?q=does-not-exist").content.decode()
 
 
+def test_language_and_program_filters_retain_shared_practice_workflow(catalog, client):
+    response = client.get("/practice/", {"language": "javascript"})
+    assert response.context["page"].paginator.count == 3
+    assert all(p["language"] == "javascript" for p in response.context["page"])
+    response = client.get("/practice/", {"evaluator": "python-stdio-v1"})
+    assert response.context["page"].paginator.count == 1
+    assert response.context["page"][0]["id"] == "sensor-analysis-report"
+    text = client.get("/problems/sensor-analysis-report/").content.decode()
+    assert "标准输入" in text and "完整程序" in text and "定义  函数" not in text
+
+
 def test_problem_page_no_protected_data(catalog, client):
     response = client.get("/problems/sum-positive/")
     text = response.content.decode()

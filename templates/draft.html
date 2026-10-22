@@ -1,12 +1,12 @@
-{% extends 'base.html' %}{% block title %}私有草稿 · {{ problem.title }}{% endblock %}
-{% block content %}
-<section class="page-heading"><a class="crumb" href="{% url 'dashboard' %}">← 我的学习</a><h1>{{ problem.title }}</h1><p>私有草稿 · 题目 v{{ problem.revision }} · 保存于 {{ draft.updated_at|date:'Y-m-d H:i' }} UTC</p></section>
+{% extends 'base.html' %}{% load i18n localized %}{% block title %}{% blocktranslate with value1=problem.title %}私有草稿 · {{ value1 }}{% endblocktranslate %}{% endblock %}
+{% block content %}{% include "localization/fallback.html" with content=problem %}
+<section class="page-heading"><a class="crumb" href="{% url 'dashboard' %}">{% translate "← 我的学习" %}</a><h1>{{ problem.title }}</h1><p>{% blocktranslate with value1=problem.revision value2=draft.updated_at|date:'Y-m-d H:i' %}私有草稿 · 题目 v{{ value1 }} · 保存于 {{ value2 }} UTC{% endblocktranslate %}</p></section>
 <section class="section compact">
   {% if current_available %}
-    {% if is_current %}<p><a class="button" href="{% url 'problem' problem.id %}">继续编辑 →</a></p>
-    {% else %}<p class="notice">题目已有新版本。这份草稿保留原版本的代码和题意；你可以复制代码，在阅读新题意后继续练习。</p><p><a class="button" href="{% url 'problem' problem.id %}">查看当前题目 →</a></p>{% endif %}
-  {% else %}<p class="notice">题目已下线。这份私有草稿仍可查看和复制。</p>{% endif %}
-  <h2>保存的代码（仅你可见）</h2><pre class="source-view"><code>{{ draft.source }}</code></pre>
-  <details><summary>保存时的题意与版本</summary><p>{{ problem.statement }}</p><p>{{ problem.constraints }}</p><p>{{ problem.changelog }}</p></details>
+    {% if is_current %}<p><a class="button" href="{% url 'problem' problem.id %}">{% translate "继续编辑 →" %}</a></p>
+    {% else %}<p class="notice">{% translate "题目已有新版本。这份草稿保留原版本的代码和题意；你可以复制代码，在阅读新题意后继续练习。" %}</p><p><a class="button" href="{% url 'problem' problem.id %}">{% translate "查看当前题目 →" %}</a></p>{% endif %}
+  {% else %}<p class="notice">{% translate "题目已下线。这份私有草稿仍可查看和复制。" %}</p>{% endif %}
+  <h2>{% translate "保存的代码（仅你可见）" %}</h2><pre class="source-view"><code>{{ draft.source }}</code></pre>
+  <details><summary>{% translate "保存时的题意与版本" %}</summary><p>{{ problem.statement }}</p><p>{{ problem.constraints }}</p><p>{{ problem.changelog }}</p></details>
 </section>
 {% endblock %}

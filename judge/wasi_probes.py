@@ -82,4 +82,26 @@ PROBES = [
         "ok",
         True,
     ),
+    (
+        "read-only-library-alias",
+        "def solve():\n try:\n  open('/python/lib/python3.14/lib-dynload/python314.zip', 'wb').write(b'bad')\n  return False\n except OSError: return True",
+        "ok",
+        True,
+    ),
+] + [
+    (
+        f"strict-json/{name}",
+        f"import os\ndef solve():\n os.write(1, {payload!r})\n os._exit(0)",
+        "runtime_error",
+        None,
+    )
+    for name, payload in (
+        ("duplicate-model-key", b'{"value":{"weights":[1],"weights":[2]}}'),
+        ("duplicate-envelope", b'{"value":1,"value":2}'),
+        ("nan", b'{"value":NaN}'),
+        ("infinity", b'{"value":Infinity}'),
+        ("exponent-overflow", b'{"value":{"weights":[1e999]}}'),
+        ("depth", b'{"value":' + b"[" * 34 + b"0" + b"]" * 34 + b"}"),
+        ("decoder-recursion", b'{"value":' + b"[" * 2000 + b"0" + b"]" * 2000 + b"}"),
+    )
 ]

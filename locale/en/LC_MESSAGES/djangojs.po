@@ -1,0 +1,38 @@
+# English interface for PraxiMesh.
+# Copyright PraxiMesh contributors.
+msgid ""
+msgstr "Project-Id-Version: PraxiMesh\nLanguage: en\nPO-Revision-Date: 2026-10-23 00:00+0000\nLast-Translator: PraxiMesh contributors\nLanguage-Team: English\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nPlural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "尚未保存"
+msgstr "Unsaved changes"
+
+msgid "正在保存…"
+msgstr "Saving…"
+
+msgid "正在提交…"
+msgstr "Submitting…"
+
+msgid "登录可能已过期。请先保留代码，再刷新并登录。"
+msgstr "Your session may have expired. Save a copy of your code, then refresh and log in."
+
+msgid "操作失败，请稍后重试。"
+msgstr "The operation failed. Please try again later."
+
+msgid "上一份草稿已保存；当前还有修改。"
+msgstr "The previous draft was saved; you have further changes."
+
+msgid "草稿已私密保存"
+msgstr "Draft saved privately"
+
+msgid "已提交所选代码；编辑区的新修改尚未保存。请到我的学习查看结果。"
+msgstr "The selected code was submitted. Your newer edits are unsaved. View the result in My learning."
+
+msgid "连接中断，请稍后重试。"
+msgstr "Connection interrupted. Please try again later."
+
+msgid "暂时无法读取状态，请刷新页面或重新登录。"
+msgstr "Cannot read the status right now. Refresh or log in again."
+
+msgid "连接暂时中断，正在重试。你也可以稍后在提交历史查看结果。"
+msgstr "Connection interrupted; retrying. You can also view the result later in submission history."
+

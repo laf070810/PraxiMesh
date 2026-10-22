@@ -12,11 +12,29 @@ from scripts.release import (
     SOURCE_FILES,
     ReleaseError,
     identity,
+    initial_content_commands,
     sha256,
     snapshot,
     source_archive,
     verify,
 )
+
+
+def test_initial_content_commands_respect_frozen_release_capabilities():
+    assert initial_content_commands({"source_files": {}}) == [["content_import"]]
+    files = {
+        "content/en.json": "digest",
+        "content/projects.json": "digest",
+        "localization/management/commands/translation_import.py": "digest",
+        "projects/management/commands/project_import.py": "digest",
+    }
+    assert initial_content_commands({"source_files": files}) == [
+        ["content_import", "--translations", "/app/content/en.json"],
+        ["project_import", "/app/content/projects.json"],
+    ]
+    files.pop("projects/management/commands/project_import.py")
+    with pytest.raises(ReleaseError):
+        initial_content_commands({"source_files": files})
 
 
 def write_manifest(root, manifest):

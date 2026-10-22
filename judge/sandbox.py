@@ -61,6 +61,12 @@ def policy_digest(root=None):
         "judge/wasi_policy.py",
         "judge/wasi_runner.py",
         "judge/wasi_probes.py",
+        "judge/javascript.py",
+        "judge/stdio.py",
+        "judge/stdio_probes.py",
+        "judge/javascript_bridge.c",
+        "judge/javascript_probes.py",
+        "vendor/quickjs/wasi.patch",
         "judge/evaluator.py",
         "judge/results.py",
         "core/queue.py",
@@ -210,6 +216,12 @@ class DockerSandbox:
             raise SandboxUnavailable("Process limits were not applied.")
         if host.get("LogConfig", {}).get("Type") != "none":
             raise SandboxUnavailable("Guest persistent logging must be disabled.")
+
+    def execute_program(self, source, stdin):
+        raise SandboxUnavailable("Complete programs require the reviewed WASI backend.")
+
+    def execute_javascript(self, source, function, args):
+        raise SandboxUnavailable("JavaScript requires the reviewed WASI backend.")
 
     def execute(self, source, function, args):
         payload = json.dumps(

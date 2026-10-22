@@ -1,9 +1,9 @@
-{% extends 'base.html' %}{% block title %}{{ note.title }} · 私有笔记{% endblock %}
+{% extends 'base.html' %}{% load i18n localized %}{% block title %}{% blocktranslate with value1=note.title %}{{ value1 }} · 私有笔记{% endblocktranslate %}{% endblock %}
 {% block content %}
-<section class="page-heading"><p class="eyebrow">仅自己可见</p><h1>{{ note.title }}</h1><p>更新于 {{ note.updated_at|date:'Y-m-d H:i' }} UTC</p>{% include 'learning/nav.html' %}</section>
+<section class="page-heading"><p class="eyebrow">{% translate "仅自己可见" %}</p><h1>{{ note.title }}</h1><p>{% blocktranslate with value1=note.updated_at|date:'Y-m-d H:i' %}更新于 {{ value1 }} UTC{% endblocktranslate %}</p>{% include 'learning/nav.html' %}</section>
 <section class="section compact">
-{% if note.version %}<p>关联题目：{{ note.version.data.title }} · v{{ note.version.revision }}</p>{% if note.version.problem.published and note.version.problem.current_id %}<p><a href="{% url 'problem' note.version.problem_id %}">查看当前题目 →</a>{% if note.version_id != note.version.problem.current_id %}（笔记关联旧版本，请先核对新题意）{% endif %}</p>{% else %}<p>题目已下线，笔记仍然保留。</p>{% endif %}<details><summary>关联版本的题意</summary><p>{{ note.version.data.statement|linebreaksbr }}</p><p>{{ note.version.data.constraints|linebreaksbr }}</p></details>
-{% elif note.node %}<p>关联知识：{% if note.node.published %}<a href="{% url 'node' note.node_id %}">{{ note.node.title }}</a>{% else %}{{ note.node.title }}（已下线）{% endif %}</p>{% endif %}
-<div class="note-body">{{ note.body|linebreaksbr }}</div><p><a class="button" href="{% url 'learning:note_edit' note.pk %}">编辑笔记</a></p>
-<details><summary>删除这份笔记</summary><p>删除后无法恢复。</p><form action="{% url 'learning:note_delete' note.pk %}" method="post">{% csrf_token %}<button class="secondary">删除笔记</button></form></details>
+{% if note.version %}<p>{% blocktranslate with value1=note.version|problem_title value2=note.version.revision %}关联题目：{{ value1 }} · v{{ value2 }}{% endblocktranslate %}</p>{% if note.version.problem.published and note.version.problem.current_id %}<p><a href="{% url 'problem' note.version.problem_id %}">{% translate "查看当前题目 →" %}</a>{% if note.version_id != note.version.problem.current_id %}{% translate "（笔记关联旧版本，请先核对新题意）" %}{% endif %}</p>{% else %}<p>{% translate "题目已下线，笔记仍然保留。" %}</p>{% endif %}<details><summary>{% translate "关联版本的题意" %}</summary><p>{% problem_field note.version "statement" %}</p><p>{% problem_field note.version "constraints" %}</p></details>
+{% elif note.node %}<p>{% translate "关联知识：" %}{% if note.node.published %}<a href="{% url 'node' note.node_id %}">{% node_field note.node "title" %}</a>{% else %}{% blocktranslate with value1=note.node|node_title %}{{ value1 }}（已下线）{% endblocktranslate %}{% endif %}</p>{% endif %}
+<div class="note-body">{{ note.body|linebreaksbr }}</div><p><a class="button" href="{% url 'learning:note_edit' note.pk %}">{% translate "编辑笔记" %}</a></p>
+<details><summary>{% translate "删除这份笔记" %}</summary><p>{% translate "删除后无法恢复。" %}</p><form action="{% url 'learning:note_delete' note.pk %}" method="post">{% csrf_token %}<button class="secondary">{% translate "删除笔记" %}</button></form></details>
 </section>{% endblock %}

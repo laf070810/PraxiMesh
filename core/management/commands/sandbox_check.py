@@ -70,13 +70,30 @@ PROBES = [
 
 
 def probes_for(identity):
-    if identity.get("policy") == "wasi-python-function-v1":
+    from judge.wasi_policy import POLICY_VERSION
+
+    if identity.get("policy") == POLICY_VERSION:
+        from judge.javascript_probes import PROBES as javascript_probes
+        from judge.stdio_probes import PROBES as stdio_probes
         from judge.wasi_probes import PROBES as wasi_probes
 
-        return wasi_probes
+        return [
+            (f"{language}/{name}", source, verdict, expected, language)
+            for language, probes in (("python", wasi_probes), ("javascript", javascript_probes))
+            for name, source, verdict, expected in probes
+        ] + [
+            (
+                f"python-stdio/{name}",
+                {"source": source, "stdin": stdin},
+                verdict,
+                expected,
+                "python-stdio",
+            )
+            for name, source, stdin, verdict, expected in stdio_probes
+        ]
     if identity.get("policy") != "gvisor-python-function-v1":
         raise SandboxUnavailable("Unknown isolation policy.")
-    return PROBES
+    return [(*probe, "python") for probe in PROBES]
 
 
 def suite_digest(identity):
@@ -111,8 +128,14 @@ class Command(BaseCommand):
             sandbox = configured_sandbox()
             identity = sandbox.preflight()
             passed = []
-            for name, source, verdict, expected in probes_for(identity):
-                result = sandbox.execute(source, "solve", [])
+            for name, source, verdict, expected, language in probes_for(identity):
+                if language == "python-stdio":
+                    result = sandbox.execute_program(source["source"], source["stdin"])
+                else:
+                    execute = (
+                        sandbox.execute if language == "python" else sandbox.execute_javascript
+                    )
+                    result = execute(source, "solve", [])
                 if result.verdict != verdict or (
                     verdict == "ok"
                     and (type(result.value) is not type(expected) or result.value != expected)

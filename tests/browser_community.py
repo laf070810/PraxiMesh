@@ -124,9 +124,9 @@ def run_workflow(browser, base, accounts, result, artifacts, progress, errors):
 
     author, reporter, moderator = accounts
     for account in accounts:
-        account["page"] = browser.new_context(accept_downloads=True).new_page()
+        account["page"] = browser.new_context(accept_downloads=True, locale="zh-CN").new_page()
         account["page"].on("pageerror", lambda error: errors.append(type(error).__name__))
-    guest = browser.new_context().new_page()
+    guest = browser.new_context(locale="zh-CN").new_page()
     guest.on("pageerror", lambda error: errors.append(type(error).__name__))
     author_page, reporter_page, reviewer = [account["page"] for account in accounts]
     phase("registration_and_moderator_login")
@@ -147,7 +147,7 @@ def run_workflow(browser, base, accounts, result, artifacts, progress, errors):
     private_source = "def solve(values): return 0\n# PRIVATE-COMMUNITY-SOURCE-" + suffix
     phase("private_draft_and_explicit_review_request")
     author_page.goto(base + "/problems/sum-positive/")
-    author_page.get_by_label("Python 源代码").fill(private_source)
+    author_page.locator("#source").fill(private_source)
     author_page.get_by_role("button", name="保存草稿", exact=True).click()
     expect(author_page.locator("#editor-status")).to_have_text("草稿已私密保存")
     author_page.get_by_role("link", name="写题解", exact=True).click()

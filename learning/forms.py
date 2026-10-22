@@ -1,35 +1,41 @@
 from django import forms
 from django.db.models import F, Q
+from django.utils.translation import gettext_lazy as _
 
 from core.models import KnowledgeNode, ProblemVersion
 from learning.models import Note
+from localization.presentation import localized_node, localized_problem
 
 
 class VersionChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, obj):
-        return f"{obj.data['title']} · v{obj.revision}"
+        data = localized_problem(obj)
+        suffix = str(_("中文原文")) if data["translation_fallback"] else ""
+        return f"{data['title']} · v{obj.revision} {suffix}"
 
 
 class NodeChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, obj):
-        return obj.title
+        data = localized_node(obj)
+        suffix = str(_("中文原文")) if data["translation_fallback"] else ""
+        return f"{data['title']} {suffix}"
 
 
 class NoteForm(forms.ModelForm):
     version = VersionChoiceField(
-        label="关联题目版本", queryset=ProblemVersion.objects.none(), required=False
+        label=_("关联题目版本"), queryset=ProblemVersion.objects.none(), required=False
     )
     node = NodeChoiceField(
-        label="关联知识节点", queryset=KnowledgeNode.objects.none(), required=False
+        label=_("关联知识节点"), queryset=KnowledgeNode.objects.none(), required=False
     )
 
     class Meta:
         model = Note
         fields = ["title", "body", "version", "node"]
-        labels = {"title": "标题", "body": "笔记正文"}
+        labels = {"title": _("标题"), "body": _("笔记正文")}
         help_texts = {
-            "title": "最多 120 个字符。",
-            "body": "最多 10,000 个字符，按纯文本保存，仅你可见。",
+            "title": _("最多 120 个字符。"),
+            "body": _("最多 10,000 个字符，按纯文本保存，仅你可见。"),
         }
         widgets = {"body": forms.Textarea(attrs={"rows": 12, "maxlength": 10000})}
 

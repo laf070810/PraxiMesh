@@ -2,6 +2,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxLengthValidator
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 
 class Bookmark(models.Model):
@@ -39,7 +40,7 @@ class Note(models.Model):
     def clean(self):
         super().clean()
         if self.version_id and self.node_id:
-            raise ValidationError("一份笔记只能关联一个题目版本或知识节点。")
+            raise ValidationError(_("一份笔记只能关联一个题目版本或知识节点。"))
 
 
 class TutorialReading(models.Model):

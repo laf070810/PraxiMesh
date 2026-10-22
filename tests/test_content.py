@@ -16,11 +16,16 @@ from core.models import KnowledgeNode, Problem, ProblemVersion
 
 def test_starter_contract_and_cross_domain(package):
     validate_package(package)
-    assert len(package["problems"]) == 18
+    assert len(package["problems"]) == 22
     vectors = next(n for n in package["nodes"] if n["id"] == "vectors")
     assert set(vectors["domains"]) == {"numerical", "machine-learning"}
     paths = {n["id"]: n for n in package["nodes"] if n["kind"] == "path"}
-    assert set(paths) == {"python-to-numerical", "sequence-to-graph", "statistics-to-models"}
+    assert set(paths) == {
+        "python-to-numerical",
+        "sequence-to-graph",
+        "statistics-to-models",
+        "javascript-data-path",
+    }
     exercises = {
         key: [step["target"] for step in path["steps"] if step["kind"] == "problem"]
         for key, path in paths.items()
@@ -36,7 +41,8 @@ def test_starter_contract_and_cross_domain(package):
         "stable-softmax",
     ]
     assert len(exercises["sequence-to-graph"]) == len(exercises["statistics-to-models"]) == 5
-    assert {p["id"] for p in package["problems"]} == {
+    assert len(exercises["javascript-data-path"]) == 3
+    assert {p["id"] for p in package["problems"]} - {"sensor-analysis-report"} == {
         exercise for steps in exercises.values() for exercise in steps
     }
 
@@ -49,6 +55,21 @@ def test_every_problem_has_distinct_targeted_mistakes(package):
         assert len(variants) >= 2
         assert len({variant["source"] for variant in variants}) == len(variants)
         assert all(variant["mistake"].strip() for variant in variants)
+
+
+def test_published_tests_must_fit_runtime_structural_limits(package):
+    data = copy.deepcopy(package)
+    deep = 0
+    for _ in range(33):
+        deep = [deep]
+    data["problems"][0]["tests"][0]["expected"] = deep
+    with pytest.raises(ContentError, match="structural limits"):
+        validate_package(data)
+    data = copy.deepcopy(package)
+    javascript = next(p for p in data["problems"] if p["language"] == "javascript")
+    javascript["tests"][0]["args"] = [[0] * 20000]
+    with pytest.raises(ContentError, match="structural limits"):
+        validate_package(data)
 
 
 @pytest.mark.parametrize(
@@ -131,6 +152,36 @@ def test_public_projection_excludes_protected_material(catalog):
     assert "reference" not in data and "tests" not in data
     assert all(case["public"] for case in data["examples"])
     assert "全非正数" not in json.dumps(data, ensure_ascii=False)
+
+
+def test_stdio_projection_is_program_input_and_json_output(catalog):
+    version = ProblemVersion.objects.get(problem_id="sensor-analysis-report")
+    data = public_problem(version)
+    assert data["output_format"] == "json" and "function" not in data
+    assert all(
+        "stdin" in case and "args" not in case and "call" not in case for case in data["examples"]
+    )
+    assert "reference" not in data and "tests" not in data
+
+
+@pytest.mark.parametrize(
+    "mutation", ["mismatched_language", "unsafe_integer", "too_deep", "stdio_fields"]
+)
+def test_language_contracts_fail_during_import(package, mutation):
+    problem = next(p for p in package["problems"] if p["language"] == "javascript")
+    if mutation == "mismatched_language":
+        problem["language"] = "python"
+    elif mutation == "unsafe_integer":
+        problem["tests"][0]["args"] = [2**53]
+    elif mutation == "too_deep":
+        value = 0
+        for _ in range(35):
+            value = [value]
+        problem["tests"][0]["args"] = value
+    else:
+        problem.update(evaluator="python-stdio-v1", language="python", output_format="json")
+    with pytest.raises(ContentError):
+        validate_package(package)
 
 
 def test_withdrawal_preserves_history(catalog):

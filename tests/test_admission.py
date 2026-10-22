@@ -55,6 +55,21 @@ def test_pause_keeps_existing_work_and_resume_requires_owner(ready, user):
     assert enqueue(user, version, "after resume", "run").evaluation_fingerprint == ready.fingerprint
 
 
+@pytest.mark.parametrize("problem", ["js-run-length", "sensor-analysis-report"])
+def test_gvisor_does_not_advertise_or_admit_unsupported_languages(
+    ready, settings, user, client, problem
+):
+    settings.JUDGE_BACKEND = "gvisor"
+    ready.fingerprint = configured_fingerprint()
+    ready.save()
+    version = ProblemVersion.objects.get(problem_id=problem)
+    assert available() and not available(version)
+    assert not client.get(f"/problems/{problem}/").context["judge_available"]
+    with pytest.raises(AdmissionError):
+        enqueue(user, version, version.data["reference"], "submit")
+    assert not Submission.objects.exists()
+
+
 @pytest.mark.parametrize("failure", ["stale", "wrong_policy", "unready", "disabled"])
 def test_resume_fails_closed_without_ready_matching_worker(ready, settings, failure):
     token = uuid.uuid4()

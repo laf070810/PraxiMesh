@@ -71,7 +71,7 @@ def main():
             [sys.executable, "-m", "pytest", *sys.argv[1:]],
             cwd=ROOT,
             env=environment,
-            timeout=900,
+            timeout=1800,
         )
     assert not docker(
         "volume",

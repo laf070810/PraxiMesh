@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import math
 from pathlib import Path
 
 from django.conf import settings
@@ -13,6 +14,44 @@ from core.models import KnowledgeNode, Problem, ProblemVersion
 
 class ContentError(ValueError):
     pass
+
+
+def bounded_json_shape(value):
+    pending = [(value, 0)]
+    nodes = 0
+    while pending:
+        item, depth = pending.pop()
+        nodes += 1
+        if depth > 32 or nodes > 20000:
+            raise ContentError("Test JSON exceeds the runtime structural limits.")
+        children = (
+            item.values() if isinstance(item, dict) else item if isinstance(item, list) else ()
+        )
+        pending.extend((child, depth + 1) for child in children)
+
+
+def javascript_values(value, depth=0):
+    """Content must fit the same finite, safe JSON contract as the guest bridge."""
+    if depth > 32:
+        raise ContentError("JavaScript values exceed the supported nesting depth.")
+    if isinstance(value, bool) or value is None:
+        return
+    if isinstance(value, (int, float)):
+        if not math.isfinite(value) or (value == int(value) and abs(value) > 2**53 - 1):
+            raise ContentError("JavaScript numbers must be finite and integers must be safe.")
+    elif isinstance(value, str):
+        value.encode("utf-8")
+    elif isinstance(value, list):
+        for item in value:
+            javascript_values(item, depth + 1)
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise ContentError("JavaScript object keys must be strings.")
+            key.encode("utf-8")
+            javascript_values(item, depth + 1)
+    else:
+        raise ContentError("Unsupported JavaScript JSON value.")
 
 
 def digest(value):
@@ -51,7 +90,7 @@ def validate_package(data):
     # Also catches nonfinite numbers when called directly rather than via load_package.
     try:
         digest(data)
-    except ValueError as exc:
+    except (ValueError, OverflowError, UnicodeError, RecursionError) as exc:
         raise ContentError("Nonfinite numeric values are not allowed.") from exc
     nodes = {n["id"]: n for n in data["nodes"]}
     problems = {p["id"]: p for p in data["problems"]}
@@ -125,21 +164,37 @@ def validate_package(data):
         if len(names) != len(set(names)):
             raise ContentError("Duplicate test names.")
         for case in problem["tests"]:
+            input_value = (
+                case["stdin"] if problem["evaluator"] == "python-stdio-v1" else case["args"]
+            )
             if (
-                len(json.dumps(case["args"], ensure_ascii=False).encode()) > 100000
+                len(json.dumps(input_value, ensure_ascii=False).encode()) > 100000
                 or len(json.dumps(case["expected"]).encode()) > 32000
             ):
                 raise ContentError("Test exceeds input/output budget.")
+            bounded_json_shape(case["expected"])
+            if problem["language"] == "javascript":
+                try:
+                    bounded_json_shape(case["args"])
+                    javascript_values(case["args"])
+                    javascript_values(case["expected"])
+                except (UnicodeError, OverflowError) as exc:
+                    raise ContentError("Unsupported JavaScript JSON value.") from exc
 
 
 @transaction.atomic
 def import_package(data):
+    from localization.packages import snapshot
+
     validate_package(data)
+    # Save existing knowledge before replacement; previous problem snapshots stay untouched.
+    for previous in KnowledgeNode.objects.select_for_update():
+        snapshot(previous)
     # Full replacement publication: absent IDs are withdrawn, never deleted.
     KnowledgeNode.objects.update(published=False)
     Problem.objects.update(published=False)
     for node in data["nodes"]:
-        KnowledgeNode.objects.update_or_create(
+        stored, _ = KnowledgeNode.objects.update_or_create(
             id=node["id"],
             defaults={
                 "kind": node["kind"],
@@ -148,6 +203,7 @@ def import_package(data):
                 "published": True,
             },
         )
+        snapshot(stored)
     for item in data["problems"]:
         problem, _ = Problem.objects.get_or_create(id=item["id"])
         version, created = ProblemVersion.objects.get_or_create(
@@ -177,7 +233,7 @@ def public_problem(version):
         "concepts",
         "difficulty",
         "language",
-        "function",
+        "evaluator",
         "starter",
         "hints",
         "comparison",
@@ -185,10 +241,21 @@ def public_problem(version):
         "tags",
     )
     data = {key: version.data[key] for key in fields}
+    stdio = version.data["evaluator"] == "python-stdio-v1"
+    if stdio:
+        data["output_format"] = version.data["output_format"]
+    else:
+        data["function"] = version.data["function"]
     data["examples"] = [
         {
             **case,
-            "call": f"{data['function']}({', '.join(repr(arg) for arg in case['args'])})",
+            **(
+                {}
+                if stdio
+                else {
+                    "call": f"{data['function']}({', '.join(json.dumps(arg, ensure_ascii=False) if data['language'] == 'javascript' else repr(arg) for arg in case['args'])})"
+                }
+            ),
         }
         for case in version.data["tests"]
         if case["public"]

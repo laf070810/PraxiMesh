@@ -65,17 +65,7 @@ jobs:
       - run: uv sync --frozen --group browser
       - run: uv run --group browser playwright install --with-deps chromium
       - name: Local browser journey, evaluation disabled
-        run: |
-          uv run python manage.py migrate --noinput
-          uv run python manage.py content_import
-          uv run python manage.py runserver 127.0.0.1:8765 --noreload > /tmp/server.log 2>&1 &
-          server_pid=$!
-          trap 'kill "$server_pid"' EXIT
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent http://127.0.0.1:8765/health/; then break; fi
-            sleep 1
-          done
-          uv run --group browser python tests/browser_smoke.py
+        run: uv run --group browser python scripts/browser_acceptance.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

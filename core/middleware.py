@@ -3,6 +3,7 @@ import ipaddress
 from django.conf import settings
 from django.contrib.auth.forms import UsernameField
 from django.http import HttpResponse
+from django.utils.translation import gettext
 
 from core.limits import consume
 
@@ -42,7 +43,7 @@ class SecurityPolicyMiddleware:
         if request.method == "POST" and request.path.startswith("/accounts/"):
             # Only an explicitly trusted proxy can supply a rewritten client IP.
             if not consume("account-ip", client_address(request), 30, 900):
-                response = HttpResponse("操作过于频繁，请 15 分钟后重试。", status=429)
+                response = HttpResponse(gettext("操作过于频繁，请 15 分钟后重试。"), status=429)
                 response["Retry-After"] = "900"
             # Match authentication's whitespace stripping and NFKC conversion:
             # equivalent spellings must not create fresh per-account quotas.
@@ -52,7 +53,7 @@ class SecurityPolicyMiddleware:
                 .casefold()[:150]
             )
             if response is None and username and not consume("account-name", username, 15, 900):
-                response = HttpResponse("操作过于频繁，请稍后重试。", status=429)
+                response = HttpResponse(gettext("操作过于频繁，请稍后重试。"), status=429)
         response = response or self.get_response(request)
         response["Content-Security-Policy"] = (
             "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "

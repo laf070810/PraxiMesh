@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "projects": [
+    {
+      "id": "sensor-analysis",
+      "revision": 1,
+      "title": "传感器读数分析报告",
+      "summary": "从可独立练习的统计、查询与积分组件，走到可以读取数据并输出完整报告的程序。",
+      "integration_goal": "交付一个完整Python标准输入输出程序，读取时间、读数与半开区间查询，同时生成区间和、总体均值/方差以及非等距有符号积分。组件可以直接跳过，但最终必须提交整合后的程序并经过正式评测。",
+      "stages": [
+        {
+          "id": "statistics",
+          "title": "组件：总体统计",
+          "description": "明确均值和总体方差的返回结构，处理单样本。",
+          "problem": "population-stats",
+          "problem_revision": 1,
+          "problem_digest": "b1d70a1216d32a8463194d6dac305376fd1428d49bd2c8befb47197004284da8",
+          "recommended": [],
+          "final": false
+        },
+        {
+          "id": "ranges",
+          "title": "组件：区间查询",
+          "description": "复用前缀和回答半开区间，保持查询顺序。",
+          "problem": "range-sums",
+          "problem_revision": 1,
+          "problem_digest": "4ccd3263a7e84c51d34f4704da1ed7ec7cba4e7240a44436d3916ad7e0410514",
+          "recommended": [],
+          "final": false
+        },
+        {
+          "id": "integration",
+          "title": "组件：非等距积分",
+          "description": "使用每段真实Δt并保留负高度的符号；最终任务还需扩展到单样本积分0。",
+          "problem": "trapezoid-samples",
+          "problem_revision": 1,
+          "problem_digest": "b047c0775911c29f5659763b88f4318e77d39dbe6d21f8d20fae2282b3f242cf",
+          "recommended": [],
+          "final": false
+        },
+        {
+          "id": "report",
+          "title": "集成：完整传感器分析程序",
+          "description": "连接JSON输入、三个计算组件和规范输出；不能用单个组件结果代替整份报告。",
+          "problem": "sensor-analysis-report",
+          "problem_revision": 1,
+          "problem_digest": "3233f28ffb24b3b3facb17b5e8bb15626afd58fc107019530ee8a2e5208a9d1f",
+          "recommended": [
+            "statistics",
+            "ranges",
+            "integration"
+          ],
+          "final": true
+        }
+      ]
+    }
+  ]
+}

@@ -30,13 +30,14 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from scripts.deploy_database import DeploymentDatabase, DeploymentDatabaseError  # noqa: E402
 from scripts.deploy_proxy import DeploymentProxy, ProxyError  # noqa: E402
-from scripts.release import inspect_images, verify  # noqa: E402
+from scripts.release import initial_content_commands, inspect_images, verify  # noqa: E402
 
 CONTROL_DIAGNOSTIC_STREAM_BYTES = 64 * 1024
 CONTROL_DIAGNOSTIC_MAX_BYTES = 1024 * 1024
 CONTROL_COMMANDS = {
     "check",
     "content_import",
+    "project_import",
     "deployment_check",
     "judge_admission",
     "maintain",
@@ -474,7 +475,7 @@ class Deployment:
         if not initial:
             raise DeploymentError("Candidate worker is missing")
         restart_count = initial["RestartCount"]
-        deadline = time.monotonic() + 180
+        deadline = time.monotonic() + 300
         while time.monotonic() < deadline:
             if self.ready(generation):
                 return
@@ -624,7 +625,8 @@ class Deployment:
             self.save("migrating")
             self.control(candidate, "migrate", "--noinput", timeout=300)
             if initial_content:
-                self.control(candidate, "content_import")
+                for command in initial_content_commands(candidate["manifest"]):
+                    self.control(candidate, *command)
             self.database.grant(candidate["database"])
             self.database.invalidate_health(candidate["database"])
             self.control(candidate, "judge_admission", "pause", "--token", token)

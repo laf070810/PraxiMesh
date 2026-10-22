@@ -31,7 +31,7 @@ DB_OPTIONS = (
     "-c statement_timeout=60000 -c lock_timeout=5000 "
     "-c idle_in_transaction_session_timeout=15000 -c transaction_timeout=900000"
 )
-WEB_READ = (
+BASE_WEB_READ = (
     "core_knowledgenode",
     "core_problem",
     "core_problemversion",
@@ -41,6 +41,19 @@ WEB_READ = (
     "auth_group_permissions",
     "django_content_type",
 )
+FEATURE_READ_TABLES = {
+    ("projects", "0001_initial"): (
+        "projects_project",
+        "projects_projectrevision",
+        "projects_projectstage",
+    ),
+    ("localization", "0001_initial"): (
+        "localization_knowledgesnapshot",
+        "localization_knowledgetranslation",
+        "localization_problemtranslation",
+    ),
+}
+WEB_READ = BASE_WEB_READ + tuple(table for group in FEATURE_READ_TABLES.values() for table in group)
 BASE_WEB_WRITE = (
     "auth_user",
     "auth_user_groups",
@@ -66,6 +79,14 @@ FEATURE_TABLES = {
         "community_appeal",
         "community_moderationevent",
     ),
+    ("practice_api", "0001_initial"): (
+        "practice_api_accesstoken",
+        "practice_api_submissionrequest",
+    ),
+    ("showcase", "0001_initial"): (
+        "showcase_publicprofile",
+        "showcase_sharedresult",
+    ),
 }
 WEB_WRITE = BASE_WEB_WRITE + tuple(table for group in FEATURE_TABLES.values() for table in group)
 WORKER_PRIVILEGES = {
@@ -79,7 +100,7 @@ class DeploymentDatabaseError(RuntimeError):
     """Safe operational error: no underlying server output or credentials."""
 
 
-def web_write_tables(connection):
+def schema_tables(connection, base, features):
     """Use the recorded schema, including the previous generation during upgrades."""
     installed = set(connection.execute("SELECT app, name FROM public.django_migrations").fetchall())
     present = {
@@ -89,8 +110,8 @@ def web_write_tables(connection):
             "WHERE n.nspname='public' AND c.relkind IN ('r','p')"
         ).fetchall()
     }
-    expected = list(BASE_WEB_WRITE)
-    for migration, tables in FEATURE_TABLES.items():
+    expected = list(base)
+    for migration, tables in features.items():
         if migration in installed:
             expected.extend(tables)
         elif present.intersection(tables):
@@ -98,6 +119,14 @@ def web_write_tables(connection):
     if not set(expected).issubset(present):
         raise DeploymentDatabaseError("Recorded migrations are missing required runtime tables")
     return tuple(expected)
+
+
+def web_write_tables(connection):
+    return schema_tables(connection, BASE_WEB_WRITE, FEATURE_TABLES)
+
+
+def web_read_tables(connection):
+    return schema_tables(connection, BASE_WEB_READ, FEATURE_READ_TABLES)
 
 
 def safe_errors(function):
@@ -402,6 +431,7 @@ class DeploymentDatabase:
         self._require_roles()
         with self._connect(name) as connection:
             writable = web_write_tables(connection)
+            readable = web_read_tables(connection)
             # No implicit grants to newly migrated tables. Every writable table
             # and every sequence is derived from this reviewed allowlist.
             principals = sql.SQL("PUBLIC, {}, {}").format(*map(sql.Identifier, self.roles.values()))
@@ -419,7 +449,7 @@ class DeploymentDatabase:
                     sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(sql.Identifier(role))
                 )
             for tables, privileges in [
-                (WEB_READ, "SELECT"),
+                (readable, "SELECT"),
                 (writable, "SELECT, INSERT, UPDATE, DELETE"),
             ]:
                 connection.execute(
@@ -460,6 +490,7 @@ class DeploymentDatabase:
         """Check effective privileges, including column grants and grant options."""
         with self.connection(name) as connection:
             writable = web_write_tables(connection)
+            readable = web_read_tables(connection)
             sequences = self._web_sequences(connection)
             if connection.execute(
                 "SELECT EXISTS (SELECT 1 FROM pg_database d, "
@@ -471,7 +502,7 @@ class DeploymentDatabase:
             for role, identity in self.roles.items():
                 expected = (
                     {
-                        **{table: {"SELECT"} for table in WEB_READ},
+                        **{table: {"SELECT"} for table in readable},
                         **{table: {"SELECT", "INSERT", "UPDATE", "DELETE"} for table in writable},
                     }
                     if role == "web"

@@ -178,5 +178,49 @@
       "mistake": "遗漏两端高度平均的二分之一",
       "source": "def solve(xs,ys): return sum((xs[i+1]-xs[i])*(ys[i]+ys[i+1]) for i in range(len(xs)-1))"
     }
+  ],
+  "js-run-length": [
+    {
+      "mistake": "把不相邻的相同值合并",
+      "source": "function solve(values) { const m = new Map(); for (const x of values) m.set(x, (m.get(x)||0)+1); return Array.from(m); }"
+    },
+    {
+      "mistake": "遗漏最后一个游程",
+      "source": "function solve(values) { const r=[]; let n=1; for(let i=1;i<values.length;i++){if(values[i]===values[i-1])n++;else{r.push([values[i-1],n]);n=1;}}return r; }"
+    }
+  ],
+  "js-label-count": [
+    {
+      "mistake": "把继承属性当作计数",
+      "source": "function solve(values) { const r={}; for(const x of values)r[x]=(r[x]||0)+1;return r; }"
+    },
+    {
+      "mistake": "擅自忽略大小写",
+      "source": "function solve(values) { const m=new Map();for(const x of values){const k=x.toLowerCase();m.set(k,(m.get(k)||0)+1);}return Object.fromEntries(m); }"
+    }
+  ],
+  "js-window-mean": [
+    {
+      "mistake": "将窗口和作为均值",
+      "source": "function solve(values,width){const r=[];for(let i=0;i+width<=values.length;i++)r.push(values.slice(i,i+width).reduce((a,b)=>a+b,0));return r;}"
+    },
+    {
+      "mistake": "遗漏最后一个完整窗口",
+      "source": "function solve(values,width){const r=[];for(let i=0;i+width<values.length;i++)r.push(values.slice(i,i+width).reduce((a,b)=>a+b,0)/width);return r;}"
+    }
+  ],
+  "sensor-analysis-report": [
+    {
+      "mistake": "错误使用单位时间间隔",
+      "source": "import json\nimport sys\n\n\ndef interval_sums(values, queries):\n    prefix = [0]\n    for value in values:\n        prefix.append(prefix[-1] + value)\n    return [prefix[right] - prefix[left] for left, right in queries]\n\n\ndef summarize(values):\n    mean = sum(values) / len(values)\n    variance = sum((value - mean) ** 2 for value in values) / len(values)\n    return mean, variance\n\n\ndef integrate(times, values):\n    return sum((values[i] + values[i + 1]) / 2\n               for i in range(len(values) - 1))\n\n\ndata = json.load(sys.stdin)\ntimes, values, queries = data[\"times\"], data[\"values\"], data[\"queries\"]\nmean, variance = summarize(values)\nprint(json.dumps({\"range_sums\": interval_sums(values, queries), \"mean\": mean,\n                  \"variance\": variance, \"integral\": integrate(times, values)}, allow_nan=False))\n"
+    },
+    {
+      "mistake": "错误包含区间右端点",
+      "source": "import json\nimport sys\n\n\ndef interval_sums(values, queries):\n    prefix = [0]\n    for value in values:\n        prefix.append(prefix[-1] + value)\n    return [prefix[min(right + 1, len(values))] - prefix[left] for left, right in queries]\n\n\ndef summarize(values):\n    mean = sum(values) / len(values)\n    variance = sum((value - mean) ** 2 for value in values) / len(values)\n    return mean, variance\n\n\ndef integrate(times, values):\n    return sum((times[i + 1] - times[i]) * (values[i] + values[i + 1]) / 2\n               for i in range(len(values) - 1))\n\n\ndata = json.load(sys.stdin)\ntimes, values, queries = data[\"times\"], data[\"values\"], data[\"queries\"]\nmean, variance = summarize(values)\nprint(json.dumps({\"range_sums\": interval_sums(values, queries), \"mean\": mean,\n                  \"variance\": variance, \"integral\": integrate(times, values)}, allow_nan=False))\n"
+    },
+    {
+      "mistake": "错误使用样本方差分母",
+      "source": "import json\nimport sys\n\n\ndef interval_sums(values, queries):\n    prefix = [0]\n    for value in values:\n        prefix.append(prefix[-1] + value)\n    return [prefix[right] - prefix[left] for left, right in queries]\n\n\ndef summarize(values):\n    mean = sum(values) / len(values)\n    variance = sum((value - mean) ** 2 for value in values) / max(len(values) - 1, 1)\n    return mean, variance\n\n\ndef integrate(times, values):\n    return sum((times[i + 1] - times[i]) * (values[i] + values[i + 1]) / 2\n               for i in range(len(values) - 1))\n\n\ndata = json.load(sys.stdin)\ntimes, values, queries = data[\"times\"], data[\"values\"], data[\"queries\"]\nmean, variance = summarize(values)\nprint(json.dumps({\"range_sums\": interval_sums(values, queries), \"mean\": mean,\n                  \"variance\": variance, \"integral\": integrate(times, values)}, allow_nan=False))\n"
+    }
   ]
 }

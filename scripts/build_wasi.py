@@ -1,4 +1,4 @@
-"""Build the reviewed CPython/WASI bundle from pinned official releases.
+"""Build the CPython/WASI base for build_functions_wasi.py from pinned official releases.
 
 Run with the locked judge dependency group. Build code is trusted; no submitted
 program is involved. Generated native Wasmtime cache must be treated like an
@@ -23,7 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from judge.wasi_policy import (  # noqa: E402
-    BUNDLE_FILES,
+    PYTHON_BUNDLE_FILES,
     PYTHON_VERSION,
     TARGET,
     WASMTIME_VERSION,
@@ -184,14 +184,14 @@ def main():
             "engine_policy": sha256(
                 Path(__file__).resolve().parent.parent / "judge/wasi_policy.py"
             ),
-            "files": {name: sha256(bundle / name) for name in BUNDLE_FILES},
+            "files": {name: sha256(bundle / name) for name in PYTHON_BUNDLE_FILES},
         }
         (bundle / "manifest.json").write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n")
         for file in bundle.rglob("*"):
             file.chmod(0o755 if file.is_dir() else 0o644)
         bundle.rename(output)
-    print(f"JUDGE_WASI_BUNDLE={output}")
-    print(f"JUDGE_WASI_SHA256={sha256(output / 'manifest.json')}")
+    print(f"PYTHON_BASE_BUNDLE={output}")
+    print(f"PYTHON_BASE_SHA256={sha256(output / 'manifest.json')}")
 
 
 if __name__ == "__main__":

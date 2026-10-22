@@ -45,7 +45,7 @@ def learning_and_community(page, base, *, judge):
     page.get_by_role("button", name="主动提交公开审核", exact=True).click()
     page.goto(post_url)
     expect(page.get_by_text("这份内容当前未公开。", exact=False)).to_be_visible()
-    guest = page.context.browser.new_context()
+    guest = page.context.browser.new_context(locale="zh-CN")
     try:
         visitor = guest.new_page()
         assert visitor.goto(post_url).status == 404
@@ -77,7 +77,7 @@ def main():
         launch_args.append("--ignore-certificate-errors-spki-list=" + pin)
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(args=launch_args)
-        page = browser.new_page(viewport={"width": 1440, "height": 1050})
+        page = browser.new_page(locale="zh-CN", viewport={"width": 1440, "height": 1050})
         page.on("pageerror", lambda error: errors.append(str(error)))
         response = page.goto(base)
         if base.startswith("https://"):
@@ -88,7 +88,7 @@ def main():
         page.goto(base + "/learn/vectors/")
         expect(page.get_by_role("heading", name="向量与点积", exact=True)).to_be_visible()
         page.get_by_role("link", name="向量的点积", exact=False).click()
-        expect(page.get_by_label("Python 源代码")).to_be_visible()
+        expect(page.locator("#source")).to_be_visible()
         page.goto(base + "/accounts/register/")
         page.get_by_label("用户名", exact=False).fill(username)
         page.locator("#id_password1").fill(password)
@@ -103,11 +103,11 @@ def main():
             assert cookies["csrftoken"]["secure"]
         page.goto(base + "/problems/sum-positive/")
         source = "def solve(values):\n    return sum(x for x in values if x > 0)\n"
-        page.get_by_label("Python 源代码").fill(source)
+        page.locator("#source").fill(source)
         page.get_by_role("button", name="保存草稿").click()
         expect(page.locator("#editor-status")).to_have_text("草稿已私密保存")
         page.reload()
-        expect(page.get_by_label("Python 源代码")).to_have_value(source)
+        expect(page.locator("#source")).to_have_value(source)
         page.goto(base + "/me/")
         draft_link = page.locator('a[href^="/drafts/"]')
         expect(draft_link).to_have_count(1)
@@ -116,7 +116,7 @@ def main():
         expect(page.locator(".source-view")).to_have_text(source.strip())
         page.get_by_role("link", name="继续编辑", exact=False).focus()
         page.keyboard.press("Enter")
-        expect(page.get_by_label("Python 源代码")).to_have_value(source)
+        expect(page.locator("#source")).to_have_value(source)
         if os.environ.get("BROWSER_JUDGE") == "1":
             page.get_by_role("button", name="运行样例", exact=True).click()
             expect(page.get_by_role("heading", name="通过", exact=True)).to_be_visible(
@@ -128,13 +128,13 @@ def main():
             page.goto(base + "/me/")
             expect(page.get_by_text("已通过 0 道", exact=False)).to_be_visible()
             page.goto(base + "/problems/sum-positive/")
-            page.get_by_label("Python 源代码").fill("def solve(values): return -1")
+            page.locator("#source").fill("def solve(values): return -1")
             page.get_by_role("button", name="提交评测", exact=False).click()
             expect(page.get_by_role("heading", name="答案有误", exact=True)).to_be_visible(
                 timeout=180000
             )
             page.goto(base + "/problems/sum-positive/")
-            page.get_by_label("Python 源代码").fill(source)
+            page.locator("#source").fill(source)
             page.get_by_role("button", name="提交评测", exact=False).click()
             expect(page.get_by_role("heading", name="通过", exact=True)).to_be_visible(
                 timeout=180000

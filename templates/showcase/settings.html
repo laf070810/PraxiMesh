@@ -1,0 +1,5 @@
+{% extends 'base.html' %}{% load i18n localized %}{% block title %}{% translate "公开主页设置 · PraxiMesh" %}{% endblock %}{% block content %}
+<section class="page-heading"><h1>{% translate "公开主页设置" %}</h1>{% include 'showcase/nav.html' %}<p>{% blocktranslate with value1=user.username %}默认关闭。这里的公开名称和简介独立填写，不读取私有显示名称。开启后会展示用户名 {{ value1 }}；评测结果需要逐条主动选择。{% endblocktranslate %}</p></section>
+<section class="section compact"><form method="post">{% csrf_token %}{{ form.as_p }}<button class="button">{% translate "保存公开设置" %}</button></form>
+{% if profile.is_public %}<p><a href="{% url 'showcase:profile' user.username %}">{% translate "查看我的公开主页" %}</a></p><form action="{% url 'showcase:close' %}" method="post">{% csrf_token %}<input type="hidden" name="revision" value="{{ profile.revision }}"><button class="secondary">{% translate "关闭主页并撤回全部分享" %}</button></form>{% else %}<p>{% translate "主页当前关闭，作品和榜单均不可公开访问。" %}</p>{% endif %}
+<p>{% translate "关闭会撤回全部作品和榜单条目；重新开启不会自动重新分享。此前独立提交公开的社区正文不受影响，需在社区中单独撤回。" %}</p></section>{% endblock %}

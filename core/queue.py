@@ -5,6 +5,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
+from django.utils.translation import gettext
 
 from core.models import Problem, QueueLock, Submission, WorkerHealth
 from judge.results import LABELS
@@ -39,9 +40,20 @@ def worker_available():
     )
 
 
-def available():
+def supports(version):
+    from judge.evaluator import EVALUATORS
+
+    evaluator = version.data.get("evaluator")
+    return evaluator in EVALUATORS and (
+        settings.JUDGE_BACKEND == "wasi"
+        or (settings.JUDGE_BACKEND == "gvisor" and evaluator == "python-function-v1")
+    )
+
+
+def available(version=None):
     return (
-        worker_available()
+        (version is None or supports(version))
+        and worker_available()
         and not QueueLock.objects.filter(id=1, pause_token__isnull=False).exists()
     )
 
@@ -122,16 +134,16 @@ def expire_jobs():
 @transaction.atomic
 def enqueue(user, version, source, mode):
     lock_queue()
-    if not available():
-        raise AdmissionError("评测暂不可用。你仍可阅读题目和保存草稿。")
+    if not available(version):
+        raise AdmissionError(gettext("评测暂不可用。你仍可阅读题目和保存草稿。"))
     if not Problem.objects.filter(id=version.problem_id, current=version, published=True).exists():
-        raise AdmissionError("题目已更新或下线，请刷新后重新提交。", 409)
+        raise AdmissionError(gettext("题目已更新或下线，请刷新后重新提交。"), 409)
     expire_jobs()
     active = Submission.objects.filter(status__in=["queued", "running"])
     if active.filter(user=user).count() >= settings.JUDGE_MAX_PENDING:
-        raise AdmissionError("你已有待处理任务，请等待结果后继续。", 429)
+        raise AdmissionError(gettext("你已有待处理任务，请等待结果后继续。"), 429)
     if active.count() >= settings.JUDGE_MAX_QUEUE:
-        raise AdmissionError("评测队列已满，请稍后重试。", 429)
+        raise AdmissionError(gettext("评测队列已满，请稍后重试。"), 429)
     return Submission.objects.create(
         user=user,
         version=version,
@@ -174,6 +186,11 @@ def renew(job):
 
 
 def finish(job, result, environment):
+    environment = {
+        **environment,
+        "language": job.version.data["language"],
+        "evaluator": job.version.data["evaluator"],
+    }
     return Submission.objects.filter(
         id=job.id, status="running", lease_token=job.lease_token
     ).update(

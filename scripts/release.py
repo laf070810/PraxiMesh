@@ -28,6 +28,11 @@ SOURCE_DIRS = {
     "core",
     "learning",
     "community",
+    "practice_api",
+    "showcase",
+    "localization",
+    "projects",
+    "locale",
     "judge",
     "praximesh",
     "content",
@@ -68,6 +73,22 @@ IMAGE = re.compile(r"sha256:[a-f0-9]{64}")
 
 class ReleaseError(ValueError):
     pass
+
+
+def initial_content_commands(manifest):
+    """Explicit demo-catalog installation, compatible with frozen older images."""
+    files = manifest["source_files"]
+    content = ["content_import"]
+    if "content/en.json" in files:
+        if "localization/management/commands/translation_import.py" not in files:
+            raise ReleaseError("Translation content requires its reviewed importer")
+        content += ["--translations", "/app/content/en.json"]
+    commands = [content]
+    if "content/projects.json" in files:
+        if "projects/management/commands/project_import.py" not in files:
+            raise ReleaseError("Project content requires its reviewed importer")
+        commands.append(["project_import", "/app/content/projects.json"])
+    return commands
 
 
 def sha256(path):
