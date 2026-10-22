@@ -1,6 +1,6 @@
 # 构建、校验与导入发布制品
 
-发布制品把同一源码快照、锁文件、Web 镜像和 WASI worker 镜像绑定起来，供部署与回滚使用。当前已经实现制品流程及独立的暂停/排空命令；服务激活、迁移协调和自动回滚仍待完成，不能将 `load` 当成上线。设计见 [RFC-004](rfcs/004-release-artifacts.md)和[部署协调指南](deployment-coordination.md)。
+发布制品把同一源码快照、锁文件、Web 镜像和 WASI worker 镜像绑定起来。制品流程与单主机发布协调器均已实现：`load` 负责导入，`deploy.py apply` 负责维护窗口内的备份恢复、迁移、候选验证和代理激活。设计见 [RFC-004](rfcs/004-release-artifacts.md)、[ADR-008](adr/008-deployment-generations.md)及[部署协调指南](deployment-coordination.md)。
 
 ## 构建
 
@@ -55,8 +55,18 @@ Web 不含 Wasmtime 或解释器，只记录匹配的制品摘要；worker 包�
 
 检查真实启动探针、镜像内策略一致性、Web 不含运行时、浏览器 Run→错误提交→Accepted→路径/历史→删除、真实任务的暂停/超时保持关闭/排空/恢复，以及错误解释器摘要导致启动拒绝。结束清理容器、网络和显式标记的数据库卷，另查卷是否已消失，才输出 `test-results/release-acceptance.json` 和受限日志。它检查当前协议的打包核心功能；生产设置/TLS 另按 [HTTPS 验收指南](production-acceptance.md)验证。
 
+## 激活与恢复
+
+按[部署协调指南](deployment-coordination.md)准备私有配置、专用 PostgreSQL 与网络、Caddy 和服务监管，然后使用经审查的制品摘要执行 `deploy.py apply`。协调器暂停并排空任务、切换维护页、停止旧进程、冻结旧库，将备份恢复到新的代际库并比较表数据、列定义与序列，再迁移和启动候选。首次示例内容导入必须显式指定；升级保留原有内容。
+
+候选 worker 重跑实际隔离探针，指定实例的真实正确/错误提交及执行身份通过后才开放。开放前失败可恢复原代；开放意图一旦持久保存，`recover` 就保留可能已接收用户写入的数据库进行前向恢复，不能自动切回旧快照。旧库与备份保留，清理由运营保留政策决定。
+
+candidate-6 已使用同一不可变发布包完成四代真实部署，验证备份恢复、HTTPS 浏览器判题、开放前中断恢复旧代、开放后保留新写入及账号删除，以及 Caddy 被杀后的重启。测试仅使用合成数据、私有 Docker 网络和回环 HTTPS；该次没有改变 schema，也没有验证失败迁移。证据为 `test-results/deployment-candidate-6/deployment-acceptance.json`，完整范围见[验收记录](acceptance.md)。
+
+后续 candidate-7 的五代演练另用正常构建流程生成真正失败的原子迁移制品，验证实际 DDL 后异常、事务回滚、旧站数据保留和恢复后的真实 Accepted。该故障制品只供隔离验收使用，不能部署到实际站点。命令见[部署协调指南](deployment-coordination.md)，证据为 `test-results/deployment-candidate-7/deployment-acceptance.json`。
+
 ## 当前发布边界
 
 WASI bundle format 2 使用显式 `x86_64-unknown-linux-gnu` target、关闭 component model，并保留 CPython 与固定 SDK 运行库声明。旧 format 1 bundle 和 receipt 不可复用。目标主机仍须运行实际门槛；不同 CPU/内核兼容性不能只靠架构标签宣称通过。
 
-镜像更新不会自动迁移数据库或导入内容；必须明确安排备份、兼容迁移、内容审核、在途任务与回滚策略。不能让不兼容 worker 同时争抢同一个队列。当前尚无完整激活/回滚协调器、registry/部署目标或托管 CI 运行证据。本项目代码与内容许可、公开实例及运营决策也尚未确认；工具不会推送镜像或创建公网服务。
+单独导入镜像不会迁移数据库或切换服务；激活必须通过已配置的协调器，并审查内容与迁移。部署工作流只支持手工触发，默认禁用，受保护环境、专用 runner 和生产目标尚未配置，托管 CI 运行也未验证。本地演练不证明公有证书、系统服务、持续容量或异机灾难恢复已通过。本项目代码与内容许可、公开实例及运营决策仍待确认；工具不会推送镜像或自行创建公网服务。

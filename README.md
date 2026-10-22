@@ -26,13 +26,13 @@ uv run python manage.py makemigrations --check --dry-run
 uv run pip-audit
 ```
 
-测试自动收集静态资源。普通测试会跳过 5 项需要实际沙箱的检查，SQLite 还会跳过 2 项 PostgreSQL 并发检查。完整真实判题配置、构建和一键浏览器验收见 [WASI 指南](docs/wasi.md)；跳过不能作为验证通过的证据。
+测试自动收集静态资源。普通测试会跳过需要实际沙箱的场景，SQLite 还会跳过 PostgreSQL 专属检查。完整真实判题配置、构建和一键浏览器验收见 [WASI 指南](docs/wasi.md)；跳过不能作为验证通过的证据。
 
 生产设置的真实 Caddy/Gunicorn/PostgreSQL/WASI 验收已在临时回环部署通过，包含 HTTPS 浏览器、数据库权限、并发测量和 worker 停机降级。重放方法与边界见 [HTTPS 部署验收](docs/production-acceptance.md)；公有域名和目标生产主机仍待验收。
 
-同源的 Web 与 WASI worker 也可构建成固定镜像发布包，校验后导入并重放容器内真实练习流程，见[发布制品指南](docs/releases.md)。当前已验证制品和镜像运行，服务激活、迁移协调与自动回滚尚未完成。
+同源的 Web 与 WASI worker 可构建成固定镜像发布包，见[发布制品指南](docs/releases.md)。单主机协调器已通过五代真实回环 HTTPS 演练：排空、维护窗口、候选数据库备份恢复、真实 DDL 失败回滚、实际判题检查、代理激活及中断恢复。成功替换使用同一 schema，不能据此保证任意未来迁移兼容。
 
-发布前可使用持久暂停/排空命令，已有任务继续处理，阅读和草稿保持可用；新提交按评测指纹交给匹配 worker。操作和首次 schema 升级边界见[部署协调指南](docs/deployment-coordination.md)。
+开放前的失败可恢复旧代；开放意图持久保存后，恢复保留当前数据库，避免丢失用户写入或恢复已删除账号。操作、首次 schema 升级和恢复边界见[部署协调指南](docs/deployment-coordination.md)与[ADR-008](docs/adr/008-deployment-generations.md)。部署工作流需手工触发且默认禁用；托管 CI、实际生产目标及公有证书尚未验收。
 
 浏览器验收（独立本地测试实例，评测关闭）：
 

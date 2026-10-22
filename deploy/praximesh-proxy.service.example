@@ -1,0 +1,21 @@
+# User service, installed under the dedicated deployment account.
+# Adjust /srv/praximesh and provision the rootless Docker service separately.
+[Unit]
+Description=PraxiMesh dedicated TLS proxy
+After=docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/praximesh/controller
+Environment=DOCKER_HOST=unix://%t/docker.sock
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/srv/praximesh/controller/.venv/bin/python scripts/deploy.py --config /srv/praximesh/config.json --state /srv/praximesh/state serve-proxy
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=45
+UMask=0077
+NoNewPrivileges=true
+LimitCORE=0
+
+[Install]
+WantedBy=default.target

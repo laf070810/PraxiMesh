@@ -1,0 +1,61 @@
+name: Activate a reviewed release
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Operation on the configured deployment
+        type: choice
+        options: [apply, recover]
+        default: apply
+        required: true
+      release_sha256:
+        description: Trusted manifest SHA-256 of the pre-staged release (apply only)
+        type: string
+        required: false
+      initial_content:
+        description: Explicit starter content import on first installation only
+        type: boolean
+        default: false
+permissions: {}
+concurrency:
+  group: praximesh-production-deployment
+  cancel-in-progress: false
+jobs:
+  activate:
+    # Enable only after configuring protected environment/default-branch rules
+    # and a dedicated deployment runner. Never use this runner for PR/build jobs.
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && vars.PRAXIMESH_DEPLOY_ENABLED == 'true'
+    environment: production
+    runs-on: [self-hosted, linux, x64, praximesh-deploy]
+    timeout-minutes: 60
+    steps:
+      # No checkout or downloaded executable runs on the deployment host.
+      # The controller and immutable release must be independently reviewed
+      # and installed under the fixed paths documented in deployment-coordination.md.
+      - name: Apply or recover with the installed controller
+        env:
+          DEPLOY_ACTION: ${{ inputs.action }}
+          RELEASE_SHA256: ${{ inputs.release_sha256 }}
+          INITIAL_CONTENT: ${{ inputs.initial_content }}
+        shell: bash
+        run: |
+          /srv/praximesh/controller/.venv/bin/python - <<'PY'
+          import os, re, subprocess
+          from pathlib import Path
+          root = Path('/srv/praximesh')
+          command = [str(root / 'controller/.venv/bin/python'),
+                     str(root / 'controller/scripts/deploy.py'),
+                     '--config', str(root / 'config.json'), '--state', str(root / 'state')]
+          action = os.environ['DEPLOY_ACTION']
+          if action not in {'apply', 'recover'}:
+              raise SystemExit('Unsupported deployment action')
+          command.append(action)
+          if action == 'apply':
+              digest = os.environ['RELEASE_SHA256']
+              if not re.fullmatch('[a-f0-9]{64}', digest):
+                  raise SystemExit('Provide the reviewed lowercase manifest SHA-256')
+              command += ['--release', str(root / 'releases' / digest), '--sha256', digest]
+              if os.environ['INITIAL_CONTENT'] == 'true':
+                  command.append('--initial-content')
+          subprocess.run(command, check=True, cwd=root / 'controller')
+          PY

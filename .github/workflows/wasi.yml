@@ -9,7 +9,7 @@ jobs:
   real-wasi:
     # Disposable hosted runner, never a privileged shared execution node.
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -38,8 +38,23 @@ jobs:
           printf 'RELEASE_SHA256=%s\n' "$(sha256sum var/releases/candidate/release.json | cut -d ' ' -f 1)" >> "$GITHUB_ENV"
       - name: Import and exercise the packaged release
         run: .venv/bin/python scripts/release_acceptance.py --release var/releases/candidate --sha256 "$RELEASE_SHA256"
+      - name: Build an intentionally failing migration fixture
+        run: |
+          .venv/bin/python scripts/build_failed_migration_release.py --release var/releases/candidate --sha256 "$RELEASE_SHA256" --bundle var/wasi-python --bundle-sha256 "$JUDGE_WASI_SHA256" --output var/releases/migration-failure
+          printf 'FAILED_RELEASE_SHA256=%s\n' "$(sha256sum var/releases/migration-failure/release.json | cut -d ' ' -f 1)" >> "$GITHUB_ENV"
+      - name: Real deployment, failed migration and interrupted recovery
+        run: |
+          .venv/bin/python scripts/deploy_acceptance.py --release var/releases/candidate --manifest-sha256 "$RELEASE_SHA256" --failed-release var/releases/migration-failure --failed-manifest-sha256 "$FAILED_RELEASE_SHA256" --caddy var/tools/caddy-2.11.7
       - name: Audit judge dependencies
         run: .venv/bin/pip-audit --progress-spinner off
+      - name: Retain the verified deployable release
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: immutable-release
+          path: var/releases/candidate/
+          compression-level: 0
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         if: always()
         with:

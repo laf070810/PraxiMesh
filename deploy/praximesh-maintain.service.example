@@ -1,0 +1,15 @@
+# User service. It shares both deployment locks with apply/recover.
+[Unit]
+Description=PraxiMesh current generation maintenance
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/praximesh/controller
+Environment=DOCKER_HOST=unix://%t/docker.sock
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/srv/praximesh/controller/.venv/bin/python scripts/deploy.py --config /srv/praximesh/config.json --state /srv/praximesh/state maintain
+TimeoutStartSec=180
+UMask=0077
+NoNewPrivileges=true
+LimitCORE=0

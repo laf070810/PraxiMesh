@@ -1,0 +1,25 @@
+{
+  "format": 1,
+  "instance": "learn",
+  "database": {
+    "container": "praximesh-postgres",
+    "owner_user": "postgres",
+    "owner_password": "REPLACE_WITH_EXISTING_DEDICATED_CLUSTER_OWNER_PASSWORD",
+    "web_password": "REPLACE_WITH_RANDOM_WEB_DATABASE_PASSWORD",
+    "worker_password": "REPLACE_WITH_DIFFERENT_RANDOM_WORKER_DATABASE_PASSWORD"
+  },
+  "networks": {
+    "backend": "praximesh-backend",
+    "frontend": "praximesh-frontend"
+  },
+  "application": {
+    "secret_key": "REPLACE_WITH_RANDOM_SECRET_OF_AT_LEAST_50_CHARACTERS",
+    "worker_secret": "REPLACE_WITH_A_DIFFERENT_RANDOM_SECRET_OF_AT_LEAST_50_CHARACTERS",
+    "registration_open": false
+  },
+  "proxy": {
+    "caddy": "/srv/praximesh/tools/caddy-2.11.7",
+    "origin": "http://127.0.0.1:8443",
+    "bind": "127.0.0.1"
+  }
+}

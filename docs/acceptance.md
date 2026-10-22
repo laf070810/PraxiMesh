@@ -12,13 +12,13 @@
 | AC-04 真实在线判题 | CPython/WASI 实际执行；21 项资源/能力探针；宿主 canary 拒绝、父 worker 被杀后驱动退出；真实参考/错误解；浏览器运行到结果闭环 | 专用生产节点配置与独立安全复核。gVisor 后端仍未实测，不能用 WASI 结果代替 |
 | AC-05 账户/隐私/权限 | 注册/登录/POST 退出、恢复码轮换和旧会话失效；私有草稿/记录隔离；XSS/CSRF/限流；导出/删除；真实 TLS/代理、Secure cookie 和浏览器删除 | 公有证书/续期、生产备份删除保留政策 |
 | AC-06 内容质量与迭代 | 严格 schema/引用/DAG；原子发布、不可变修订、历史保留和撤回；8 道 v2 题、51 个实际通过的参考用例；16 个针对性错误实现与 8 个恒空值实现均被拒绝 | 维护者独立内容审核、正式授权与第三方制品许可核验；当前仍为内部开发许可标记 |
-| AC-07 部署与交付 | 同源固定 Web/worker 镜像、源码与逐层档案校验、实际导入和容器内真实浏览器闭环；持久暂停、策略绑定及 PostgreSQL 并发检查；真实 WASI/HTTPS CI 定义；临时 TLS 部署、容量、数据库权限；此前已验证备份恢复 | 服务激活/迁移协调/自动回滚、托管 CI、目标主机系统服务与持续容量、公有 TLS 和发布复核 |
+| AC-07 部署与交付 | 固定 Web/worker 制品与逐层校验；持久排空及任务策略绑定；真实 HTTPS 多代发布、全表备份恢复核对、Caddy 重启、开放前中断恢复旧站、开放后保留新写入/删除；CI/CD 定义与服务示例 | 托管 CI/CD、目标主机服务监管与持续容量、公有 TLS、异机灾难恢复及发布复核 |
 | AC-08 新题型 | evaluator 注册表、统一任务/结果/版本边界及两种隔离策略 | 后续验证第二种题型；增加隔离后端不等于新增题型 |
 
 ## 当前版本的实际检查
 
-- 当前普通 SQLite 回归：**114 passed、10 skipped，8.1 秒**；跳过的是 5 项真实沙箱与 5 项 PostgreSQL 并发检查。此前 format 2 运行时的 SQLite 真实 WASI 基线为 107 passed、2 skipped，不能替代新增协议的当前 PostgreSQL 结果。
-- 当前临时 PostgreSQL 完整回归：**124 passed、0 skipped，122.1 秒**，同一次运行包含真实 WASI、全部发布档案检查、持久暂停/恢复、任务策略隔离及 5 项生产数据库并发检查。此前的 109 项结果和发布 17 项子套件保留为历史记录。真实判题没有模拟成功或宿主执行用户 Python。
+- 当前普通 SQLite 回归：**293 passed、18 skipped，10.3 秒**；跳过的是 5 项真实沙箱与 13 项 PostgreSQL 专用检查。
+- 当前临时 PostgreSQL 完整回归：**310 passed、1 skipped，137.1 秒**，包含真实 WASI、发布档案、暂停/恢复、策略隔离、数据库并发/超时、候选验证重试清理、部署控制流程及配置边界；跳过项只验证 SQLite busy timeout。控制流程中的替身测试与下文真实容器证据分别记录，不能用替身代替执行验证。
 - 真实沙箱套件含 21 项版本、正确/错误分类、fuel、阻塞调用墙钟、内存、输出、空环境、只读库、宿主路径/遍历拒绝、无文件写入/网络/进程/原生执行/线程、FD 上限、伪造退出码和跨实例状态检查。另以实际存在的宿主 canary 验证拒绝读取，并用内核进程句柄确认监督进程被杀后驱动退出。
 - 8 个参考实现通过全部 51 个用例，包含声明上限；16 个典型错误实现、8 个返回 None 的实现及伪造 accepted/评分返回值均未通过。两道题把“保留输入”明确为建议，所有题都只按返回值判断；二分题不声称认证渐近复杂度。
 - CPython 3.14.9、WASI SDK 24、Wasmtime 50.0.1；再次完成固定源码构建。当前 bundle format 2 显式设置 `x86_64-unknown-linux-gnu`、关闭 component model、保留固定运行库声明。manifest SHA-256 为 `35a76bda43a52c1db3ba0e4627922264d26e4486dc17722d49c7b374fbba216b`，位于 `var/wasi-python-3.14.9-v3/`。旧 v2 目录是 format 1 历史制品，当前策略会拒绝它；目标节点仍须实际验证。
@@ -26,7 +26,7 @@
 - 当前应用镜像真实构建与烟雾检查通过：UID 65532、只读根、无网络、迁移/导入/Gunicorn/静态资源 HTTP。Web 镜像含策略与锁文件，不包含 WASI 制品或 Docker socket；容器烟雾检查保持执行关闭。
 - `content_check`、Ruff、迁移漂移、Django `check`、锁文件/生产 requirements 一致性通过。`pip-audit` 包含新增 judge 依赖，查询时未发现已知漏洞；不表示基础镜像系统包或未来漏洞已获证明。
 
-本地证据在忽略的 `test-results/`，当前为 `postgres-admission.xml`、`application-admission.xml`，另有浏览器截图、受限日志和构建日志。`*-release.xml`、`*-proxy.xml`、`*-all.xml` 保留为历史基线。重放见 [WASI 指南](wasi.md)；WASI 工作流已改为在临时 PostgreSQL 中执行完整真实套件，随后执行 HTTPS 与镜像导入验收，但尚未在托管 CI 服务端运行。
+本地证据在忽略的 `test-results/`，当前为 `postgres-coordinator-final.xml`、`application-coordinator-final.xml`，另有浏览器截图、受限日志和构建日志；旧文件保留为历史基线。重放见 [WASI 指南](wasi.md)；WASI 工作流在临时 PostgreSQL 执行完整真实套件，随后执行 HTTPS、镜像导入与部署恢复验收，尚未在托管 CI 服务端运行。
 
 ## 真实 HTTPS 部署与容量（2026-10-23）
 
@@ -56,17 +56,33 @@
 
 实际导入后在新的 PostgreSQL 和独立网络中启动两者：Web 不包含 Wasmtime/bundle，worker 无 Docker socket 或宿主目录挂载，只连内部数据库网络，启用只读根、capability 删除、init、内存/PID 限额。镜像内真实策略摘要与发布 manifest 一致。worker 在当前容器执行 21 项探针后才开始取任务；浏览器的 Run、WA、Accepted、路径/历史和删除账号全部通过。错误解释器摘要会阻止服务启动。
 
-最新通过的是 `var/releases/2026-10-23-candidate-5/`，可信本地构建输出的 release manifest SHA-256 为 `95dee546759a91a58455109b172649bf81afa3c5bc903737064a05c60512ac5a`。其中的 Web/worker 已包含暂停协议与 `0002` 迁移。构建之后补写的验收文档不修改已冻结的源码档案；制品仍按原摘要校验。
+此前独立制品验收通过 `var/releases/2026-10-23-candidate-5/`，可信构建输出的 release manifest SHA-256 为 `95dee546759a91a58455109b172649bf81afa3c5bc903737064a05c60512ac5a`。其中的 Web/worker 包含暂停协议与 `0002` 迁移。后续协调器的实际制品与结果见下一节。构建后补写的验收文档不修改已冻结的源码档案。
 
 同次容器验收实际提交延迟受限的正确函数：零秒排空确实超时且保持关闭，新请求 503，阅读/草稿正常；原任务完成 Accepted 后排空结束但仍暂停；错误 token 被拒绝；原 token 恢复后，第二份新提交也实际 Accepted。自己的测试账号/提交被删除，临时容器、网络与数据库卷清理通过。队列协调见 [ADR-007](adr/007-admission-coordination.md)及[操作指南](deployment-coordination.md)。
 
-证据为 `test-results/release-acceptance.json`、`release-worker.log`、`release-browser.log` 和发布目录的 `release.json`；设计见 [ADR-006](adr/006-release-artifacts.md)，重放见[制品指南](releases.md)。这是打包核心的回环 HTTP 验收，生产 TLS 由上一节独立验证。镜像导入没有激活现有服务、执行生产迁移或发布 registry；完整 CD 与自动回滚仍未实现。
+证据为 `test-results/release-acceptance.json`、`release-worker.log`、`release-browser.log` 和发布目录的 `release.json`；设计见 [ADR-006](adr/006-release-artifacts.md)，重放见[制品指南](releases.md)。这是打包核心的回环 HTTP 验收，生产 TLS 由独立验收验证。镜像导入本身没有激活现有服务、执行生产迁移或发布 registry。
 
 清理复查发现旧脚本强制删除容器时会留下匿名 PostgreSQL 卷，已按明确的容器事件归属删除 10 个无使用者的合成测试卷，记录在 `owned-volume-cleanup.json`。当前镜像验收改为显式标记并删除数据库卷、验证卷消失；HTTPS 脚本强制清理容器时也要求删除其匿名卷。没有执行全局 prune。
 
+## 真实发布协调与恢复
+
+`scripts/deploy_acceptance.py` 已用 `var/releases/2026-10-23-candidate-7/` 完成五次代际部署尝试，包括一份真正失败的迁移制品。正常发布 manifest SHA-256 为 `3487592ae939f38907a614334e30129213db3ff3b0b38f520810cb91c393301e`，故障制品为 `00a4cc546ea04fb1bf73e01f576a2c490db19c467583fbd8d4606369e86b6b61`。前一份 candidate-6 的四代结果保留作基线。
+
+- 首次安装与同版替换通过真实 HTTPS 浏览器 Run→WA→Accepted、路径/历史和删除。升级冻结旧数据库，备份/恢复后逐表比较 19 张表及 12 个序列，再迁移、最小授权和启动；真实账号、私有草稿及已完成提交保持不变，新账号 ID 不回退。
+- 故障制品通过正式构建器从已校验源码生成，仅额外加入说明和原子迁移。迁移真实建表后在 PostgreSQL 内抛出固定异常；实际服务日志确认失败，候选表和迁移记录均不存在。协调器恢复旧代，保留用户记录及备份，随后又完成真实 HTTPS Accepted。未改写 manifest、journal 或判题结果。
+- Caddy 被 SIGKILL 后，从相同持久配置恢复；仅清除确认无监听进程且归属/inode 不变的旧 socket。
+- 候选开放前强制终止协调器，`recover` 重新验证并恢复旧库/旧站。开放后先通过真实 HTTPS 新增草稿和 Accepted 提交、删除另一账号，再终止协调器；恢复保留已开放候选库、新增数据和删除结果，旧快照中仍存在的账号没有复活。
+- 每次启动 worker 均重新运行真实隔离探针；候选检查实际执行正确/错误程序，匹配本 worker 的新心跳、制品与策略。临时容器、网络、数据库卷和本地进程均清理，receipt 的 `cleanup.passed=true`。
+
+完整结果为 `test-results/deployment-candidate-7/deployment-acceptance.json`，重放见[部署协调指南](deployment-coordination.md)。成功替换使用同一应用 schema；失败迁移则确实执行 DDL 后回滚。这不证明任意未来 schema 变更兼容，也未验证公有 CA、目标系统服务、异机恢复或持续容量。恢复边界见 [ADR-008](adr/008-deployment-generations.md)。
+
+最新制品是 `var/releases/2026-10-23-candidate-8/`，manifest SHA-256 为 `9cd00ac2ff40569aca24813063e5fcabb896b65d8a8d6201b93d530a69125982`。它修复协调器对既有重启计数的误判：等待期间新增重启仍拒绝，但不因等待开始前已有重启而拒绝当前启动探针。额外真实演练只终止所属 worker 控制器，观察自动重启计数从 0 到 1、当前启动尚未就绪，然后立即执行 `recover`；恢复保留同一已开放数据库及用户记录，再次得到真实 HTTPS Accepted，全部临时资源清理通过。Docker 随后的主动 stop/start 将计数重置为 0，记录按实测保存。
+
+该补充证据为 `test-results/deployment-worker-restart/deployment-acceptance.json`。candidate-8 没有重跑五代矩阵；已比较其应用源码、评测身份以及 Web/worker 的全部 rootfs layer，与 candidate-7 一致，差异是控制器、验收、CI 和文档，记录在 `release-runtime-equivalence.json`。完整 CI 流程现在会同时执行五代场景和 worker 自动重启场景，托管执行仍待验收。构建后补写的结果文档不改变冻结制品。
+
 ## 已有运维证据及验证范围
 
-此前迭代已实际验证 SQLite 在线备份/0600 文件/integrity_check/独立恢复，以及 PostgreSQL `pg_dump`→独立库 `pg_restore`→内容、版本和私有记录核对。本轮未重复这两项恢复演练，生产实例和实际保留政策仍未验证。受限 worker 角色和生产 `check --deploy --fail-level WARNING` 已在本轮临时部署重新通过；静态检查自身不验证 DNS/TLS，TLS 的证据来自上述实际请求。
+此前迭代已实际验证 SQLite 在线备份/0600 文件/integrity_check/独立恢复。当前协调器重复验证 PostgreSQL `pg_dump`→独立库 `pg_restore`，并比较所有表行、列定义和序列状态；生产实例与实际保留政策仍未验证。受限角色和生产 `check --deploy --fail-level WARNING` 也在上述部署重新通过；静态检查自身不验证 DNS/TLS，TLS 的证据来自实际请求。
 
 此前的小题库顺序 HTTP 基线和约 0.7 秒/参考用例的独立执行数字，不能替代上面的端到端提交测量。目标生产节点仍须测持续负载、恶意超时负载、排队、尾延迟和限流。默认每用户 2 个待处理任务、全局 100，排队十分钟到期按平台故障处理。
 
@@ -78,4 +94,4 @@ gVisor 在本机仍因缺少 runsc、rootless Docker CPU quota 不可用而拒�
 2. 在明确的仓库/部署目标运行托管 CI，完成专用生产节点与独立安全复核。
 3. 维护者按 PRD §13 确认品牌、代码/内容许可、公开实例/注册政策、额度、治理、安全报告渠道和隐私地域/保留周期。
 
-阶段 B/C 的社区、排行榜、更多语言、GPU/ML/Agent 评测仍未实现。目标继续保持进行中，不能因本地闭环通过而宣称整个阶段 A 或公开发布已完成。
+阶段 B/C 的社区、排行榜、更多语言、GPU/ML/Agent 评测仍未实现。阶段 A 的公开发布门槛仍待验收。
