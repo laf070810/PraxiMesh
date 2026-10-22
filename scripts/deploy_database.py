@@ -41,7 +41,7 @@ WEB_READ = (
     "auth_group_permissions",
     "django_content_type",
 )
-WEB_WRITE = (
+BASE_WEB_WRITE = (
     "auth_user",
     "auth_user_groups",
     "auth_user_user_permissions",
@@ -53,6 +53,21 @@ WEB_WRITE = (
     "core_queuelock",
     "django_session",
 )
+FEATURE_TABLES = {
+    ("learning", "0001_initial"): (
+        "learning_bookmark",
+        "learning_note",
+        "learning_tutorialreading",
+    ),
+    ("community", "0001_initial"): (
+        "community_post",
+        "community_comment",
+        "community_report",
+        "community_appeal",
+        "community_moderationevent",
+    ),
+}
+WEB_WRITE = BASE_WEB_WRITE + tuple(table for group in FEATURE_TABLES.values() for table in group)
 WORKER_PRIVILEGES = {
     "core_submission": "SELECT, UPDATE",
     "core_problemversion": "SELECT",
@@ -62,6 +77,27 @@ WORKER_PRIVILEGES = {
 
 class DeploymentDatabaseError(RuntimeError):
     """Safe operational error: no underlying server output or credentials."""
+
+
+def web_write_tables(connection):
+    """Use the recorded schema, including the previous generation during upgrades."""
+    installed = set(connection.execute("SELECT app, name FROM public.django_migrations").fetchall())
+    present = {
+        row[0]
+        for row in connection.execute(
+            "SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
+            "WHERE n.nspname='public' AND c.relkind IN ('r','p')"
+        ).fetchall()
+    }
+    expected = list(BASE_WEB_WRITE)
+    for migration, tables in FEATURE_TABLES.items():
+        if migration in installed:
+            expected.extend(tables)
+        elif present.intersection(tables):
+            raise DeploymentDatabaseError("Feature tables exist without their recorded migration")
+    if not set(expected).issubset(present):
+        raise DeploymentDatabaseError("Recorded migrations are missing required runtime tables")
+    return tuple(expected)
 
 
 def safe_errors(function):
@@ -365,6 +401,7 @@ class DeploymentDatabase:
         self._require_frozen(name)
         self._require_roles()
         with self._connect(name) as connection:
+            writable = web_write_tables(connection)
             # No implicit grants to newly migrated tables. Every writable table
             # and every sequence is derived from this reviewed allowlist.
             principals = sql.SQL("PUBLIC, {}, {}").format(*map(sql.Identifier, self.roles.values()))
@@ -383,7 +420,7 @@ class DeploymentDatabase:
                 )
             for tables, privileges in [
                 (WEB_READ, "SELECT"),
-                (WEB_WRITE, "SELECT, INSERT, UPDATE, DELETE"),
+                (writable, "SELECT, INSERT, UPDATE, DELETE"),
             ]:
                 connection.execute(
                     sql.SQL("GRANT {} ON {} TO {}").format(
@@ -422,6 +459,7 @@ class DeploymentDatabase:
     def _verify_permissions(self, name, *, connected):
         """Check effective privileges, including column grants and grant options."""
         with self.connection(name) as connection:
+            writable = web_write_tables(connection)
             sequences = self._web_sequences(connection)
             if connection.execute(
                 "SELECT EXISTS (SELECT 1 FROM pg_database d, "
@@ -434,7 +472,7 @@ class DeploymentDatabase:
                 expected = (
                     {
                         **{table: {"SELECT"} for table in WEB_READ},
-                        **{table: {"SELECT", "INSERT", "UPDATE", "DELETE"} for table in WEB_WRITE},
+                        **{table: {"SELECT", "INSERT", "UPDATE", "DELETE"} for table in writable},
                     }
                     if role == "web"
                     else {

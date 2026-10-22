@@ -148,3 +148,19 @@ RUN_SANDBOX_TESTS=1 .venv/bin/python scripts/postgres_tests.py -q
 ```
 
 真实场景先提交有界的标准库函数，让 `drain --timeout 0` 确实超时；检查新提交 503、阅读和草稿可用，等待原任务实际 Accepted，拒绝错误 token，再恢复并执行另一份正确提交。测试自己的账号和数据库均清理，不使用注入的评测结果。
+
+## 阶段 A 到 B1 的真实 schema 升级复验
+
+本批已验证 `learning.0001_initial`、`community.0001_initial` 的新增表迁移、原数据保留、按实际迁移授予 Web 权限及 worker 拒绝访问。它保留旧目录，不自动发布扩充题库；新目录仍按内容审核流程显式导入。具体身份和限制见 [B1 验收](acceptance-b1.md)。
+
+```sh
+python scripts/deploy_acceptance.py \
+  --release /path/to/b1-release --manifest-sha256 TRUSTED_B1_DIGEST \
+  --upgrade-only \
+  --previous-release /path/to/phase-a-release \
+  --previous-manifest-sha256 TRUSTED_PHASE_A_DIGEST \
+  --caddy /path/to/caddy-2.11.7 \
+  --artifacts test-results/deployment-upgrade
+```
+
+两个 digest 必须独立确认。此模式验证明确的阶段 A→B1 迁移组合，不能用同一版本代替，也不能与失败迁移或 worker-restart-only 模式混用。它在隔离临时实例中创建真实用户/草稿/AC，比较迁移前后的身份、数据和目录，实际检查八张新表的权限，并通过 HTTPS 多账号浏览器核验社区流程。只在全部步骤成功后记录 schema 升级通过。

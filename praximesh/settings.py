@@ -21,6 +21,8 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "core",
+    "learning",
+    "community",
 ]
 MIDDLEWARE = [
     "core.middleware.ProxyHeadersMiddleware",

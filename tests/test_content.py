@@ -1,5 +1,6 @@
 import copy
 import json
+from pathlib import Path
 
 import pytest
 
@@ -15,10 +16,39 @@ from core.models import KnowledgeNode, Problem, ProblemVersion
 
 def test_starter_contract_and_cross_domain(package):
     validate_package(package)
-    assert len(package["problems"]) == 8
+    assert len(package["problems"]) == 18
     vectors = next(n for n in package["nodes"] if n["id"] == "vectors")
     assert set(vectors["domains"]) == {"numerical", "machine-learning"}
-    assert sum(n["kind"] == "path" for n in package["nodes"]) == 1
+    paths = {n["id"]: n for n in package["nodes"] if n["kind"] == "path"}
+    assert set(paths) == {"python-to-numerical", "sequence-to-graph", "statistics-to-models"}
+    exercises = {
+        key: [step["target"] for step in path["steps"] if step["kind"] == "problem"]
+        for key, path in paths.items()
+    }
+    assert exercises["python-to-numerical"] == [
+        "sum-positive",
+        "unique-stable",
+        "word-count",
+        "lower-bound",
+        "dot-product",
+        "transpose",
+        "normalize-rows",
+        "stable-softmax",
+    ]
+    assert len(exercises["sequence-to-graph"]) == len(exercises["statistics-to-models"]) == 5
+    assert {p["id"] for p in package["problems"]} == {
+        exercise for steps in exercises.values() for exercise in steps
+    }
+
+
+def test_every_problem_has_distinct_targeted_mistakes(package):
+    # This checks review inputs only; real rejection is tested exclusively in the sandbox suite.
+    mistakes = json.loads(Path(__file__).with_name("incorrect_solutions.json").read_text())
+    assert set(mistakes) == {problem["id"] for problem in package["problems"]}
+    for variants in mistakes.values():
+        assert len(variants) >= 2
+        assert len({variant["source"] for variant in variants}) == len(variants)
+        assert all(variant["mistake"].strip() for variant in variants)
 
 
 @pytest.mark.parametrize(
@@ -51,7 +81,8 @@ def test_invalid_content_rejected(package, mutation):
     elif mutation == "unknown_evaluator":
         data["problems"][0]["evaluator"] = "shell"
     elif mutation == "bad_step":
-        data["nodes"][-1]["steps"][0]["target"] = "functions"
+        path = next(node for node in data["nodes"] if node["id"] == "python-to-numerical")
+        path["steps"][0]["target"] = "functions"
     elif mutation == "contradiction":
         concepts[1]["relations"].append({"kind": "recommended", "target": "functions"})
     with pytest.raises(ContentError):
@@ -78,7 +109,7 @@ def test_immutable_revision_import_is_atomic(catalog):
     original.refresh_from_db()
     assert "Unauthorized" not in original.data["statement"]
     assert KnowledgeNode.objects.get(id="programming").title == "编程语言与基础"
-    assert Problem.objects.filter(published=True).count() == 8
+    assert Problem.objects.filter(published=True).count() == len(catalog["problems"])
 
 
 def test_new_revision_preserves_old_and_does_not_rewrite_current(catalog):
@@ -108,4 +139,4 @@ def test_withdrawal_preserves_history(catalog):
     data["nodes"] = [n for n in data["nodes"] if n["kind"] != "path"]
     import_package(data)
     assert not Problem.objects.filter(published=True).exists()
-    assert ProblemVersion.objects.count() == 8
+    assert ProblemVersion.objects.count() == len(catalog["problems"])

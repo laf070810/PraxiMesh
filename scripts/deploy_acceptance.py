@@ -1,8 +1,9 @@
 """Rehearse journalled deployment with real HTTPS, PostgreSQL and WASI judging.
 
-All resources are disposable, owner-labelled and loopback/private. The same
-verified release is applied into successive database generations; this exercises
-real migration invocation and restores, not a schema-changing application upgrade.
+All resources are disposable, owner-labelled and loopback/private. The default
+mode applies the same release to successive generations. --upgrade-only instead
+installs an explicitly verified Phase A release, creates real private data and
+formal AC, then applies B1's schema migrations without republishing the catalogue.
 Interruption checkpoints only pause a real CLI process with SIGSTOP. They do not
 alter its journal, database, verdicts or production implementation.
 """
@@ -34,6 +35,17 @@ from scripts.release import inspect_images, verify  # noqa: E402
 
 CORRECT = "def solve(values):\n    return sum(x for x in values if x > 0)\n"
 LABEL = "org.praximesh.acceptance"
+UPGRADE_MIGRATIONS = {("learning", "0001_initial"), ("community", "0001_initial")}
+UPGRADE_TABLES = (
+    "learning_bookmark",
+    "learning_note",
+    "learning_tutorialreading",
+    "community_post",
+    "community_comment",
+    "community_report",
+    "community_appeal",
+    "community_moderationevent",
+)
 
 # This trusted administrative program runs only in the labelled worker container.
 # Killing its exact controller models unexpected process death. `docker kill`
@@ -135,9 +147,17 @@ class Rehearsal:
             "schema_changing_upgrade_tested": False,
             "schema_failure_rollback_tested": False,
             "worker_restart_only": options.worker_restart_only,
+            "upgrade_only": options.upgrade_only,
             "worker_auto_restart_recovery_tested": False,
             "public_CA_or_system_trust_tested": False,
         }
+        if options.upgrade_only:
+            self.result.update(
+                scope="Phase A to B1 schema upgrade; synthetic private data; original eight-problem catalogue retained; private Docker networks; loopback HTTPS",
+                previous_release_sha256=options.previous_manifest_sha256,
+                feature_role_permissions_tested=False,
+                expanded_catalogue_published=False,
+            )
 
     def labelled(self, resource, label):
         return docker(resource, "ls", "--quiet", "--filter", "label=" + label).decode().splitlines()
@@ -283,13 +303,19 @@ class Rehearsal:
         # Read only. No acceptance test ever creates/edits this authoritative file.
         return json.loads((self.state_dir / "deployment.json").read_text())
 
-    def apply_args(self, *, initial=False):
+    def apply_args(self, *, initial=False, previous=False):
+        if previous and not (initial and self.options.upgrade_only):
+            raise ValueError(
+                "The previous release is only an upgrade rehearsal's initial generation"
+            )
+        if self.options.upgrade_only and initial and not previous:
+            raise ValueError("An upgrade must preserve the previous catalogue")
         return [
             "apply",
             "--release",
-            str(self.options.release),
+            str(self.options.previous_release if previous else self.options.release),
             "--sha256",
-            self.options.manifest_sha256,
+            self.options.previous_manifest_sha256 if previous else self.options.manifest_sha256,
             *(["--initial-content"] if initial else []),
         ]
 
@@ -303,6 +329,48 @@ class Rehearsal:
             connect_timeout=5,
             sslmode="disable",
         )
+
+    def runtime_connection(self, generation, role):
+        if role not in {"web", "worker"}:
+            raise ValueError("Expected a runtime role")
+        return psycopg.connect(
+            host="127.0.0.1",
+            port=self.db_port,
+            dbname=generation["database"],
+            user=f"px_{self.instance}_{role}",
+            password=self.config["database"][role + "_password"],
+            connect_timeout=5,
+            sslmode="disable",
+            options="-c statement_timeout=15000 -c lock_timeout=3000",
+            autocommit=True,
+        )
+
+    def catalogue_snapshot(self, generation):
+        """Compare all stable IDs, versions and private test data without emitting rows."""
+        result = {}
+        with self.connection(generation) as connection:
+            for table in ["core_knowledgenode", "core_problem", "core_problemversion"]:
+                rows = connection.execute(
+                    sql.SQL("SELECT to_jsonb(t) FROM {} t ORDER BY id").format(
+                        sql.Identifier(table)
+                    )
+                ).fetchall()
+                encoded = json.dumps(rows, sort_keys=True, separators=(",", ":")).encode()
+                result[table] = {"rows": len(rows), "sha256": hashlib.sha256(encoded).hexdigest()}
+        return result
+
+    def schema_state(self, generation):
+        with self.connection(generation) as connection:
+            migrations = set(
+                connection.execute("SELECT app, name FROM django_migrations").fetchall()
+            )
+            tables = {
+                row[0]
+                for row in connection.execute(
+                    "SELECT tablename FROM pg_tables WHERE schemaname='public'"
+                ).fetchall()
+            }
+        return migrations, tables
 
     def user_id(self, generation, username):
         with self.connection(generation) as connection:
@@ -513,6 +581,58 @@ class Rehearsal:
                 check=True,
                 timeout=300,
             )
+        reviewer = "community-reviewer-" + uuid.uuid4().hex[:12]
+        password = secrets.token_urlsafe(32)
+        client = Client(self.base, self.context)
+        assert client.request("/accounts/register/")[0] == 200
+        assert (
+            client.request(
+                "/accounts/register/",
+                {"username": reviewer, "password1": password, "password2": password},
+            )[0]
+            == 200
+        )
+        # Bootstrap only a permission in this owned disposable database. Every
+        # subsequent content/moderation transition goes through real HTTPS forms.
+        generation = self.journal()["current"]
+        with self.connection(generation) as connection:
+            identity = connection.execute(
+                "SELECT id, is_staff, is_superuser FROM auth_user WHERE username=%s",
+                (reviewer,),
+            ).fetchone()
+            assert identity and identity[1:] == (False, False)
+            permission = connection.execute(
+                "SELECT p.id FROM auth_permission p JOIN django_content_type c "
+                "ON c.id=p.content_type_id WHERE c.app_label='community' "
+                "AND p.codename='moderate_content'"
+            ).fetchone()[0]
+            connection.execute(
+                "INSERT INTO auth_user_user_permissions (user_id, permission_id) VALUES (%s,%s)",
+                (identity[0], permission),
+            )
+        environment.update(BROWSER_MODERATOR_USERNAME=reviewer, BROWSER_MODERATOR_PASSWORD=password)
+        with (self.options.artifacts / "community-browser.log").open("wb") as stream:
+            subprocess.run(
+                [sys.executable, str(ROOT / "tests/browser_community.py")],
+                cwd=self.directory,
+                env=environment,
+                stdout=stream,
+                stderr=subprocess.STDOUT,
+                check=True,
+                timeout=300,
+            )
+        with self.connection(generation) as connection:
+            assert (
+                connection.execute(
+                    "SELECT count(*) FROM auth_user WHERE username=%s", (reviewer,)
+                ).fetchone()[0]
+                == 0
+            )
+        self.result["community_moderation_via_https_browser"] = True
+        receipt = self.directory / "test-results/community-browser.json"
+        community_result = json.loads(receipt.read_text())
+        assert community_result["passed"] and community_result["https_transport_tested"]
+        (self.options.artifacts / receipt.name).write_bytes(receipt.read_bytes())
         for screenshot in (self.directory / "test-results").glob("*.png"):
             (self.options.artifacts / screenshot.name).write_bytes(screenshot.read_bytes())
 
@@ -545,6 +665,317 @@ class Rehearsal:
             scope="initial deployment and failed migration; synthetic data; loopback HTTPS",
             browser_real_https_run_wrong_accepted=True,
             generations_attempted=2,
+            completed_at=datetime.now(UTC).isoformat(),
+        )
+
+    def feature_roles(self, generation, username):
+        """Real runtime credentials, SQL and rollback; no owner-role impersonation."""
+        user_id = self.user_id(generation, username)
+        with self.connection(generation) as connection:
+            version_id = connection.execute(
+                "SELECT current_id FROM core_problem WHERE id='sum-positive'"
+            ).fetchone()[0]
+            assert all(
+                connection.execute(
+                    sql.SQL("SELECT count(*) FROM {}").format(sql.Identifier(table))
+                ).fetchone()[0]
+                == 0
+                for table in UPGRADE_TABLES
+            ), "An initial feature migration must start with empty private feature tables"
+        now = datetime.now(UTC)
+        post_id, comment_id = uuid.uuid4(), uuid.uuid4()
+        writing = {
+            "author_id": user_id,
+            "body": "Disposable role probe",
+            "state": "draft",
+            "revision": 1,
+            "moderation_note": "",
+            "created_at": now,
+            "updated_at": now,
+        }
+        rows = {
+            "learning_bookmark": {
+                "user_id": user_id,
+                "problem_id": "sum-positive",
+                "created_at": now,
+            },
+            "learning_note": {
+                "user_id": user_id,
+                "title": "Role probe",
+                "body": "Disposable role probe",
+                "version_id": version_id,
+                "node_id": None,
+                "created_at": now,
+                "updated_at": now,
+            },
+            "learning_tutorialreading": {
+                "user_id": user_id,
+                "tutorial_id": "tutorial-functions",
+                "completed_at": now,
+                "content_digest": "0" * 64,
+            },
+            "community_post": {
+                **writing,
+                "id": post_id,
+                "kind": "solution",
+                "title": "Role probe",
+                "version_id": version_id,
+            },
+            "community_comment": {**writing, "id": comment_id, "post_id": post_id},
+            "community_report": {
+                "id": uuid.uuid4(),
+                "reporter_id": user_id,
+                "post_id": post_id,
+                "comment_id": None,
+                "reason": "Role probe",
+                "status": "open",
+                "resolution": "",
+                "resolved_by_id": None,
+                "created_at": now,
+                "updated_at": now,
+            },
+            "community_appeal": {
+                "id": uuid.uuid4(),
+                "author_id": user_id,
+                "post_id": post_id,
+                "comment_id": None,
+                "target_revision": 1,
+                "reason": "Role probe",
+                "status": "open",
+                "resolution": "",
+                "resolved_by_id": None,
+                "created_at": now,
+                "updated_at": now,
+            },
+            "community_moderationevent": {
+                "actor_id": user_id,
+                "target_kind": "post",
+                "target_id": post_id,
+                "target_revision": 1,
+                "action": "role_probe",
+                "created_at": now,
+            },
+        }
+        assert set(rows) == set(UPGRADE_TABLES)
+        allowed = {"SELECT", "INSERT", "UPDATE", "DELETE"}
+        privileges = allowed | {"TRUNCATE", "REFERENCES", "TRIGGER", "MAINTAIN"}
+        for role in ["web", "worker"]:
+            with self.runtime_connection(generation, role) as connection:
+                assert (
+                    connection.execute("SELECT current_user").fetchone()[0]
+                    == f"px_{self.instance}_{role}"
+                )
+                assert (
+                    connection.execute(
+                        "SELECT rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls "
+                        "FROM pg_roles WHERE rolname=current_user"
+                    ).fetchone()
+                    == (False,) * 5
+                )
+                assert (
+                    connection.execute(
+                        "SELECT has_schema_privilege(current_user, 'public', 'CREATE'), "
+                        "has_database_privilege(current_user, current_database(), 'CREATE'), "
+                        "has_database_privilege(current_user, current_database(), 'TEMP')"
+                    ).fetchone()
+                    == (False,) * 3
+                )
+                for table in UPGRADE_TABLES:
+                    for privilege in sorted(privileges):
+                        actual, delegable = connection.execute(
+                            "SELECT has_table_privilege(current_user, %s, %s), "
+                            "has_table_privilege(current_user, %s, %s)",
+                            (table, privilege, table, privilege + " WITH GRANT OPTION"),
+                        ).fetchone()
+                        assert actual == (role == "web" and privilege in allowed)
+                        assert not delegable
+                if role == "web":
+                    # Exercise generated identities as well as table permissions.
+                    # The complete transaction is rolled back even on success.
+                    with connection.transaction(force_rollback=True):
+                        inserted = []
+                        for table, values in rows.items():
+                            identifier = connection.execute(
+                                sql.SQL("INSERT INTO {} ({}) VALUES ({}) RETURNING id").format(
+                                    sql.Identifier(table),
+                                    sql.SQL(", ").join(map(sql.Identifier, values)),
+                                    sql.SQL(", ").join(sql.Placeholder() for _ in values),
+                                ),
+                                tuple(values.values()),
+                            ).fetchone()[0]
+                            assert connection.execute(
+                                sql.SQL("SELECT id FROM {} WHERE id=%s").format(
+                                    sql.Identifier(table)
+                                ),
+                                (identifier,),
+                            ).fetchone() == (identifier,)
+                            assert (
+                                connection.execute(
+                                    sql.SQL("UPDATE {} SET id=id WHERE id=%s").format(
+                                        sql.Identifier(table)
+                                    ),
+                                    (identifier,),
+                                ).rowcount
+                                == 1
+                            )
+                            inserted.append((table, identifier))
+                        for table, identifier in reversed(inserted):
+                            assert (
+                                connection.execute(
+                                    sql.SQL("DELETE FROM {} WHERE id=%s").format(
+                                        sql.Identifier(table)
+                                    ),
+                                    (identifier,),
+                                ).rowcount
+                                == 1
+                            )
+                else:
+                    # ACL inspection is supplemented by actual refused SQL. If a
+                    # refusal fails, its surrounding transaction still rolls back.
+                    for table in UPGRADE_TABLES:
+                        for statement in [
+                            "SELECT id FROM {} LIMIT 0",
+                            "INSERT INTO {} DEFAULT VALUES",
+                            "UPDATE {} SET id=id WHERE FALSE",
+                            "DELETE FROM {} WHERE FALSE",
+                        ]:
+                            try:
+                                with connection.transaction(force_rollback=True):
+                                    connection.execute(
+                                        sql.SQL(statement).format(sql.Identifier(table))
+                                    )
+                            except psycopg.errors.InsufficientPrivilege:
+                                pass
+                            else:
+                                raise AssertionError(
+                                    "Worker unexpectedly accessed a private feature table"
+                                )
+        with self.connection(generation) as connection:
+            for table in UPGRADE_TABLES:
+                assert (
+                    connection.execute(
+                        sql.SQL("SELECT count(*) FROM {}").format(sql.Identifier(table))
+                    ).fetchone()[0]
+                    == 0
+                )
+        return {
+            "tables": list(UPGRADE_TABLES),
+            "web_real_crud_rolled_back": True,
+            "worker_real_crud_denied": True,
+            "no_extra_table_privileges_or_grant_options": True,
+            "no_role_administration_or_schema_database_creation": True,
+        }
+
+    def upgraded_http(self, generation, username):
+        client, _ = self.accounts[username]
+        for endpoint in [
+            "/learning/",
+            "/learning/notes/",
+            "/learning/reading/",
+            "/community/mine/",
+        ]:
+            status, headers, _ = client.request(endpoint)
+            assert status == 200 and headers["Cache-Control"] == "no-store"
+        assert client.request("/learning/bookmarks/sum-positive/", {"action": "save"})[0] == 200
+        assert (
+            client.request(
+                "/learning/notes/new/",
+                {
+                    "title": "Upgrade private note",
+                    "body": "Retained learner's new note",
+                    "version": client.version,
+                },
+            )[0]
+            == 200
+        )
+        assert (
+            client.request("/learning/reading/tutorial-functions/", {"action": "complete"})[0]
+            == 200
+        )
+        assert (
+            client.request(
+                "/community/new/",
+                {
+                    "kind": "solution",
+                    "title": "Upgrade private solution",
+                    "body": "Private draft",
+                    "version": client.version,
+                },
+            )[0]
+            == 200
+        )
+        status, _, body = client.request("/accounts/export/", {})
+        assert status == 200
+        exported = json.loads(body)
+        assert len(exported["learning"]["bookmarks"]) == 1
+        assert len(exported["learning"]["notes"]) == 1
+        assert len(exported["learning"]["reading"]) == 1
+        with self.connection(generation) as connection:
+            post_id, state = connection.execute(
+                "SELECT id, state FROM community_post WHERE author_id=%s",
+                (self.user_id(generation, username),),
+            ).fetchone()
+            assert state == "draft"
+        assert Client(self.base, self.context).request(f"/community/{post_id}/")[0] == 404
+        self.submit_and_wait(client)
+
+    def upgrade_rehearsal(self):
+        print(
+            "Installing the verified Phase A release and creating real private data and AC",
+            flush=True,
+        )
+        self.run(*self.apply_args(initial=True, previous=True), log="previous-initial")
+        previous = self.journal()["current"]
+        assert previous["release_sha256"] == self.options.previous_manifest_sha256
+        old_migrations, old_tables = self.schema_state(previous)
+        assert not {app for app, _ in old_migrations}.intersection({"learning", "community"})
+        assert not set(UPGRADE_TABLES).intersection(old_tables)
+        catalogue = self.catalogue_snapshot(previous)
+        assert catalogue["core_problem"]["rows"] == 8, (
+            "Expected the frozen Phase A eight-problem catalogue"
+        )
+        username = self.register("upgrade-before")
+        before = self.snapshot(previous, [username])
+        assert before["tables"]["core_draft"]["rows"] == 1
+        assert before["tables"]["core_submission"]["rows"] == 1
+
+        print(
+            "Applying the B1 release with real migrations and no catalogue publication", flush=True
+        )
+        self.run(*self.apply_args(), log="schema-upgrade")
+        journal = self.journal()
+        upgraded = journal["current"]
+        assert journal["operation"]["phase"] == "active"
+        assert upgraded["release_sha256"] == self.options.manifest_sha256
+        assert upgraded["id"] != previous["id"] and upgraded["database"] != previous["database"]
+        new_migrations, new_tables = self.schema_state(upgraded)
+        assert UPGRADE_MIGRATIONS <= new_migrations - old_migrations
+        assert old_migrations <= new_migrations
+        assert set(UPGRADE_TABLES) <= new_tables - old_tables
+        restored = self.snapshot(upgraded, [username])
+        assert restored["tables"] == before["tables"] and restored["user_ids"] == before["user_ids"]
+        for sequence, value in before["sequences"].items():
+            assert restored["sequences"][sequence][0] >= value[0]
+        assert self.catalogue_snapshot(upgraded) == catalogue
+        backup = journal["operation"]["backup"]
+        assert backup["backup_bytes"] > 0 and backup["sequences"] > 0
+        permissions = self.feature_roles(upgraded, username)
+        self.upgraded_http(upgraded, username)
+        self.browser()
+        assert self.catalogue_snapshot(upgraded) == catalogue
+        self.result.update(
+            schema_changing_upgrade_tested=True,
+            real_added_migrations=[list(item) for item in sorted(new_migrations - old_migrations)],
+            previous_user_draft_and_formal_AC_preserved=True,
+            original_catalogue_preserved=catalogue,
+            feature_role_permissions_tested=True,
+            feature_role_permissions=permissions,
+            upgraded_private_features_and_export_via_https=True,
+            retained_user_new_real_https_submission_accepted=True,
+            browser_real_https_run_wrong_accepted=True,
+            backup_restore=backup,
+            generations_attempted=2,
+            no_journal_or_verdict_edits=True,
             completed_at=datetime.now(UTC).isoformat(),
         )
 
@@ -835,18 +1266,41 @@ class Rehearsal:
             raise RuntimeError("Owned rehearsal cleanup could not be fully confirmed")
 
 
-def main():
+def parse_options(arguments=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--release", type=Path, required=True)
     parser.add_argument("--manifest-sha256", required=True)
+    parser.add_argument(
+        "--previous-release", type=Path, help="Verified frozen Phase A release, for --upgrade-only"
+    )
+    parser.add_argument(
+        "--previous-manifest-sha256",
+        help="Independently trusted SHA-256 of the previous release manifest",
+    )
     parser.add_argument("--failed-release", type=Path)
     parser.add_argument("--failed-manifest-sha256")
     parser.add_argument("--worker-restart-only", action="store_true")
     parser.add_argument("--migration-only", action="store_true")
+    parser.add_argument(
+        "--upgrade-only",
+        action="store_true",
+        help="Upgrade Phase A to B1 without importing the expanded catalogue",
+    )
     parser.add_argument("--caddy", type=Path, required=True)
     parser.add_argument("--artifacts", type=Path, default=ROOT / "test-results/deployment")
     parser.add_argument("--output", type=Path)
-    options = parser.parse_args()
+    options = parser.parse_args(arguments)
+    if bool(options.previous_release) != bool(options.previous_manifest_sha256):
+        parser.error("--previous-release and --previous-manifest-sha256 must be supplied together")
+    if options.upgrade_only:
+        if not options.previous_release:
+            parser.error("--upgrade-only requires the previous release and its trusted digest")
+        if options.worker_restart_only or options.migration_only or options.failed_release:
+            parser.error("--upgrade-only excludes worker restart and failed migration modes")
+        if options.previous_manifest_sha256 == options.manifest_sha256:
+            parser.error("A schema upgrade requires two different verified releases")
+    elif options.previous_release:
+        parser.error("Previous release options require --upgrade-only")
     if bool(options.failed_release) != bool(options.failed_manifest_sha256):
         parser.error("--failed-release and --failed-manifest-sha256 must be supplied together")
     if options.worker_restart_only and options.failed_release:
@@ -856,29 +1310,69 @@ def main():
             "--migration-only requires a failed release and excludes --worker-restart-only"
         )
     options.release, options.caddy = options.release.resolve(), options.caddy.resolve()
+    if options.previous_release:
+        options.previous_release = options.previous_release.resolve()
+        if options.previous_release == options.release:
+            parser.error("A schema upgrade requires distinct release directories")
+    options.artifacts = options.artifacts.resolve()
+    return options
+
+
+def validate_upgrade_manifests(previous, target):
+    """Preflight contract only. It cannot prove that a live migration succeeds."""
+    paths = {f"{app}/migrations/{name}.py" for app, name in UPGRADE_MIGRATIONS}
+    if any(
+        path.startswith(("learning/migrations/", "community/migrations/"))
+        and path.endswith(".py")
+        and not path.endswith("/__init__.py")
+        for path in previous["source_files"]
+    ):
+        raise ValueError("The previous release must precede the learning/community schema")
+    if not paths <= target["source_files"].keys():
+        raise ValueError("The target release must contain both B1 initial migrations")
+    if previous["images"]["web"] == target["images"]["web"]:
+        raise ValueError("A schema upgrade must exercise a different Web image")
+
+
+def main():
+    options = parse_options()
     if options.failed_release:
         options.failed_release = options.failed_release.resolve()
         failed = verify(options.failed_release, options.failed_manifest_sha256)
         if "core/migrations/0003_acceptance_atomic_failure.py" not in failed["source_files"]:
-            parser.error("Expected the explicitly constructed atomic migration failure fixture")
-    options.artifacts = options.artifacts.resolve()
+            raise ValueError("Expected the explicitly constructed atomic migration failure fixture")
     options.artifacts.mkdir(parents=True, exist_ok=True)
     output = options.output or options.artifacts / "deployment-acceptance.json"
     output.unlink(missing_ok=True)
     manifest = verify(options.release, options.manifest_sha256)
+    previous_manifest = None
+    if options.upgrade_only:
+        previous_manifest = verify(options.previous_release, options.previous_manifest_sha256)
+        validate_upgrade_manifests(previous_manifest, manifest)
+        docker(
+            "image", "load", "--input", str(options.previous_release / "images.tar"), timeout=900
+        )
+        inspect_images(previous_manifest)
     docker("image", "load", "--input", str(options.release / "images.tar"), timeout=900)
     inspect_images(manifest)
     version = command(str(options.caddy), "version").decode().strip()
     if not version.startswith("v2.11.7 "):
-        parser.error("Use the pinned Caddy 2.11.7 executable")
+        raise ValueError("Use the pinned Caddy 2.11.7 executable")
     with tempfile.TemporaryDirectory(prefix="px-deploy-") as temporary:
         rehearsal = Rehearsal(options, Path(temporary))
         rehearsal.result.update(
             source_id=manifest["source_id"], images=manifest["images"], caddy=version
         )
+        if previous_manifest is not None:
+            rehearsal.result.update(
+                previous_source_id=previous_manifest["source_id"],
+                previous_images=previous_manifest["images"],
+            )
         try:
             rehearsal.start()
-            if options.worker_restart_only:
+            if options.upgrade_only:
+                rehearsal.upgrade_rehearsal()
+            elif options.worker_restart_only:
                 rehearsal.worker_restart()
             elif options.migration_only:
                 rehearsal.migration_rehearsal()

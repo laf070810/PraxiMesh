@@ -13,6 +13,50 @@ from urllib.parse import urlsplit
 from playwright.sync_api import expect, sync_playwright
 
 
+def learning_and_community(page, base, *, judge):
+    page.goto(base + "/problems/sum-positive/")
+    page.get_by_role("button", name="收藏题目", exact=True).click()
+    page.goto(base + "/learning/bookmarks/")
+    expect(page.get_by_role("link", name="只累加正数", exact=False)).to_be_visible()
+    page.goto(base + "/problems/sum-positive/")
+    expect(page.get_by_role("button", name="取消收藏", exact=True)).to_be_visible()
+    page.get_by_role("link", name="写私人笔记", exact=True).click()
+    page.locator("#id_title").fill("浏览器私有笔记")
+    page.locator("#id_body").fill("<script>private browser note</script>")
+    page.get_by_role("button", name="保存笔记", exact=True).click()
+    expect(page.get_by_role("heading", name="浏览器私有笔记", exact=True)).to_be_visible()
+    expect(page.get_by_text("<script>private browser note</script>", exact=True)).to_be_visible()
+    page.goto(base + "/learn/tutorial-functions/")
+    page.get_by_role("button", name="标记为已读", exact=True).click()
+    page.goto(base + "/learn/tutorial-functions/")
+    expect(page.get_by_role("button", name="撤销已读标记", exact=True)).to_be_visible()
+    page.goto(base + "/learning/")
+    expect(page.get_by_role("heading", name="实践证据与建议", exact=True)).to_be_visible()
+    expect(page.get_by_text(f"当前版本通过 {1 if judge else 0} /", exact=False)).to_be_visible()
+    page.goto(base + "/problems/sum-positive/")
+    page.get_by_role("link", name="写题解", exact=True).click()
+    expect(page.locator("#id_kind")).to_have_value("solution")
+    assert page.locator("#id_version").input_value()
+    page.locator("#id_title").fill("浏览器题解草稿")
+    page.locator("#id_body").fill("独立写下的解题思路，未自动附带私有代码。")
+    page.get_by_role("button", name="保存内容", exact=True).click()
+    post_url = page.url
+    expect(page.get_by_text("这份内容当前未公开。", exact=False)).to_be_visible()
+    page.get_by_role("button", name="主动提交公开审核", exact=True).click()
+    page.goto(post_url)
+    expect(page.get_by_text("这份内容当前未公开。", exact=False)).to_be_visible()
+    guest = page.context.browser.new_context()
+    try:
+        visitor = guest.new_page()
+        assert visitor.goto(post_url).status == 404
+    finally:
+        guest.close()
+    page.get_by_role("button", name="撤回公开内容", exact=True).click()
+    page.goto(post_url)
+    expect(page.get_by_role("button", name="主动提交公开审核", exact=True)).to_be_visible()
+    return post_url
+
+
 def main():
     base = os.environ.get("BROWSER_URL", "http://127.0.0.1:8765")
     username = f"browser-{uuid.uuid4().hex[:12]}"
@@ -109,6 +153,7 @@ def main():
         if os.environ.get("BROWSER_JUDGE") == "1":
             expect(page.get_by_text("已通过 1 道", exact=False)).to_be_visible()
             expect(page.locator("tbody tr")).to_have_count(3)
+        post_url = learning_and_community(page, base, judge=os.environ.get("BROWSER_JUDGE") == "1")
         page.goto(base + "/practice/")
         page.get_by_role("searchbox").fill("Softmax")
         page.get_by_role("button", name="筛选", exact=True).click()
@@ -125,10 +170,11 @@ def main():
         deletion.get_by_label("输入 DELETE 确认").fill("DELETE")
         deletion.get_by_role("button", name="永久删除当前账号").click()
         expect(page.get_by_role("heading", name="账号已删除")).to_be_visible()
+        assert page.goto(post_url).status == 404
         assert not errors, errors
         browser.close()
     print(
-        "Browser flow passed: navigation, registration, private draft, path enrollment, search, mobile layout, deletion. Judge mode="
+        "Browser flow passed: navigation, registration, private draft, path enrollment, bookmarks, private notes, reading evidence, community draft/review request/withdrawal, search, mobile layout, deletion. Judge mode="
         + os.environ.get("BROWSER_JUDGE", "0")
     )
 

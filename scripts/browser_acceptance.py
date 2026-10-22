@@ -14,6 +14,50 @@ import urllib.request
 from pathlib import Path
 
 
+def bootstrap_moderator(run, environment):
+    """Use a trusted management runner, returning only fresh browser credentials.
+
+    ``run`` accepts management-script arguments and an ``env`` mapping. Container
+    callers can adapt it to their owned control container with the DB owner role.
+    No community writing or moderation state is created by this bootstrap.
+    """
+    credentials = {
+        "BROWSER_MODERATOR_USERNAME": "community-reviewer-" + secrets.token_hex(6),
+        "BROWSER_MODERATOR_PASSWORD": secrets.token_urlsafe(36),
+    }
+    private_environment = dict(environment, **credentials)
+    run(
+        "manage.py",
+        "shell",
+        "-c",
+        "import os; from django.contrib.auth import get_user_model; "
+        "user = get_user_model().objects.create_user("
+        "username=os.environ['BROWSER_MODERATOR_USERNAME'], "
+        "password=os.environ['BROWSER_MODERATOR_PASSWORD']); "
+        "assert not user.is_staff and not user.is_superuser",
+        env=private_environment,
+    )
+    run(
+        "manage.py",
+        "community_moderator",
+        credentials["BROWSER_MODERATOR_USERNAME"],
+        "--grant",
+        env=private_environment,
+    )
+    run(
+        "manage.py",
+        "shell",
+        "-c",
+        "import os; from django.contrib.auth import get_user_model; "
+        "user = get_user_model().objects.get(username=os.environ['BROWSER_MODERATOR_USERNAME']); "
+        "assert not user.is_staff and not user.is_superuser and not user.groups.exists(); "
+        "assert set(user.user_permissions.values_list('content_type__app_label', 'codename')) "
+        "== {('community', 'moderate_content')}",
+        env=private_environment,
+    )
+    return credentials
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -38,18 +82,25 @@ def main():
                 "BROWSER_JUDGE": "1" if options.judge else "0",
             }
         )
+        # This launcher owns a new local HTTP endpoint, not an inherited TLS fixture.
+        env.pop("BROWSER_TEST_SPKI", None)
+        env.pop("BROWSER_MODERATOR_USERNAME", None)
+        env.pop("BROWSER_MODERATOR_PASSWORD", None)
 
         def run(*args, **kwargs):
-            subprocess.run([sys.executable, *args], cwd=root, env=env, check=True, **kwargs)
+            environment = kwargs.pop("env", env)
+            subprocess.run([sys.executable, *args], cwd=root, env=environment, check=True, **kwargs)
 
         run("manage.py", "migrate", "--noinput", "--verbosity=0")
         run("manage.py", "content_import")
+        browser_env = dict(env, **bootstrap_moderator(run, env))
         if options.judge:
             run("manage.py", "sandbox_check")
         with socket.socket() as allocated:
             allocated.bind(("127.0.0.1", 0))
             port = allocated.getsockname()[1]
         env["BROWSER_URL"] = f"http://127.0.0.1:{port}"
+        browser_env["BROWSER_URL"] = env["BROWSER_URL"]
         processes = []
         with (
             (artifacts / "browser-server.log").open("w") as server_log,
@@ -101,6 +152,7 @@ def main():
                 else:
                     raise RuntimeError("Application or real judge did not become ready.")
                 run("tests/browser_smoke.py", timeout=300)
+                run("tests/browser_community.py", env=browser_env, timeout=300)
             finally:
                 for process in processes:
                     if process.poll() is None:

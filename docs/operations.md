@@ -46,7 +46,7 @@ docker compose up --build
 
 容器构建与烟雾检查也已加入 CI；可本地复现 `docker build -t praximesh:phase-a-check .` 和 `uv run python scripts/container_smoke.py`。脚本验证非 root、只读根、无外部网络情况下的迁移、内容导入及 HTTP/静态资源，结束删除临时容器；不运行用户提交代码。
 
-Web 的数据库权限限制为知识/题目/健康记录只读，以及账号、会话、草稿、路径、任务、限流和队列锁的必要操作；不给迁移表、DDL 或修改题目/健康的权限。协调器授权白名单位于 `scripts/deploy_database.py`，HTTPS 验收另有 `scripts/production_acceptance.py` 的 `database_roles()`。部署迁移增加表时必须复核权限；不能给日常 Web 超级用户或 owner 凭证。`APP_STATIC_ROOT` 可指定收集静态资源的目标，生产容器继续使用镜像内只读资源。
+Web 的数据库权限限制为知识/题目/健康记录只读，以及账号、会话、草稿、路径、任务、限流、队列锁、私有学习记录和社区内容的必要操作；不给迁移表、DDL 或修改题目/健康的权限。协调器授权白名单位于 `scripts/deploy_database.py`，HTTPS 验收的 `scripts/production_acceptance.py` 中 `database_roles()` 复用同一表权限清单。部署迁移增加表时必须复核权限；不能给日常 Web 超级用户或 owner 凭证。`APP_STATIC_ROOT` 可指定收集静态资源的目标，生产容器继续使用镜像内只读资源。
 
 ## 启用真实判题
 
@@ -68,7 +68,7 @@ GRANT SELECT ON core_problemversion TO praximesh_judge;
 GRANT SELECT, INSERT, UPDATE ON core_workerhealth TO praximesh_judge;
 ```
 
-不授予 auth/session/profile/draft 表权限。worker 使用独立 APP_SECRET_KEY；它不需要 Web 会话密钥。数据库网络只允许所需连接。凭证只在控制器环境中，绝不传入 guest。以上角色已在本地真实 PostgreSQL 实例验证任务操作成功、auth_user 读取被拒绝；部署到生产仍须复验网络和实际权限。
+不授予 auth/session/profile/draft、learning 或 community 表权限。worker 使用独立 APP_SECRET_KEY；它不需要 Web 会话密钥。数据库网络只允许所需连接。凭证只在控制器环境中，绝不传入 guest。以上角色已在本地真实 PostgreSQL 实例验证任务操作成功、auth_user 读取被拒绝；部署到生产仍须复验网络和实际权限。
 
 ```sh
 # 通过受保护的环境文件配置 DATABASE_URL、生产设置以及下列参数。

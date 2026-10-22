@@ -10,6 +10,8 @@ ARG WASI_SHA256=""
 ENV JUDGE_BACKEND=wasi JUDGE_WASI_SHA256=${WASI_SHA256}
 COPY praximesh ./praximesh
 COPY core ./core
+COPY learning ./learning
+COPY community ./community
 COPY judge ./judge
 COPY content ./content
 COPY templates ./templates

@@ -1,0 +1,11 @@
+{% extends 'base.html' %}{% block title %}实践证据与建议 · PraxiMesh{% endblock %}
+{% block content %}
+<section class="page-heading"><p class="eyebrow">仅自己可见</p><h1>实践证据与建议</h1><p>当前版本通过 {{ summary.completed }} / {{ summary.problems }} 道题；尝试 {{ summary.attempted }} 道，得到 {{ summary.attempts }} 次正式结果。</p>{% include 'learning/nav.html' %}</section>
+<section class="section compact"><p class="notice">一次通过不等于掌握。这里按当前题目版本汇总你的正式结果，展示不同题目、难度与重复练习证据；不推断掌握百分比。公开样例 Run、排队中的任务和评测服务故障不计入。错误次数描述提交结果，不判断你的能力。</p><p>旧版或下线题目的 {{ archived_attempts }} 次正式结果保留在<a href="{% url 'dashboard' %}">提交历史</a>，不计为当前版本通过。跨领域题目会出现在相关领域中，同一领域内不重复计题。</p>
+<h2>可以接着做什么</h2><p>建议依据你的记录与已发布的前置关系生成，可以自由跳过。超过 {{ recent_days }} 天未练习时会提示间隔复习。</p>
+{% for item in recommendations %}<article class="card"><p class="eyebrow">{{ item.kind }}</p><h3><a href="{% url 'problem' item.problem.id %}">{{ item.problem.title }} · v{{ item.problem.revision }} →</a></h3><p>{{ item.reason }}</p></article>{% empty %}<p>当前没有待练习或到期复习建议，可以自行选择题目重做。</p>{% endfor %}
+{% include 'learning/pagination.html' with page=recommendations %}
+<h2>按领域查看</h2>{% include 'learning/evidence_table.html' with groups=domains group_name='领域' %}
+<h2>按概念查看</h2>{% include 'learning/evidence_table.html' with groups=concepts group_name='概念' %}
+<h2>近期错误结果</h2><p>仅列本人当前版本正式提交，最近 {{ recent_days }} 天内的最新 10 条。</p><ul>{% for item in recent_errors %}<li><a href="{% url 'submission' item.id %}">{{ item.problem }} · v{{ item.revision }}：{{ item.label }}</a> · {{ item.result_at|date:'Y-m-d H:i' }} UTC</li>{% empty %}<li>没有符合条件的结果。</li>{% endfor %}</ul>
+</section>{% endblock %}

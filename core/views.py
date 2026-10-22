@@ -12,13 +12,16 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from core.content import public_problem
+from community.services import export_user_data as export_community
+from core.content import digest, public_problem
 from core.forms import ProfileForm, RecoveryForm, RegisterForm, SourceForm
 from core.limits import consume
 from core.models import AccountProfile, Draft, Enrollment, KnowledgeNode, Problem, Submission
 from core.queue import AdmissionError, available, enqueue
 from judge.backends import result_environment_label
 from judge.results import LABELS
+from learning.models import Bookmark, TutorialReading
+from learning.services import export_user_data as export_learning
 
 
 def graph():
@@ -101,6 +104,9 @@ def node_detail(request, slug):
         request.user.is_authenticated
         and Enrollment.objects.filter(user=request.user, path=node).exists()
     )
+    reading = None
+    if request.user.is_authenticated and node.kind == "tutorial":
+        reading = TutorialReading.objects.filter(user=request.user, tutorial=node).first()
     return render(
         request,
         "node.html",
@@ -115,6 +121,8 @@ def node_detail(request, slug):
             "exercise_count": len(exercise_steps),
             "completed": completed,
             "enrolled": enrolled,
+            "reading": reading,
+            "reading_current": reading is not None and reading.content_digest == digest(data),
         },
     )
 
@@ -206,6 +214,8 @@ def problem_detail(request, slug):
             "concepts": [nodes[c] for c in data["concepts"]],
             "judge_available": available(),
             "runtime_description": configured_runtime_description(),
+            "bookmarked": request.user.is_authenticated
+            and Bookmark.objects.filter(user=request.user, problem=problem).exists(),
         },
     )
 
@@ -466,6 +476,8 @@ def export_account(request):
         "paths": list(
             Enrollment.objects.filter(user=request.user).values_list("path_id", flat=True)
         ),
+        "learning": export_learning(request.user),
+        "community": export_community(request.user),
     }
     response = HttpResponse(
         json.dumps(data, ensure_ascii=False, indent=2), content_type="application/json"
@@ -490,7 +502,8 @@ def delete_account(request):
         "message.html",
         {
             "title": "账号已删除",
-            "body": "账号、草稿、提交记录和路径记录已从当前数据库删除。备份按站点保留周期清除。",
+            "body": "账号、草稿、提交、学习记录及你发布的社区内容已从当前数据库删除。"
+            "审核事件只保留不含正文的操作记录，操作者关联已清除。备份按站点保留周期清除。",
         },
     )
 

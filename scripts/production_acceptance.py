@@ -36,6 +36,10 @@ import psycopg
 from psycopg import sql
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+from scripts.browser_acceptance import bootstrap_moderator  # noqa: E402
+from scripts.deploy_database import WEB_READ, WORKER_PRIVILEGES, web_write_tables  # noqa: E402
+
 POSTGRES = (
     "postgres:17-alpine@sha256:e4cb93687b062cd25a0e8f672d85a7708235009d70d31f8a7698d9370092a9c4"
 )
@@ -229,21 +233,24 @@ def database_roles(owner_url, web_password, worker_password):
                 sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(sql.Identifier(name))
             )
         connection.execute(
-            "GRANT SELECT ON core_knowledgenode, core_problem, core_problemversion, "
-            "core_workerhealth, auth_group, auth_permission, auth_group_permissions, "
-            "django_content_type TO acceptance_web"
+            sql.SQL("GRANT SELECT ON {} TO acceptance_web").format(
+                sql.SQL(", ").join(map(sql.Identifier, WEB_READ))
+            )
         )
         connection.execute(
-            "GRANT SELECT, INSERT, UPDATE, DELETE ON auth_user, auth_user_groups, "
-            "auth_user_user_permissions, core_accountprofile, core_draft, core_enrollment, "
-            "core_submission, core_ratebucket, core_queuelock, django_session TO acceptance_web"
+            sql.SQL("GRANT SELECT, INSERT, UPDATE, DELETE ON {} TO acceptance_web").format(
+                sql.SQL(", ").join(map(sql.Identifier, web_write_tables(connection)))
+            )
         )
         connection.execute(
             "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO acceptance_web"
         )
-        connection.execute("GRANT SELECT, UPDATE ON core_submission TO acceptance_judge")
-        connection.execute("GRANT SELECT ON core_problemversion TO acceptance_judge")
-        connection.execute("GRANT SELECT, INSERT, UPDATE ON core_workerhealth TO acceptance_judge")
+        for table, privileges in WORKER_PRIVILEGES.items():
+            connection.execute(
+                sql.SQL("GRANT {} ON {} TO acceptance_judge").format(
+                    sql.SQL(privileges), sql.Identifier(table)
+                )
+            )
 
 
 def denied(url, statement):
@@ -524,11 +531,16 @@ def main():
             env=env,
         )
         del env["ACCEPTANCE_PASSWORD"]
+        moderator_credentials = bootstrap_moderator(
+            lambda *arguments, env: run(sys.executable, *arguments, env=env), env
+        )
         database_roles(owner_url, web_password, worker_password)
         denied(web_url, "CREATE TABLE forbidden_acceptance_table (id integer)")
         denied(web_url, "UPDATE core_problemversion SET data=data WHERE false")
         denied(web_url, "UPDATE core_workerhealth SET ready=true WHERE false")
         denied(worker_url, "SELECT * FROM auth_user LIMIT 1")
+        denied(worker_url, "SELECT * FROM learning_note LIMIT 1")
+        denied(worker_url, "SELECT * FROM community_report LIMIT 1")
         web_env = dict(env, DATABASE_URL=web_url)
         worker_env = dict(env, DATABASE_URL=worker_url, APP_SECRET_KEY=secrets.token_urlsafe(48))
         proxy_env = dict(
@@ -597,6 +609,12 @@ def main():
         transport = transport_checks(base, http_port, backend_port, context)
         output = run(sys.executable, "tests/browser_smoke.py", env=web_env)
         (artifacts / "production-browser.log").write_bytes(output)
+        output = run(
+            sys.executable,
+            "tests/browser_community.py",
+            env=dict(web_env, **moderator_credentials),
+        )
+        (artifacts / "production-community-browser.log").write_bytes(output)
         print("Measuring eight-client browsing and a six-account real submission burst", flush=True)
         baseline = browse(base, context)
         jobs, during_judge, signed_in, source = load_jobs(base, context, password, owner_url)
@@ -658,11 +676,13 @@ def main():
             "tls": transport,
             "database_roles": {
                 "worker_auth_read_denied": True,
+                "worker_learning_and_community_read_denied": True,
                 "web_ddl_denied": True,
                 "web_content_and_health_write_denied": True,
             },
             "browser": {
                 "real_judge": True,
+                "community_moderation_workflow": True,
                 "hsts": True,
                 "secure_cookies": True,
                 "certificate_exception": "ephemeral leaf SPKI only",

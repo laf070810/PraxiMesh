@@ -16,6 +16,7 @@
 }
 body {
   margin: 0;
+  overflow-wrap: anywhere;
   background: var(--paper);
   color: var(--ink);
   font:
@@ -173,10 +174,18 @@ main {
 }
 .site-header nav {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 26px;
   font-size: 14px;
   font-weight: 550;
+}
+.workspace-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin: 24px 0;
 }
 .site-header nav span {
   font-weight: 400;

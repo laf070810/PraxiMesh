@@ -1,0 +1,9 @@
+{% extends 'base.html' %}{% block title %}{{ item.title }} · 社区{% endblock %}{% block content %}
+<section class="page-heading">{% include 'community/nav.html' %}<p>{{ item.get_kind_display }} · {{ item.get_state_display }} · 修订 {{ item.revision }}</p><h1>{{ item.title }}</h1><p>{{ item.author.username }} · {{ item.created_at|date:'Y-m-d H:i' }}</p>{% if item.version_id %}<p>关联 {{ item.version.problem_id }} v{{ item.version.revision }}{% if not item.version.problem.published %}（题目已下线，本文停止公开）{% endif %}</p>{% endif %}</section>
+{% if not is_public %}<p role="status">这份内容当前未公开。私有草稿和撤回内容仅作者可见；待审、未通过和隐藏内容还可由审核者处理。</p>{% endif %}
+{% if item.kind == 'solution' %}<p>以下题解包含解题思路或答案。</p>{% endif %}<article class="card"><div>{{ item.body|linebreaksbr }}</div></article>
+{% if own or moderator %}{% if item.moderation_note %}<p>处理说明：{{ item.moderation_note }}</p>{% endif %}{% endif %}
+{% include 'community/actions.html' %}
+<section><h2>评论</h2>{% if is_public %}<a href="{% url 'community:comment_create' item.pk %}">写评论草稿</a>{% endif %}
+{% for comment in comments %}<article class="card"><p>{{ comment.author.username }} · {{ comment.get_state_display }}</p><div>{{ comment.body|linebreaksbr }}</div><a href="{% url 'community:comment_detail' comment.pk %}">评论详情与操作</a></article>{% empty %}<p>暂无可见评论。</p>{% endfor %}{% include 'community/pagination.html' with page=comments %}</section>
+{% endblock %}

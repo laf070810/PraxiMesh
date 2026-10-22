@@ -4,6 +4,8 @@
 
 **已交付可自部署的阶段 A 核心，尚未公开上线。** 导航、教程、题库、账户、私有草稿、CPython/WASI 执行、历史与路径进度已联通；评测默认关闭，配置真实沙箱后才接收提交。当前结果与缺口见 [验收记录](docs/acceptance.md)。
 
+完整阶段 B/C 正在实施，范围见[需求追踪](docs/requirements.md)。本批将题库扩充至 18 题、3 条路径，并新增私有收藏和笔记、阅读记录、实践证据与复习建议，以及需要主动送审的社区讨论、题解、评论、举报和申诉。本批已通过真实 PostgreSQL/WASI、浏览器与冻结镜像升级验证，范围见 [B1 验收](docs/acceptance-b1.md)。
+
 ## 本地体验
 
 需要 Python 3.11 和 [uv](https://docs.astral.sh/uv/)。不需要 Node 或容器即可体验非执行功能。
@@ -39,18 +41,18 @@ uv run pip-audit
 ```sh
 uv sync --frozen --group browser
 uv run --group browser playwright install chromium
-uv run --group browser python manage.py runserver 127.0.0.1:8765 --noreload
-# 另一个终端
-uv run --group browser python tests/browser_smoke.py
+uv run --group browser python scripts/browser_acceptance.py
 ```
 
-脚本创建并删除自己的账号，截图在忽略目录 `test-results/`。需浏览器系统依赖，CI 用受支持的 Ubuntu。
+脚本启动独立临时数据库和回环服务，创建并删除测试账号，结束清理进程及数据库。截图在忽略目录 `test-results/`。需浏览器系统依赖，CI 用受支持的 Ubuntu。
 
 ## 项目边界
 
 | 目录 | 职责 |
 | --- | --- |
 | `core/` | 知识与题目版本、私有账户数据、Web 页面与队列 |
+| `learning/` | 私有收藏、笔记、阅读记录及实践证据 |
+| `community/` | 主动送审的讨论、题解、评论、举报与申诉 |
 | `judge/` | 可信结果比较、WASI 执行器和独立选择的 gVisor 适配器 |
 | `content/` | JSON Schema、原创示例包、公开样例和维护测试 |
 | `templates/`, `static/` | 自托管页面、样式与渐进交互 |

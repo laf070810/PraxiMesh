@@ -1,34 +1,182 @@
 {
   "sum-positive": [
-    {"mistake": "包含负数", "source": "def solve(values): return sum(values)"},
-    {"mistake": "返回计数而非总和", "source": "def solve(values): return sum(1 for x in values if x > 0)"}
+    {
+      "mistake": "包含负数",
+      "source": "def solve(values): return sum(values)"
+    },
+    {
+      "mistake": "返回计数而非总和",
+      "source": "def solve(values): return sum(1 for x in values if x > 0)"
+    }
   ],
   "unique-stable": [
-    {"mistake": "排序破坏原顺序", "source": "def solve(values): return sorted(set(values))"},
-    {"mistake": "未去重", "source": "def solve(values): return values"}
+    {
+      "mistake": "排序破坏原顺序",
+      "source": "def solve(values): return sorted(set(values))"
+    },
+    {
+      "mistake": "未去重",
+      "source": "def solve(values): return values"
+    }
   ],
   "word-count": [
-    {"mistake": "忽略大小写", "source": "def solve(words):\n d={}\n for word in words:\n  word=word.lower()\n  d[word]=d.get(word,0)+1\n return d"},
-    {"mistake": "遗漏空字符串", "source": "def solve(words):\n d={}\n for word in words:\n  if word: d[word]=d.get(word,0)+1\n return d"}
+    {
+      "mistake": "忽略大小写",
+      "source": "def solve(words):\n d={}\n for word in words:\n  word=word.lower()\n  d[word]=d.get(word,0)+1\n return d"
+    },
+    {
+      "mistake": "遗漏空字符串",
+      "source": "def solve(words):\n d={}\n for word in words:\n  if word: d[word]=d.get(word,0)+1\n return d"
+    }
   ],
   "lower-bound": [
-    {"mistake": "返回相等区间右端", "source": "import bisect\ndef solve(values,target): return bisect.bisect_right(values,target)"},
-    {"mistake": "未找到时返回减一", "source": "def solve(values,target): return values.index(target) if target in values else -1"}
+    {
+      "mistake": "返回相等区间右端",
+      "source": "import bisect\ndef solve(values,target): return bisect.bisect_right(values,target)"
+    },
+    {
+      "mistake": "未找到时返回减一",
+      "source": "def solve(values,target): return values.index(target) if target in values else -1"
+    }
   ],
   "dot-product": [
-    {"mistake": "只逐元素乘未求和", "source": "def solve(a,b): return [x*y for x,y in zip(a,b)]"},
-    {"mistake": "把乘积和写成和的乘积", "source": "def solve(a,b): return sum(a)*sum(b)"}
+    {
+      "mistake": "只逐元素乘未求和",
+      "source": "def solve(a,b): return [x*y for x,y in zip(a,b)]"
+    },
+    {
+      "mistake": "把乘积和写成和的乘积",
+      "source": "def solve(a,b): return sum(a)*sum(b)"
+    }
   ],
   "transpose": [
-    {"mistake": "没有转置", "source": "def solve(matrix): return matrix"},
-    {"mistake": "错误地假设方阵", "source": "def solve(matrix): return [[matrix[j][i] for j in range(len(matrix))] for i in range(len(matrix))]"}
+    {
+      "mistake": "没有转置",
+      "source": "def solve(matrix): return matrix"
+    },
+    {
+      "mistake": "错误地假设方阵",
+      "source": "def solve(matrix): return [[matrix[j][i] for j in range(len(matrix))] for i in range(len(matrix))]"
+    }
   ],
   "normalize-rows": [
-    {"mistake": "使用整张矩阵的和", "source": "def solve(matrix):\n total=sum(map(sum,matrix))\n return [[x/total if total else 0 for x in row] for row in matrix]"},
-    {"mistake": "零行除以零", "source": "def solve(matrix): return [[x/sum(row) for x in row] for row in matrix]"}
+    {
+      "mistake": "使用整张矩阵的和",
+      "source": "def solve(matrix):\n total=sum(map(sum,matrix))\n return [[x/total if total else 0 for x in row] for row in matrix]"
+    },
+    {
+      "mistake": "零行除以零",
+      "source": "def solve(matrix): return [[x/sum(row) for x in row] for row in matrix]"
+    }
   ],
   "stable-softmax": [
-    {"mistake": "直接指数导致溢出", "source": "import math\ndef solve(scores):\n e=[math.exp(x) for x in scores]\n return [x/sum(e) for x in e]"},
-    {"mistake": "误用最大指数作分母", "source": "import math\ndef solve(scores):\n e=[math.exp(x-max(scores)) for x in scores]\n return [x/max(e) for x in e]"}
+    {
+      "mistake": "直接指数导致溢出",
+      "source": "import math\ndef solve(scores):\n e=[math.exp(x) for x in scores]\n return [x/sum(e) for x in e]"
+    },
+    {
+      "mistake": "误用最大指数作分母",
+      "source": "import math\ndef solve(scores):\n e=[math.exp(x-max(scores)) for x in scores]\n return [x/max(e) for x in e]"
+    }
+  ],
+  "argmax-first": [
+    {
+      "mistake": "相等时错误更新为最后一次出现",
+      "source": "def solve(values):\n best=0\n for i in range(1,len(values)):\n  if values[i]>=values[best]: best=i\n return best"
+    },
+    {
+      "mistake": "用零初始化导致全负数失效",
+      "source": "def solve(values):\n best=0\n maximum=0\n for i,value in enumerate(values):\n  if value>maximum: best,maximum=i,value\n return best"
+    }
+  ],
+  "range-sums": [
+    {
+      "mistake": "错误包含右端点",
+      "source": "def solve(values,queries): return [sum(values[left:right+1]) for left,right in queries]"
+    },
+    {
+      "mistake": "遗漏减去左前缀",
+      "source": "def solve(values,queries): return [sum(values[:right]) for left,right in queries]"
+    }
+  ],
+  "merge-sorted": [
+    {
+      "mistake": "集合错误去重",
+      "source": "def solve(left,right): return sorted(set(left+right))"
+    },
+    {
+      "mistake": "遗漏一个序列的剩余尾部",
+      "source": "def solve(left,right):\n i=j=0\n result=[]\n while i<len(left) and j<len(right):\n  if left[i]<=right[j]: result.append(left[i]); i+=1\n  else: result.append(right[j]); j+=1\n return result"
+    }
+  ],
+  "balanced-brackets": [
+    {
+      "mistake": "只比较每种括号数量",
+      "source": "def solve(text): return all(text.count(a)==text.count(b) for a,b in [('(',')'),('[',']'),('{','}')])"
+    },
+    {
+      "mistake": "遗漏结束后栈非空检查",
+      "source": "def solve(text):\n stack=[]\n opening={')':'(',']':'[','}':'{'}\n for char in text:\n  if char in '([{': stack.append(char)\n  elif not stack or stack.pop()!=opening[char]: return False\n return True"
+    }
+  ],
+  "shortest-distances": [
+    {
+      "mistake": "不可达点错误返回零",
+      "source": "def solve(graph,start):\n d=[-1]*len(graph)\n d[start]=0\n queue=[start]\n for u in queue:\n  for v in graph[u]:\n   if d[v]==-1: d[v]=d[u]+1; queue.append(v)\n return [max(0,x) for x in d]"
+    },
+    {
+      "mistake": "深度优先首次发现并非最短",
+      "source": "def solve(graph,start):\n d=[-1]*len(graph)\n d[start]=0\n stack=[start]\n while stack:\n  u=stack.pop()\n  for v in graph[u]:\n   if d[v]==-1: d[v]=d[u]+1; stack.append(v)\n return d"
+    }
+  ],
+  "matrix-product": [
+    {
+      "mistake": "误写为逐元素乘法",
+      "source": "def solve(a,b): return [[x*y for x,y in zip(row_a,row_b)] for row_a,row_b in zip(a,b)]"
+    },
+    {
+      "mistake": "把行数误作内部维度",
+      "source": "def solve(a,b): return [[sum(a[i][t]*b[t][j] for t in range(len(a))) for j in range(len(b[0]))] for i in range(len(a))]"
+    }
+  ],
+  "population-stats": [
+    {
+      "mistake": "误用样本方差分母",
+      "source": "def solve(values):\n mean=sum(values)/len(values)\n return {'mean':mean,'variance':sum((x-mean)**2 for x in values)/(len(values)-1)}"
+    },
+    {
+      "mistake": "两个大平方相减导致相消",
+      "source": "def solve(values):\n mean=sum(values)/len(values)\n return {'mean':mean,'variance':sum(x*x for x in values)/len(values)-mean*mean}"
+    }
+  ],
+  "regression-errors": [
+    {
+      "mistake": "把有符号均值当作MAE",
+      "source": "def solve(actual,predicted):\n e=[p-a for a,p in zip(actual,predicted)]\n return {'mae':sum(e)/len(e),'mse':sum(x*x for x in e)/len(e)}"
+    },
+    {
+      "mistake": "MSE遗漏除以样本数",
+      "source": "def solve(actual,predicted):\n e=[p-a for a,p in zip(actual,predicted)]\n return {'mae':sum(abs(x) for x in e)/len(e),'mse':sum(x*x for x in e)}"
+    }
+  ],
+  "gradient-step": [
+    {
+      "mistake": "遗漏平方导数的系数二",
+      "source": "def solve(xs,ys,weight,rate): return weight-rate*sum(x*(weight*x-y) for x,y in zip(xs,ys))/len(xs)"
+    },
+    {
+      "mistake": "遗漏平均损失的分母",
+      "source": "def solve(xs,ys,weight,rate): return weight-rate*2*sum(x*(weight*x-y) for x,y in zip(xs,ys))"
+    }
+  ],
+  "trapezoid-samples": [
+    {
+      "mistake": "错误假定采样等距",
+      "source": "def solve(xs,ys):\n step=(xs[-1]-xs[0])/(len(xs)-1)\n return sum(step*(ys[i]+ys[i+1])/2 for i in range(len(xs)-1))"
+    },
+    {
+      "mistake": "遗漏两端高度平均的二分之一",
+      "source": "def solve(xs,ys): return sum((xs[i+1]-xs[i])*(ys[i]+ys[i+1]) for i in range(len(xs)-1))"
+    }
   ]
 }

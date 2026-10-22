@@ -1,0 +1,5 @@
+{% extends 'base.html' %}{% block title %}{% if editing %}编辑笔记{% else %}新建笔记{% endif %} · PraxiMesh{% endblock %}
+{% block content %}
+<section class="page-heading"><h1>{% if editing %}编辑笔记{% else %}新建笔记{% endif %}</h1><p>笔记仅你可见。可关联一个题目版本或知识节点，也可以独立保存。</p>{% include 'learning/nav.html' %}</section>
+<section class="section compact"><form method="post">{% csrf_token %}{{ form.as_p }}<button class="button">保存笔记</button></form>{% if editing %}<p><a href="{% url 'learning:note_detail' note.pk %}">取消编辑</a></p>{% endif %}</section>
+{% endblock %}

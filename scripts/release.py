@@ -26,6 +26,8 @@ from judge.wasi_policy import TARGET  # noqa: E402
 
 SOURCE_DIRS = {
     "core",
+    "learning",
+    "community",
     "judge",
     "praximesh",
     "content",

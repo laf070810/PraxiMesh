@@ -159,6 +159,40 @@ def test_runtime_permissions_separate_private_accounts_content_and_health():
         "core_problemversion": "SELECT",
         "core_workerhealth": "SELECT, INSERT, UPDATE",
     }
+    assert "learning_note" in WEB_WRITE and "community_report" in WEB_WRITE
+    assert not any(name.startswith(("learning_", "community_")) for name in WORKER_PRIVILEGES)
+
+
+@pytest.mark.parametrize(
+    "installed", [(), (("learning", "0001_initial"),), tuple(deploy_database.FEATURE_TABLES)]
+)
+def test_web_role_supports_old_and_migrated_schema(installed):
+    tables = set(deploy_database.BASE_WEB_WRITE)
+    for migration in installed:
+        tables.update(deploy_database.FEATURE_TABLES[migration])
+    tables.add("unrelated_private_table")
+
+    class Connection:
+        def execute(self, statement):
+            rows = installed if "django_migrations" in statement else [(table,) for table in tables]
+            return SimpleNamespace(fetchall=lambda: rows)
+
+    granted = set(deploy_database.web_write_tables(Connection()))
+    assert granted == tables - {"unrelated_private_table"}
+
+
+@pytest.mark.parametrize("recorded", [True, False])
+def test_web_role_fails_closed_when_feature_schema_disagrees_with_migrations(recorded):
+    installed = [("learning", "0001_initial")] if recorded else []
+    tables = [*deploy_database.BASE_WEB_WRITE, "learning_note"]
+
+    class Connection:
+        def execute(self, statement):
+            rows = installed if "django_migrations" in statement else [(table,) for table in tables]
+            return SimpleNamespace(fetchall=lambda: rows)
+
+    with pytest.raises(DeploymentDatabaseError):
+        deploy_database.web_write_tables(Connection())
 
 
 @pytest.mark.parametrize(

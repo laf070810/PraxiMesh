@@ -1,0 +1,6 @@
+{% extends 'base.html' %}{% block title %}社区 · PraxiMesh{% endblock %}{% block content %}
+<section class="page-heading">{% include 'community/nav.html' %}<h1>一起讨论，分享理解</h1><p>讨论、提问与题解由作者主动送审，审核通过后公开。题解会明确标注对应题目版本。</p></section>
+{% if problem %}<p>关联题目：{{ problem }} · <a href="{% url 'community:index' %}">查看全部题目的社区内容</a></p>{% endif %}
+<nav aria-label="内容类型"><a href="?problem={{ problem|urlencode }}">全部</a> · <a href="?kind=discussion&amp;problem={{ problem|urlencode }}">讨论</a> · <a href="?kind=question&amp;problem={{ problem|urlencode }}">提问</a> · <a href="?kind=solution&amp;problem={{ problem|urlencode }}">题解（含答案）</a></nav>
+{% for post in page %}<article class="card"><span>{{ post.get_kind_display }}</span><h2><a href="{% url 'community:detail' post.pk %}">{{ post.title }}</a></h2><p>{{ post.author.username }} · {{ post.created_at|date:'Y-m-d H:i' }}{% if post.version_id %} · {{ post.version.problem_id }} v{{ post.version.revision }}{% endif %}</p></article>{% empty %}<p>这个分类暂时没有公开内容。可以先写一份私有草稿。</p>{% endfor %}
+{% include 'community/pagination.html' %}{% endblock %}

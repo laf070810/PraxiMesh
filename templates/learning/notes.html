@@ -1,0 +1,5 @@
+{% extends 'base.html' %}{% block title %}我的笔记 · PraxiMesh{% endblock %}
+{% block content %}
+<section class="page-heading"><p class="eyebrow">仅自己可见</p><h1>我的笔记</h1>{% include 'learning/nav.html' %}<p><a class="button" href="{% url 'learning:note_create' %}">写一份笔记</a></p></section>
+<section class="section compact">{% for note in page %}<article class="card"><h2><a href="{% url 'learning:note_detail' note.pk %}">{{ note.title }}</a></h2><p>{% if note.version %}{{ note.version.data.title }} · v{{ note.version.revision }}{% elif note.node %}{{ note.node.title }}{% else %}独立笔记{% endif %}</p><p class="muted">更新于 {{ note.updated_at|date:'Y-m-d H:i' }} UTC</p></article>{% empty %}<p>这里可以记录思路、错误原因和待复习的问题。</p>{% endfor %}{% include 'learning/pagination.html' %}</section>
+{% endblock %}

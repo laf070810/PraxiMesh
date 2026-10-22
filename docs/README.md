@@ -3,6 +3,8 @@
 需求基线：[PRD v0.2](../PRD.md)。技术方案可变，产品验收不随实现缩减。
 
 - [阶段计划与安全发布门槛](plan.md)
+- [完整 PRD 需求追踪](requirements.md) — 阶段 A/B/C 全目标实施中
+- [RFC-006：阶段 B/C 的完整产品实施](rfcs/006-complete-product.md) — 实施中
 - [RFC-001：阶段 A 的架构、内容和可信评测](rfcs/001-phase-a.md) — 接受，2026-10-22
 - [ADR-001：应用和数据边界](adr/001-application.md) — 接受
 - [ADR-002：评测隔离与结果信任边界](adr/002-evaluation.md) — 接受，运行环境待验证
@@ -16,6 +18,8 @@
 - [RFC-005：任务排空与版本协调](rfcs/005-deployment-coordination.md) — 协调器已实现，本地五代部署、失败迁移与中断恢复通过
 - [ADR-007：暂停入口与策略绑定](adr/007-admission-coordination.md) — 接受
 - [ADR-008：维护窗口发布与保留数据的恢复](adr/008-deployment-generations.md) — 接受
+- [ADR-009：学习记录和社区公开边界](adr/009-learning-community.md) — 接受
+- [学习记录和社区维护](community.md)
 - [威胁模型](security.md)
 - [内容贡献规范](content.md)
 - [运维手册](operations.md)
@@ -23,6 +27,7 @@
 - [生产设置的 HTTPS 验收重放](production-acceptance.md)
 - [发布制品构建、校验与导入](releases.md)
 - [单主机发布协调、排空与恢复](deployment-coordination.md)
-- [验收记录](acceptance.md)
+- [阶段 A 验收记录](acceptance.md)
+- [B1 学习与社区验收](acceptance-b1.md)
 
 修改核心边界时，先更新 RFC 的候选方案/风险，再追加或替代 ADR；保留旧决策及替代链接。验收记录必须区分单元测试、真实沙箱测试、本地体验和公开部署。

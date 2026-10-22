@@ -1,0 +1,3 @@
+<div class="table-wrap"><table><thead><tr><th>{{ group_name }}</th><th>当前练习通过 / 题数</th><th>尝试题数 / 正式结果次数</th><th>通过次数 / 难度分布</th><th>近 {{ recent_days }} 天的错误结果</th></tr></thead><tbody>
+{% for row in groups %}<tr><td><a href="{% url 'node' row.id %}">{{ row.title }}</a></td><td>{{ row.completed }} / {{ row.problems }}</td><td>{{ row.attempted }} / {{ row.attempts }}</td><td>{{ row.accepted_attempts }} 次{% for item in row.difficulty_evidence %}<br>{{ item.difficulty }}：{{ item.count }} 题{% endfor %}</td><td>{% for error in row.recent_errors %}{{ error.label }} {{ error.count }} 次{% if not forloop.last %}；{% endif %}{% empty %}无{% endfor %}</td></tr>{% endfor %}
+</tbody></table></div>

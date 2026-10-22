@@ -1,0 +1,9 @@
+{% if own %}<section aria-label="作者操作"><h2>管理自己的内容</h2>
+{% if kind == 'post' %}<a href="{% url 'community:edit' item.pk %}">编辑</a>{% else %}<a href="{% url 'community:comment_edit' item.pk %}">编辑评论</a>{% endif %}
+{% if can_submit %}<p>提交即表示你希望这份正文及作者用户名在审核通过后公开；不会自动附带私有提交源码。你可随时撤回或删除。</p><form method="post" action="{% url 'community:author_action' kind item.pk 'submit' %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ item.revision }}"><button type="submit">主动提交公开审核</button></form>{% endif %}
+<form method="post" action="{% url 'community:author_action' kind item.pk 'withdraw' %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ item.revision }}"><button type="submit">撤回公开内容</button></form>
+<form method="post" action="{% url 'community:author_action' kind item.pk 'delete' %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ item.revision }}"><button type="submit">删除正文及关联评论</button></form>
+{% if can_appeal %}<a href="{% url 'community:appeal_create' kind item.pk %}">对本次决定提出私有申诉</a>{% endif %}
+<p class="muted">删除内容或账号会删除正文与关联的评论、举报和申诉。审核记录仅保留目标编号、决定及时间，不保留正文或用户名；审核者删除账号后其关联置空。</p></section>{% endif %}
+{% if is_public and user.is_authenticated %}<p><a href="{% url 'community:report_create' kind item.pk %}">私有举报</a></p>{% endif %}
+{% if can_moderate %}<section aria-label="审核操作"><h2>审核处理</h2><p>请先阅读当前修订。处理说明只向作者及审核者显示。</p><form method="post" action="{% url 'community:moderate' kind item.pk %}">{% csrf_token %}{{ moderation_form.as_p }}<button type="submit">保存审核决定</button></form></section>{% endif %}

@@ -1,9 +1,11 @@
 from django.contrib.auth import views as auth_views
-from django.urls import path
+from django.urls import include, path
 
 from core import views
 
 urlpatterns = [
+    path("learning/", include("learning.urls")),
+    path("community/", include("community.urls")),
     path("", views.home, name="home"),
     path("learn/", views.learn, name="learn"),
     path("learn/<slug:slug>/", views.node_detail, name="node"),
