@@ -1,0 +1,8 @@
+{% load i18n %}<dl>
+<dt>{% translate "调用轮数 / 工具成本" %}</dt><dd>{{ case.metrics.turns }} / {{ case.metrics.tool_cost }}</dd>
+<dt>{% translate "驱动实际 CPU 时间（含解释器启动）" %}</dt><dd>{{ case.metrics.cpu_ms }} ms</dd>
+<dt>{% translate "保守燃料 / 输出预约" %}</dt><dd>{{ case.metrics.fuel_reserved }} / {{ case.metrics.output_reserved }} bytes</dd>
+<dt>{% translate "结束原因" %}</dt><dd>{% if case.reason == 'completed' %}{% translate "实际读取与最终报告均通过核验" %}{% elif case.reason == 'incorrect_report' %}{% translate "已读取记录，但报告的总和或数量不正确" %}{% elif case.reason == 'episode_cpu' %}{% translate "场景累计 CPU 上限" %}{% elif case.reason == 'episode_wall' %}{% translate "场景总等待上限" %}{% elif case.reason == 'turn_wall' %}{% translate "单轮等待上限" %}{% elif case.reason == 'turn_budget' or case.reason == 'tool_budget' %}{% translate "调用轮数或工具成本超限" %}{% else %}{% translate "执行失败或动作未通过工具协议校验" %}{% endif %}</dd></dl>
+<p>{% translate "以下仅为公开场景中评测端执行的轨迹，不包含私有状态或隐藏记录。CPU 为受控驱动进程的实际用量，燃料和输出为保守预约；这些指标不作为公平性能排名。" %}</p>
+<ol>{% for step in case.metrics.trajectory %}<li><strong>{{ step.tool }}</strong> · {% translate "成本" %} {{ step.cost }}<pre>{% translate "参数：" %} {{ step.args }}
+{% translate "实际工具结果：" %} {{ step.result }}</pre></li>{% empty %}<li>{% translate "尚无通过校验并实际执行的工具动作。" %}</li>{% endfor %}</ol>

@@ -1,0 +1,8 @@
+{% extends 'base.html' %}{% load i18n %}
+{% block title %}{% translate "我的成就" %} · PraxiMesh{% endblock %}
+{% block content %}<section class="page-heading"><h1>{% translate "我的成就" %}</h1>{% include 'learning/nav.html' %}
+<p>{% translate "这些是本人可核验的实践事实，不代表知识掌握程度或资质。页面仅本人可见，不会自动公开奖章。" %}</p></section>
+<section class="section compact"><p class="notice">{% translate "只统计当前可访问内容的可信正式结果。内容下线、证据失效或退出活动会改变当前展示；重复提交不增加不同题目数。" %}</p>
+{% for item in achievements %}<article class="card" id="{{ item.id }}"><h2>{{ item.title }}</h2><p>{{ item.rule }}</p>
+<p>{% if item.achieved %}{% translate "已达成" %}{% else %}{% translate "尚未达成" %}{% endif %} · {% blocktranslate with count=item.count target=item.target %}证据数量 {{ count }}，目标 {{ target }}。{% endblocktranslate %}</p>
+</article>{% endfor %}<a href="{% url 'challenges:index' %}">{% translate "浏览挑战活动" %}</a></section>{% endblock %}

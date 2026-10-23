@@ -73,24 +73,41 @@ def probes_for(identity):
     from judge.wasi_policy import POLICY_VERSION
 
     if identity.get("policy") == POLICY_VERSION:
+        from judge.agent_probes import PROBES as agent_probes
+        from judge.agent_probes import PROBLEM as agent_problem
         from judge.javascript_probes import PROBES as javascript_probes
+        from judge.specialist_probes import probes as specialist_probes
         from judge.stdio_probes import PROBES as stdio_probes
         from judge.wasi_probes import PROBES as wasi_probes
 
-        return [
-            (f"{language}/{name}", source, verdict, expected, language)
-            for language, probes in (("python", wasi_probes), ("javascript", javascript_probes))
-            for name, source, verdict, expected in probes
-        ] + [
-            (
-                f"python-stdio/{name}",
-                {"source": source, "stdin": stdin},
-                verdict,
-                expected,
-                "python-stdio",
-            )
-            for name, source, stdin, verdict, expected in stdio_probes
-        ]
+        return (
+            [
+                (f"{language}/{name}", source, verdict, expected, language)
+                for language, probes in (("python", wasi_probes), ("javascript", javascript_probes))
+                for name, source, verdict, expected in probes
+            ]
+            + [
+                (
+                    f"python-stdio/{name}",
+                    {"source": source, "stdin": stdin},
+                    verdict,
+                    expected,
+                    "python-stdio",
+                )
+                for name, source, stdin, verdict, expected in stdio_probes
+            ]
+            + [
+                (
+                    f"agent/{name}",
+                    {"problem": agent_problem, "source": source},
+                    verdict,
+                    None,
+                    "specialist",
+                )
+                for name, source, verdict in agent_probes
+            ]
+            + specialist_probes()
+        )
     if identity.get("policy") != "gvisor-python-function-v1":
         raise SandboxUnavailable("Unknown isolation policy.")
     return [(*probe, "python") for probe in PROBES]
@@ -129,7 +146,17 @@ class Command(BaseCommand):
             identity = sandbox.preflight()
             passed = []
             for name, source, verdict, expected, language in probes_for(identity):
-                if language == "python-stdio":
+                if language == "specialist":
+                    from judge.evaluator import evaluate
+                    from judge.sandbox import Execution
+
+                    graded = evaluate(source["problem"], source["source"], "submit", sandbox)
+                    result = Execution(graded["verdict"])
+                    if graded["verdict"] == "accepted" and graded.get("passed") != len(
+                        source["problem"]["tests"]
+                    ):
+                        raise SandboxUnavailable(f"Probe failed: {name}; incomplete host grading")
+                elif language == "python-stdio":
                     result = sandbox.execute_program(source["source"], source["stdin"])
                 else:
                     execute = (

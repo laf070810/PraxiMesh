@@ -1,0 +1,15 @@
+{% extends 'base.html' %}{% load i18n %}
+{% block title %}{{ task.title }} · {{ challenge.title }}{% endblock %}
+{% block content %}<section class="page-heading"><a href="{% url 'challenges:revision' challenge.id challenge.revision %}">{{ challenge.title }} · v{{ challenge.revision }}</a>
+<h1>{{ task.title }}</h1><p lang="zh-hans">{{ task.description }}</p>{% include 'challenges/source_notice.html' %}</section>
+<section class="section compact"><h2>{{ problem.title }} · v{{ task.problem_revision }}</h2>
+{% if problem.translation_fallback %}<p class="notice translation-fallback">{% translate "此版本暂无英文译文，以下显示中文原文。" %}</p>{% endif %}
+{% if task.archived %}<p class="notice">{% translate "该固定版本已归档，仅供阅读。当前版本的提交不会替代本活动绑定的版本。" %}</p>
+<a href="{% url 'problem' task.problem_id %}">{% translate "可以练习当前题目版本" %}</a>
+{% else %}<a class="button" href="{% url 'problem' task.problem_id %}">{% blocktranslate with value1=task.problem_revision %}进入练习与提交 · v{{ value1 }}{% endblocktranslate %}</a>{% endif %}
+<p>{% translate "是否计入活动取决于本人加入时间、活动窗口和固定版本；练习入口不会限制自由练习。" %}</p>
+<h3>{% translate "任务" %}</h3><p class="note-body" lang="{{ problem.content_language }}">{{ problem.statement|linebreaksbr }}</p>
+<h3>{% translate "输入与约束" %}</h3><p class="note-body" lang="{{ problem.content_language }}">{{ problem.constraints|linebreaksbr }}</p>
+<h3>{% translate "公开测试" %}</h3>{% for example in problem.examples %}<div class="example"><strong lang="{{ problem.content_language }}">{{ example.name }}</strong>
+<pre>{% if problem.evaluator == 'python-stdio-v1' %}{{ example.stdin }}{% else %}{{ example.call }}{% endif %}
+→ {{ example.expected }}</pre></div>{% endfor %}</section>{% endblock %}

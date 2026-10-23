@@ -30,7 +30,7 @@ uv sync --frozen --group judge --group browser
 
 ## 校验和导入
 
-将完整目录和经可信渠道确认的 `RELEASE_SHA256` 交给目标主机。不能仅从陌生下载里重新计算摘要，就声称已验证来源。
+将完整目录和经可信渠道确认的 `RELEASE_SHA256` 交给目标主机。不能仅从陌生下载里重新计算摘要，就声称已验证来源。以下命令在预先安装、经过审查的控制器源码根目录运行；控制器依赖可用 `uv sync --frozen --no-dev` 安装。三个发布文件不包含控制器虚拟环境。目标主机的控制器应与待部署版本匹配，升级时尤其需要包含新表权限规则。
 
 ```sh
 .venv/bin/python scripts/release.py verify \
@@ -41,11 +41,14 @@ uv sync --frozen --group judge --group browser
 
 `verify` 先检查可信 manifest，再检查文件白名单/大小/摘要、源码档案的路径/类型/内容、Docker archive 中的实际镜像配置及每个 layer 的 diff ID；验证不依赖本机已缓存的镜像层，不会解包到工作区或启动容器。`load` 在验证后导入镜像，并检查实际 image ID、平台、非 root 用户、角色、源码/策略标签及解释器配置。后续部署应使用输出的不可变 image ID。
 
-Web 不含 Wasmtime 或解释器，只记录匹配的制品摘要；worker 包含运行时。worker 的 `wasi_service` 入口要求显式 `JUDGE_ENABLED=1`，先在当前实例运行 21 项真实探针，再启动 worker。失败不发布健康记录。所有 guest 代码仍只在 WASI 内执行；打包成普通容器不改变隔离策略，不引入宿主执行回退。
+Web 不含 Wasmtime 或解释器，只记录匹配的制品摘要；worker 包含运行时。worker 的 `wasi_service` 入口要求显式 `JUDGE_ENABLED=1`，先在当前实例运行 123 项真实探针，再启动 worker。失败不发布健康记录。所有 guest 代码仍只在 WASI 内执行；打包成普通容器不改变隔离策略，不引入宿主执行回退。
 
 ## 重放镜像验收
 
+本节在独立验收环境运行。除了镜像内的 worker，它还在宿主执行公开任务的本地 CLI 测试，因此需要 browser/judge 依赖及与该 release 匹配的已验证 WASI bundle。先按 [WASI 指南](wasi.md)准备本地 bundle，设置 `JUDGE_BACKEND=wasi`、绝对路径 `JUDGE_WASI_BUNDLE` 及经可信构建记录确认的 `JUDGE_WASI_SHA256`；后者必须等于 release manifest 的 `judge.bundle_sha256`。仅执行 `verify`、`load` 或协调器部署不需要宿主安装 Wasmtime 或单独提供 bundle。不要在运行中的服务环境执行以下依赖同步。
+
 ```sh
+uv sync --frozen --group judge --group browser
 .venv/bin/playwright install chromium
 .venv/bin/python scripts/release_acceptance.py \
     --release var/releases/candidate --sha256 "$RELEASE_SHA256"

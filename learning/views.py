@@ -8,6 +8,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.translation import gettext
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from core.content import digest
@@ -47,6 +48,17 @@ def bookmarks(request):
         Bookmark.objects.filter(user=request.user).select_related("problem__current"), 20
     ).get_page(request.GET.get("page"))
     return render(request, "learning/bookmarks.html", {"page": page})
+
+
+@require_GET
+@login_required
+@never_cache
+def achievements(request):
+    from learning.achievements import achievements as build_achievements
+
+    return render(
+        request, "learning/achievements.html", {"achievements": build_achievements(request.user)}
+    )
 
 
 @require_POST

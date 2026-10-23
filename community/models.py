@@ -39,6 +39,7 @@ class Post(Writing):
         DISCUSSION = "discussion", _("讨论")
         QUESTION = "question", _("提问")
         SOLUTION = "solution", _("题解")
+        BLOG = "blog", _("博文")
 
     kind = models.CharField(max_length=12, choices=Kind.choices)
     title = models.CharField(max_length=160)

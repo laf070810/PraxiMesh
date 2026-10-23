@@ -5,6 +5,9 @@ from django.views.i18n import JavaScriptCatalog
 from core import views
 
 urlpatterns = [
+    path("challenges/", include("challenges.urls")),
+    path("coaching/", include("coaching.urls")),
+    path("organizations/", include("organizations.urls")),
     path("projects/", include("projects.urls")),
     path("showcase/", include("showcase.urls")),
     path("", include("practice_api.urls")),

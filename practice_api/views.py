@@ -11,11 +11,13 @@ from django.utils.translation import gettext as _
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from core.content import public_problem
+from core.content import public_execution, public_problem
 from core.limits import consume
 from core.middleware import client_address
 from core.models import Problem, Submission
 from core.queue import AdmissionError
+from core.resources import reservation_data, usage
+from core.result_evidence import is_formal_evidence, safe_result
 from judge.backends import result_environment_label
 from practice_api.forms import TokenForm
 from practice_api.models import AccessToken
@@ -91,13 +93,8 @@ def problem_package(request, slug):
             "source_digest": version.digest,
             "problem": data,
             "public_tests": [
-                {
-                    "name": row["name"],
-                    **({"stdin": row["stdin"]} if "stdin" in row else {"args": row["args"]}),
-                    "expected": row["expected"],
-                }
-                for row in version.data["tests"]
-                if row["public"]
+                {key: value for key, value in row.items() if key != "public"}
+                for row in public_execution(version)["tests"]
             ],
             "formal_result": False,
         }
@@ -166,21 +163,12 @@ def result(request, job_id):
             "mode": job.mode,
             "status": job.status,
             "verdict": job.verdict,
-            "result": job.result,
+            "result": safe_result(job),
+            "resource_reservation": reservation_data(job),
+            "cpu_budget": usage(request.api_user),
             "evaluation_fingerprint": job.evaluation_fingerprint,
             "evaluation_environment": result_environment_label(job.environment),
-            "formal_result": job.mode == "submit"
-            and job.status == "finished"
-            and job.verdict
-            in {
-                "accepted",
-                "wrong_answer",
-                "syntax_error",
-                "runtime_error",
-                "time_limit",
-                "memory_limit",
-                "output_limit",
-            },
+            "formal_result": is_formal_evidence(job),
         }
     )
 

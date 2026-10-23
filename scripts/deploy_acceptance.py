@@ -4,6 +4,8 @@ All resources are disposable, owner-labelled and loopback/private. The default
 mode applies the same release to successive generations. --upgrade-only instead
 installs an explicitly verified previous release, creates real private data and
 formal AC, then applies the next schema without republishing the catalogue.
+The B2-to-C rehearsal separately performs an explicit trusted-owner publication
+after verifying preservation, then checks a real new CPU reservation submission.
 Interruption checkpoints only pause a real CLI process with SIGSTOP. They do not
 alter its journal, database, verdicts or production implementation.
 """
@@ -53,6 +55,15 @@ B2_MIGRATIONS = {
     ("localization", "0001_initial"),
     ("localization", "0002_backfill_snapshots"),
 }
+C_MIGRATIONS = {
+    ("core", "0003_cpu_reservations"),
+    ("community", "0002_post_blog_kind"),
+    ("organizations", "0001_initial"),
+    ("organizations", "0002_publication_lock"),
+    ("coaching", "0001_initial"),
+    ("coaching", "0002_slot_lock"),
+}
+D_MIGRATIONS = {("challenges", "0001_initial")}
 
 # This trusted administrative program runs only in the labelled worker container.
 # Killing its exact controller models unexpected process death. `docker kill`
@@ -532,7 +543,8 @@ class Rehearsal:
             )
             assert (
                 connection.execute(
-                    "SELECT count(*) FROM django_migrations WHERE app='core' AND name='0003_acceptance_atomic_failure'"
+                    "SELECT count(*) FROM django_migrations WHERE app='core' AND name=%s",
+                    (failure_migration_name(candidate["manifest"]),),
                 ).fetchone()[0]
                 == 0
             )
@@ -567,6 +579,7 @@ class Rehearsal:
         self.result.update(
             schema_failure_rollback_tested=True,
             failed_release_sha256=self.options.failed_manifest_sha256,
+            failed_migration_name=failure_migration_name(candidate["manifest"]),
             migration_failure_observed_after_real_DDL=marker_seen,
             atomic_probe_table_and_migration_record_absent=True,
             failed_candidate_never_exposed=True,
@@ -1291,7 +1304,10 @@ def parse_options(arguments=None):
     parser.add_argument(
         "--upgrade-only",
         action="store_true",
-        help="Upgrade Phase A to B1 or B1 to B2 without republishing the catalogue",
+        help=(
+            "Rehearse A-to-B1, B1-to-B2, B2-to-C or C-to-D schema preservation; "
+            "later stages explicitly publish reviewed content after verifying preservation"
+        ),
     )
     parser.add_argument("--caddy", type=Path, required=True)
     parser.add_argument("--artifacts", type=Path, default=ROOT / "test-results/deployment")
@@ -1329,6 +1345,30 @@ def validate_upgrade_manifests(previous, target):
     """Preflight contract only. It cannot prove that a live migration succeeds."""
     paths = {f"{app}/migrations/{name}.py" for app, name in UPGRADE_MIGRATIONS}
     b2_paths = {f"{app}/migrations/{name}.py" for app, name in B2_MIGRATIONS}
+    c_paths = {f"{app}/migrations/{name}.py" for app, name in C_MIGRATIONS}
+    d_paths = {f"{app}/migrations/{name}.py" for app, name in D_MIGRATIONS}
+    if paths | b2_paths | c_paths <= previous["source_files"].keys():
+        if d_paths.intersection(previous["source_files"]):
+            raise ValueError("The previous release must precede the D schema")
+        if not d_paths <= target["source_files"].keys():
+            raise ValueError("The target release must contain all D migrations")
+        for path, digest in previous["source_files"].items():
+            if "/migrations/" in path and target["source_files"].get(path) != digest:
+                raise ValueError("An upgrade must preserve existing migration sources")
+        if previous["images"]["web"] == target["images"]["web"]:
+            raise ValueError("A schema upgrade must exercise a different Web image")
+        return "d"
+    if paths | b2_paths <= previous["source_files"].keys():
+        if c_paths.intersection(previous["source_files"]):
+            raise ValueError("The previous release must precede the C schema")
+        if not c_paths <= target["source_files"].keys():
+            raise ValueError("The target release must contain all C migrations")
+        for path, digest in previous["source_files"].items():
+            if "/migrations/" in path and target["source_files"].get(path) != digest:
+                raise ValueError("An upgrade must preserve existing migration sources")
+        if previous["images"]["web"] == target["images"]["web"]:
+            raise ValueError("A schema upgrade must exercise a different Web image")
+        return "c"
     if paths <= previous["source_files"].keys():
         if any(path in previous["source_files"] for path in b2_paths):
             raise ValueError("The previous release must precede the B2 schema")
@@ -1354,13 +1394,25 @@ def validate_upgrade_manifests(previous, target):
     return "b1"
 
 
+def failure_migration_name(manifest):
+    """Identify exactly one numbered fixture in an already verified release."""
+    names = []
+    for path in manifest["source_files"]:
+        if match := re.fullmatch(r"core/migrations/([0-9]{4}_acceptance_atomic_failure)\.py", path):
+            names.append(match[1])
+    if len(names) != 1 or int(names[0][:4]) < 3:
+        raise ValueError(
+            "Expected exactly one explicitly constructed atomic migration failure fixture"
+        )
+    return names[0]
+
+
 def main():
     options = parse_options()
     if options.failed_release:
         options.failed_release = options.failed_release.resolve()
         failed = verify(options.failed_release, options.failed_manifest_sha256)
-        if "core/migrations/0003_acceptance_atomic_failure.py" not in failed["source_files"]:
-            raise ValueError("Expected the explicitly constructed atomic migration failure fixture")
+        failure_migration_name(failed)
     options.artifacts.mkdir(parents=True, exist_ok=True)
     output = options.output or options.artifacts / "deployment-acceptance.json"
     output.unlink(missing_ok=True)
@@ -1369,10 +1421,19 @@ def main():
     rehearsal_type = Rehearsal
     if options.upgrade_only:
         previous_manifest = verify(options.previous_release, options.previous_manifest_sha256)
-        if validate_upgrade_manifests(previous_manifest, manifest) == "b2":
+        upgrade_kind = validate_upgrade_manifests(previous_manifest, manifest)
+        if upgrade_kind == "b2":
             from scripts.deploy_b2_acceptance import B2Rehearsal
 
             rehearsal_type = B2Rehearsal
+        elif upgrade_kind == "c":
+            from scripts.deploy_c_acceptance import CRehearsal
+
+            rehearsal_type = CRehearsal
+        elif upgrade_kind == "d":
+            from scripts.deploy_d_acceptance import DRehearsal
+
+            rehearsal_type = DRehearsal
         docker(
             "image", "load", "--input", str(options.previous_release / "images.tar"), timeout=900
         )

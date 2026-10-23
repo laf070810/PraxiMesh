@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from core.management.commands.sandbox_check import check_receipt
 from core.models import WorkerHealth
-from core.queue import claim, configured_fingerprint, finish, renew
+from core.queue import begin_execution, claim, configured_fingerprint, finish
 from judge.backends import configured_sandbox
 from judge.evaluator import evaluate
 from judge.results import LABELS
@@ -59,7 +59,7 @@ class Command(BaseCommand):
                 if job:
 
                     def heartbeat(current_job=job):
-                        if not renew(current_job):
+                        if not begin_execution(current_job):
                             raise LeaseLost
                         health(True)
 

@@ -21,6 +21,12 @@ def package():
 
 @pytest.fixture
 def catalog(db, package):
+    from organizations.models import PublicationLock
+
+    # Transactional database tests flush data migrations between cases.
+    # Restore the migration-owned fixture; production import still fails closed
+    # when its required lock is absent.
+    PublicationLock.objects.get_or_create(pk=1)
     import_package(package)
     return package
 

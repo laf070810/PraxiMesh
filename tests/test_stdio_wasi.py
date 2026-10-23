@@ -200,4 +200,11 @@ def test_actual_receipt_covers_function_and_program_modes(settings, tmp_path):
     identity = configured_sandbox().preflight()
     check_receipt(identity)
     passed = json.loads(Path(settings.JUDGE_RECEIPT).read_text())["passed"]
-    assert {name.split("/")[0] for name in passed} == {"python", "javascript", "python-stdio"}
+    assert {name.split("/")[0] for name in passed} == {
+        "python",
+        "javascript",
+        "python-stdio",
+        "agent",
+        "ml",
+        "science",
+    }

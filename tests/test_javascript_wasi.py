@@ -66,7 +66,7 @@ def test_joint_receipt_requires_both_languages(settings, tmp_path):
     # Receipt verification only; no claim that this fixture proves isolation.
     identity = {"policy": POLICY_VERSION, "bundle": "a" * 64}
     probes = probes_for(identity)
-    assert {item[4] for item in probes} == {"python", "javascript", "python-stdio"}
+    assert {item[4] for item in probes} == {"python", "javascript", "python-stdio", "specialist"}
     assert len({item[0] for item in probes}) == len(probes)
     import time
 

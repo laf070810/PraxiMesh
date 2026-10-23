@@ -153,6 +153,8 @@ main {
   border-bottom: 1px solid var(--line);
 }
 .brand {
+  flex-shrink: 0;
+  white-space: nowrap;
   font-size: 23px;
   letter-spacing: -0.7px;
   font-weight: 720;
@@ -535,6 +537,15 @@ a.card:hover {
 }
 .link-list small {
   color: var(--muted);
+}
+.learning-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin: 20px 0;
+}
+.learning-nav a {
+  padding: 8px 0;
 }
 .filters {
   display: flex;

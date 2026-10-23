@@ -1,0 +1,11 @@
+{% extends 'base.html' %}{% load i18n %}
+{% block title %}{% translate "我的挑战" %} · PraxiMesh{% endblock %}
+{% block content %}<section class="page-heading"><h1>{% translate "我的挑战" %}</h1><p>{% translate "参与记录与进度仅本人可见。修订更新不会改变已加入的版本。" %}</p>{% include 'learning/nav.html' %}</section>
+<section class="section compact"><a href="{% url 'challenges:index' %}">{% translate "浏览挑战活动" %}</a>
+{% for row in participations %}<article class="card">
+{% if row.available %}<h2><a href="{% url 'challenges:revision' row.id row.revision %}">{{ row.challenge.title }} · v{{ row.revision }}</a></h2><p>{{ row.challenge.state_label }}</p>
+{% else %}<h2>{% translate "活动已下线" %}</h2>{% endif %}
+<p>{% translate "加入时间" %}：{{ row.joined_at|date:'c' }}</p>
+<form method="post" action="{% url 'challenges:participate' row.id row.revision %}">{% csrf_token %}<button name="action" value="leave">{% translate "退出此活动" %}</button></form>
+</article>{% empty %}<p>{% translate "尚未加入活动；可以继续自由练习。" %}</p>{% endfor %}
+{% include 'projects/pagination.html' %}</section>{% endblock %}

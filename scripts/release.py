@@ -25,6 +25,7 @@ from judge.wasi import WasiSandbox  # noqa: E402
 from judge.wasi_policy import TARGET  # noqa: E402
 
 SOURCE_DIRS = {
+    "challenges",
     "core",
     "learning",
     "community",
@@ -32,6 +33,8 @@ SOURCE_DIRS = {
     "showcase",
     "localization",
     "projects",
+    "organizations",
+    "coaching",
     "locale",
     "judge",
     "praximesh",
@@ -88,6 +91,10 @@ def initial_content_commands(manifest):
         if "projects/management/commands/project_import.py" not in files:
             raise ReleaseError("Project content requires its reviewed importer")
         commands.append(["project_import", "/app/content/projects.json"])
+    if "content/challenges.json" in files:
+        if "challenges/management/commands/challenge_import.py" not in files:
+            raise ReleaseError("Challenge content requires its reviewed importer")
+        commands.append(["challenge_import", "/app/content/challenges.json"])
     return commands
 
 

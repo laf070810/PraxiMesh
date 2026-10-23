@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.utils.translation import gettext
 
 from core.models import Problem, QueueLock, Submission, WorkerHealth
+from core.resources import BUDGET_POLICY, reservation_units, usage, utc_day
 from judge.results import LABELS
 
 
@@ -114,20 +115,35 @@ def admission_state():
     }
 
 
+@transaction.atomic
 def expire_jobs():
     now = timezone.now()
     expired = Submission.objects.filter(status=Submission.Status.RUNNING, lease_until__lt=now)
-    expired.update(
-        status="finished",
-        verdict="internal_error",
-        finished_at=now,
-        result={"label": LABELS["internal_error"]},
+    _expire(expired, now, LABELS["internal_error"])
+    _expire(
+        Submission.objects.filter(status="queued", created_at__lt=now - timedelta(minutes=10)),
+        now,
+        "等待评测超时，请稍后重新提交。",
     )
-    Submission.objects.filter(status="queued", created_at__lt=now - timedelta(minutes=10)).update(
+
+
+def _expire(query, now, label):
+    # Each SQL transition rechecks status/lease and reservation state after row
+    # locking, so a concurrent first call can never be refunded as unstarted.
+    query.filter(budget_state="reserved").update(
         status="finished",
         verdict="internal_error",
         finished_at=now,
-        result={"label": "等待评测超时，请稍后重新提交。"},
+        result={"label": label},
+        budget_state="released",
+        lease_until=None,
+    )
+    query.exclude(budget_state="reserved").update(
+        status="finished",
+        verdict="internal_error",
+        finished_at=now,
+        result={"label": label},
+        lease_until=None,
     )
 
 
@@ -144,6 +160,13 @@ def enqueue(user, version, source, mode):
         raise AdmissionError(gettext("你已有待处理任务，请等待结果后继续。"), 429)
     if active.count() >= settings.JUDGE_MAX_QUEUE:
         raise AdmissionError(gettext("评测队列已满，请稍后重试。"), 429)
+    day = utc_day()
+    try:
+        units = reservation_units(version, mode)
+    except ValueError:
+        raise AdmissionError(gettext("该题的资源预约策略无效，暂不能评测。")) from None
+    if units > usage(user, day)["remaining"]:
+        raise AdmissionError(gettext("今日 CPU 练习预约额度不足，请在下个 UTC 日重试。"), 429)
     return Submission.objects.create(
         user=user,
         version=version,
@@ -151,6 +174,10 @@ def enqueue(user, version, source, mode):
         source_digest=hashlib.sha256(source.encode()).hexdigest(),
         evaluation_fingerprint=configured_fingerprint(),
         mode=mode,
+        budget_policy=BUDGET_POLICY,
+        budget_day=day,
+        budget_units=units,
+        budget_state="reserved",
     )
 
 
@@ -181,11 +208,47 @@ def claim(fingerprint=None):
 
 def renew(job):
     return Submission.objects.filter(
-        id=job.id, status="running", lease_token=job.lease_token
+        id=job.id, status="running", lease_token=job.lease_token, lease_until__gt=timezone.now()
     ).update(lease_until=timezone.now() + timedelta(seconds=settings.JUDGE_LEASE_SECONDS))
 
 
+@transaction.atomic
+def begin_execution(job):
+    now = timezone.now()
+    current = (
+        Submission.objects.select_for_update()
+        .filter(id=job.id, status="running", lease_token=job.lease_token, lease_until__gt=now)
+        .first()
+    )
+    if current is None or current.budget_state == "released":
+        return False
+    fields = ["lease_until"]
+    if current.budget_state == "reserved":
+        current.budget_state = "consumed"
+        current.execution_started_at = now
+        fields.extend(["budget_state", "execution_started_at"])
+    # Grandfathered work predating this migration is never retrospectively charged.
+    current.lease_until = now + timedelta(seconds=settings.JUDGE_LEASE_SECONDS)
+    current.save(update_fields=fields)
+    return True
+
+
+@transaction.atomic
 def finish(job, result, environment):
+    current = (
+        Submission.objects.select_for_update()
+        .filter(
+            id=job.id, status="running", lease_token=job.lease_token, lease_until__gt=timezone.now()
+        )
+        .first()
+    )
+    if current is None:
+        return 0
+    updates = {}
+    if current.budget_state == "reserved":
+        if result["verdict"] != "internal_error":
+            raise ValueError("A non-platform result requires a recorded execution start.")
+        updates["budget_state"] = "released"
     environment = {
         **environment,
         "language": job.version.data["language"],
@@ -194,6 +257,7 @@ def finish(job, result, environment):
     return Submission.objects.filter(
         id=job.id, status="running", lease_token=job.lease_token
     ).update(
+        **updates,
         status="finished",
         verdict=result["verdict"],
         result=result,

@@ -5,6 +5,8 @@ from community import views
 app_name = "community"
 urlpatterns = [
     path("", views.index, name="index"),
+    path("blogs/", views.blogs, name="blogs"),
+    path("blogs/<str:username>/", views.author_blog, name="author_blog"),
     path("mine/", views.mine, name="mine"),
     path("new/", views.post_edit, name="create"),
     path("reports/", views.reports, name="reports"),

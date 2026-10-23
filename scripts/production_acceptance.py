@@ -38,7 +38,7 @@ from psycopg import sql
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from scripts.browser_acceptance import bootstrap_moderator  # noqa: E402
+from scripts.browser_acceptance import bootstrap_moderator, cleanup_moderator  # noqa: E402
 from scripts.deploy_database import (  # noqa: E402
     WORKER_PRIVILEGES,
     web_read_tables,
@@ -473,6 +473,9 @@ def main():
         ]
         password = secrets.token_urlsafe(32)
         env = dict(os.environ, POSTGRES_PASSWORD=owner_password)
+        for name in list(env):
+            if name.startswith("COACHING_") or name.startswith("BROWSER_COACHING"):
+                del env[name]
         print("Starting disposable PostgreSQL and preparing production settings", flush=True)
         stack.callback(lambda: run("docker", "rm", "-f", "--volumes", container))
         run(
@@ -531,6 +534,7 @@ def main():
                 "BROWSER_URL": base,
                 "BROWSER_TEST_SPKI": pin,
                 "BROWSER_JUDGE": "1",
+                "COACHING_ENABLED": "0",
                 "ACCEPTANCE_PASSWORD": password,
                 "XDG_DATA_HOME": str(temporary / "data"),
                 "XDG_CONFIG_HOME": str(temporary / "config"),
@@ -541,6 +545,7 @@ def main():
             ["migrate", "--noinput"],
             ["content_import", "--translations", str(ROOT / "content/en.json")],
             ["project_import", str(ROOT / "content/projects.json")],
+            ["challenge_import", str(ROOT / "content/challenges.json")],
             ["collectstatic", "--noinput"],
             ["check", "--deploy", "--fail-level", "WARNING"],
         ]:
@@ -560,6 +565,12 @@ def main():
         moderator_credentials = bootstrap_moderator(
             lambda *arguments, env: run(sys.executable, *arguments, env=env), env
         )
+        stack.callback(
+            cleanup_moderator,
+            lambda *arguments, env: run(sys.executable, *arguments, env=env),
+            env,
+            moderator_credentials,
+        )
         database_roles(owner_url, web_password, worker_password)
         denied(web_url, "CREATE TABLE forbidden_acceptance_table (id integer)")
         denied(web_url, "UPDATE core_problemversion SET data=data WHERE false")
@@ -575,6 +586,37 @@ def main():
             web_url, "UPDATE localization_problemtranslation SET published=published WHERE false"
         )
         denied(web_url, "UPDATE projects_project SET published=published WHERE false")
+        for table in ("organizations_managedobject", "organizations_publicationlock"):
+            denied(web_url, f"DELETE FROM {table} WHERE false")
+        for table in (
+            "challenges_challenge",
+            "challenges_challengerevision",
+            "challenges_challengetask",
+        ):
+            denied(web_url, f"DELETE FROM {table} WHERE false")
+            denied(web_url, f"UPDATE {table} SET id=id WHERE false")
+            denied(worker_url, f"SELECT * FROM {table} LIMIT 0")
+        denied(worker_url, "SELECT * FROM challenges_participation LIMIT 0")
+        for table in (
+            "organizations_organization",
+            "organizations_membership",
+            "organizations_invitation",
+            "organizations_course",
+            "organizations_courserevision",
+            "organizations_courseunit",
+            "organizations_courseenrollment",
+            "organizations_package",
+            "organizations_packagerevision",
+            "organizations_organizationevent",
+            "organizations_managedobject",
+            "organizations_publicationlock",
+            "coaching_learningplan",
+            "coaching_hintrequest",
+            "coaching_dailyusage",
+            "coaching_slotlock",
+            "coaching_executionlease",
+        ):
+            denied(worker_url, f"SELECT * FROM {table} LIMIT 0")
         web_env = dict(env, DATABASE_URL=web_url)
         worker_env = dict(env, DATABASE_URL=worker_url, APP_SECRET_KEY=secrets.token_urlsafe(48))
         proxy_env = dict(
@@ -662,6 +704,23 @@ def main():
             timeout=300,
         )
         (artifacts / "production-practice-browser.log").write_bytes(output)
+        from scripts.advanced_browsers import run_advanced_browsers
+
+        owner_environment = dict(env)
+
+        def owner_run(*arguments, env=None):
+            fixture_env = dict(owner_environment)
+            fixture_env.update(
+                {key: value for key, value in (env or {}).items() if key.startswith("BROWSER_")}
+            )
+            return run(sys.executable, *arguments, env=fixture_env)
+
+        advanced = run_advanced_browsers(
+            dict(web_env, BROWSER_CA_FILE=str(temporary / "ca.pem")),
+            owner_run,
+            artifacts / "production-advanced",
+            include_challenges=True,
+        )
         print("Measuring eight-client browsing and a six-account real submission burst", flush=True)
         baseline = browse(base, context)
         jobs, during_judge, signed_in, source = load_jobs(base, context, password, owner_url)
@@ -726,6 +785,10 @@ def main():
                 "worker_learning_and_community_read_denied": True,
                 "worker_api_showcase_translations_projects_read_denied": True,
                 "web_translations_projects_write_denied": True,
+                "worker_organizations_and_coaching_read_denied": True,
+                "web_package_ownership_and_publication_lock_write_denied": True,
+                "web_challenge_definitions_read_only": True,
+                "worker_challenge_definitions_and_participation_read_denied": True,
                 "web_ddl_denied": True,
                 "web_content_and_health_write_denied": True,
             },
@@ -737,6 +800,7 @@ def main():
                 "hsts": True,
                 "secure_cookies": True,
                 "certificate_exception": "ephemeral leaf SPKI only",
+                "advanced": advanced,
             },
             "browse_idle": baseline,
             "browse_during_judge": during_judge,

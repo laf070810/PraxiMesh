@@ -153,8 +153,13 @@ def test_read_only_token_cannot_submit(catalog, user, client, ready):
 
 
 def test_api_rejects_invalid_unicode_and_throttles_unauthenticated_requests(
-    catalog, user, client, ready
+    catalog, user, client, ready, monkeypatch
 ):
+    # This assertion concerns one fixed window, not the documented boundary burst.
+    import time
+
+    fixed_now = time.time()
+    monkeypatch.setattr("core.limits.time.time", lambda: fixed_now)
     _, raw = token(user)
     assert send(client, raw, {**payload(), "source": "\ud800"}).status_code == 400
     assert not Submission.objects.exists()

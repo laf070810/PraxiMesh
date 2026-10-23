@@ -89,6 +89,10 @@ def runtime_description(version=None):
     ):
         return gettext("当前评测环境不支持这道题的运行方式；仍可阅读、编辑和保存草稿。")
     if settings.JUDGE_BACKEND == "wasi":
+        if version and version.data["evaluator"] == "python-agent-tools-v1":
+            return gettext(
+                "Python / WASI 受控工具任务；每轮独立实例，最多6轮。每轮墙钟5秒、每场景墙钟20秒、累计驱动CPU 6秒；输出每轮4096字节。没有网络、外部账户或系统命令工具。"
+            )
         if version and version.data["language"] == "javascript":
             return gettext(
                 "JavaScript / QuickJS 2026-06-04；只支持同步 JSON 函数，不提供 Node.js、DOM、网络或模块导入。每用例 128 MiB 线性内存、15 秒总等待、32 KiB 输出；运算量超限也会终止。"

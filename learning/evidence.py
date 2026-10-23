@@ -3,12 +3,11 @@
 from collections import Counter, defaultdict
 from datetime import timedelta
 
-from django.db.models import Count, Max, Q
-from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.translation import gettext
 
-from core.models import KnowledgeNode, Problem, Submission
+from core.models import KnowledgeNode, Problem
+from core.result_evidence import evidence_jobs, is_formal_evidence
 from localization.presentation import DIFFICULTIES, localized_node, localized_problem
 from localization.presentation import VERDICTS as LABELS
 
@@ -25,20 +24,43 @@ def build_evidence(user, *, now=None):
         Problem.objects.filter(published=True, current__isnull=False).select_related("current")
     )
     current_ids = {problem.current_id for problem in problems}
-    jobs = Submission.objects.filter(
-        user=user, mode="submit", status="finished", verdict__in=LEARNER_VERDICTS
-    ).annotate(result_at=Coalesce("finished_at", "created_at"))
-    # Aggregate in the DB instead of loading private source/result payloads or every job.
-    results = defaultdict(list)
-    for row in (
-        jobs.order_by()
-        .values("version_id", "verdict")
-        .annotate(
-            count=Count("pk"),
-            recent=Count("pk", filter=Q(result_at__gte=since)),
-            latest=Max("result_at"),
+    # Bound memory to version/verdict aggregates and ten recent errors. The
+    # stored source is deferred, and each result is checked before it counts.
+    aggregate = {}
+    recent_errors = []
+    for record in evidence_jobs(user).iterator(chunk_size=100):
+        if not is_formal_evidence(record):
+            continue
+        key = (record.version_id, record.verdict)
+        row = aggregate.setdefault(
+            key,
+            {
+                "version_id": record.version_id,
+                "verdict": record.verdict,
+                "count": 0,
+                "recent": 0,
+                "latest": record.finished_at,
+            },
         )
-    ):
+        row["count"] += 1
+        row["recent"] += record.finished_at >= since
+        if (
+            len(recent_errors) < 10
+            and record.version_id in current_ids
+            and record.finished_at >= since
+            and record.verdict != "accepted"
+        ):
+            recent_errors.append(
+                {
+                    "id": record.pk,
+                    "problem": localized_problem(record.version)["title"],
+                    "revision": record.version.revision,
+                    "label": LABELS[record.verdict],
+                    "result_at": record.finished_at,
+                }
+            )
+    results = defaultdict(list)
+    for row in aggregate.values():
         results[row["version_id"]].append(row)
 
     cards = []
@@ -195,22 +217,6 @@ def build_evidence(user, *, now=None):
                 % {"days": RECENT_DAYS},
             )
 
-    recent_errors = [
-        {
-            "id": job.pk,
-            "problem": localized_problem(job.version)["title"],
-            "revision": job.version.revision,
-            "label": LABELS[job.verdict],
-            "result_at": job.result_at,
-        }
-        for job in (
-            jobs.filter(version_id__in=current_ids, result_at__gte=since)
-            .exclude(verdict="accepted")
-            .select_related("version")
-            .defer("source", "result", "environment")
-            .order_by("-result_at", "-pk")[:10]
-        )
-    ]
     return {
         "summary": summarize(cards),
         "domains": domain_rows,

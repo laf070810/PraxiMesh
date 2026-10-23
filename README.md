@@ -2,11 +2,13 @@
 
 以结构化知识为导航、以编程实践为核心的学习平台。需求基线见 [PRD.md](PRD.md)。
 
-**当前交付方向为可本地验证的自部署版本，公开运营和许可证选择留待后续。** 已验证阶段 A/B 的知识、练习和社区闭环；评测默认关闭，配置真实沙箱后才接收提交。后续专业 CPU 评测、组织与智能学习正在集成，范围见[需求追踪](docs/requirements.md)。
+**当前交付范围为可本地验证的自部署版本。公开运营、项目许可证和真实 GPU 验收留待后续。** 评测默认关闭，配置并通过真实沙箱门槛后才接收提交；AI 辅导也默认关闭。
 
-完整阶段 B/C 正在实施，范围见[需求追踪](docs/requirements.md)。本批将题库扩充至 18 题、3 条路径，并新增私有收藏和笔记、阅读记录、实践证据与复习建议，以及需要主动送审的社区讨论、题解、评论、举报和申诉。本批已通过真实 PostgreSQL/WASI、浏览器与冻结镜像升级验证，范围见 [B1 验收](docs/acceptance-b1.md)。
+当前提供 25 道题、47 个知识节点、5 条学习路径及四阶段工程项目，支持 Python 函数、JavaScript 函数、Python 完整程序，以及 CPU 上的 ML 训练、加权拟合和受控工具 Agent 实践。账户、源码、草稿、笔记、学习计划和专业成绩默认私有。
 
-B2 已通过本地联合验收：当前目录为 22 题、4 条路径，新增 JavaScript 函数、Python 完整程序、四阶段传感器分析项目、本地公开测试与令牌提交、中英界面、可撤回的公开结果和同环境榜单。721 项 PostgreSQL/真实 WASI 回归通过，冻结镜像、HTTPS 浏览器和 B1→B2 数据保留升级通过，详见 [B2 验收](docs/acceptance-b2.md)。
+社区包含主动送审的题解、讨论和博客；公开主页与普通题型榜单需要本人选择分享。组织课程固定题目版本，第三方题库经过独立审核并由维护者发布。学习规划和综合证据不依赖模型；可选 AI 提示需逐次预览并确认输入，不能修改正式成绩。
+
+阶段 A/B 已通过真实 PostgreSQL/WASI、HTTPS 浏览器与冻结镜像升级验收，见 [B1](docs/acceptance-b1.md) 和 [B2](docs/acceptance-b2.md)。C 的专业评测、组织与智能学习也已完成本地联合验收，范围见 [C 验收](docs/acceptance-c.md)。完整筛选、私有成就及挑战活动已通过真实 HTTPS、冻结镜像和 C→D 升级验收，见 [D 验收](docs/acceptance-d.md)；全部范围与外部待办见[需求追踪](docs/requirements.md)。
 
 ## 本地体验
 
@@ -18,6 +20,7 @@ uv run python manage.py migrate
 uv run python manage.py content_check
 uv run python manage.py content_import --translations content/en.json
 uv run python manage.py project_import content/projects.json
+uv run python manage.py challenge_import content/challenges.json
 uv run python manage.py runserver 127.0.0.1:8000
 ```
 
@@ -35,7 +38,7 @@ uv run pip-audit
 
 生产设置的真实 Caddy/Gunicorn/PostgreSQL/WASI 验收已在临时回环部署通过，包含 HTTPS 浏览器、数据库权限、并发测量和 worker 停机降级。重放方法与边界见 [HTTPS 部署验收](docs/production-acceptance.md)；公有域名和目标生产主机仍待验收。
 
-同源的 Web 与 WASI worker 可构建成固定镜像发布包，见[发布制品指南](docs/releases.md)。单主机协调器已通过五代真实回环 HTTPS 演练：排空、维护窗口、候选数据库备份恢复、真实 DDL 失败回滚、实际判题检查、代理激活及中断恢复。成功替换使用同一 schema，不能据此保证任意未来迁移兼容。
+同源的 Web 与 WASI worker 可构建成固定镜像发布包，见[发布制品指南](docs/releases.md)。单主机协调器的基线通过五代真实回环 HTTPS 演练：排空、维护窗口、候选数据库备份恢复、真实 DDL 失败回滚、实际判题检查、代理激活及中断恢复。后续另行验证了 B1→B2、B2→C 与 C→D 的实际 schema 升级和旧数据保留；未来迁移仍须独立验收。
 
 开放前的失败可恢复旧代；开放意图持久保存后，恢复保留当前数据库，避免丢失用户写入或恢复已删除账号。操作、首次 schema 升级和恢复边界见[部署协调指南](docs/deployment-coordination.md)与[ADR-008](docs/adr/008-deployment-generations.md)。部署工作流需手工触发且默认禁用；托管 CI、实际生产目标及公有证书尚未验收。
 
@@ -54,8 +57,11 @@ uv run --group browser python scripts/browser_acceptance.py
 | 目录 | 职责 |
 | --- | --- |
 | `core/` | 知识与题目版本、私有账户数据、Web 页面与队列 |
-| `learning/` | 私有收藏、笔记、阅读记录及实践证据 |
-| `community/` | 主动送审的讨论、题解、评论、举报与申诉 |
+| `learning/` | 私有收藏、笔记、阅读记录、实践证据及可核验成就 |
+| `challenges/` | 限时活动、不可变任务绑定和自愿加入的私有进度 |
+| `community/` | 主动送审的讨论、题解、博客、评论、举报与申诉 |
+| `organizations/` | 私有组织、角色邀请、版本课程和有归属范围的第三方题库 |
+| `coaching/` | 自选目标、固定版本计划、多维证据与可选的私有 AI 提示 |
 | `practice_api/` | 有效期与用途受限的访问令牌、版本化公开任务和本人提交 API |
 | `projects/` | 维护者发布的不可变项目计划、固定题目版本与私有进度 |
 | `showcase/` | 自愿公开主页、可撤回结果和可比较的分组榜单 |
@@ -67,4 +73,6 @@ uv run --group browser python scripts/browser_acceptance.py
 | `deploy/` | 容器、TLS 代理样例和运维脚本 |
 | `docs/` | 阶段计划、RFC/ADR、威胁模型、运维和验收 |
 
-阅读 [设计索引](docs/README.md)、[内容规范](docs/content.md)、[贡献指南](CONTRIBUTING.md)、[安全边界](SECURITY.md) 和 [部署与恢复手册](docs/operations.md)。公开发布前的授权事项见 [LICENSES.md](LICENSES.md)。
+活动规则、发布命令和筛选说明见[挑战与成就指南](docs/challenges.md)。示例活动使用固定的 2026 年 UTC 日历窗口，结束后不会自动延长。
+
+阅读 [设计索引](docs/README.md)、[内容规范](docs/content.md)、[贡献指南](CONTRIBUTING.md)、[安全边界](SECURITY.md) 和 [部署与恢复手册](docs/operations.md)。可选模型配置与真实质量边界见 [AI 辅导指南](docs/local-coaching.md)。公开发布前的授权事项见 [LICENSES.md](LICENSES.md)。

@@ -1,0 +1,19 @@
+{% extends 'base.html' %}{% load i18n %}
+{% block title %}{% if blog_author %}{% blocktranslate %}{{ blog_author }} 的博客{% endblocktranslate %}{% else %}{% translate "博客" %}{% endif %} · PraxiMesh{% endblock %}
+{% block content %}
+<section class="page-heading">
+  {% include 'community/nav.html' %}
+  <h1>{% if blog_author %}{% blocktranslate %}{{ blog_author }} 的博客{% endblocktranslate %}{% else %}{% translate "博客与学习经验" %}{% endif %}</h1>
+  <p>{% translate "这里只显示作者主动送审并通过审核的博文。私有草稿、待审、隐藏和撤回内容不会出现在公开目录。" %}</p>
+  <p><a href="{% url 'community:create' %}?kind=blog">{% translate "写一篇私有博文草稿" %}</a>{% if blog_author %} · <a href="{% url 'community:blogs' %}">{% translate "查看全部公开博文" %}</a>{% endif %}</p>
+</section>
+<section class="section compact">
+  {% for post in page %}
+  <article class="card">
+    <h2><a href="{% url 'community:detail' post.pk %}">{{ post.title }}</a></h2>
+    <p><a href="{% url 'community:author_blog' post.author.username %}">{{ post.author.username }}</a> · {{ post.created_at|date:'Y-m-d H:i' }}</p>
+  </article>
+  {% empty %}<p>{% translate "暂无公开博文。你可以先保存私有草稿，自主决定是否送审。" %}</p>{% endfor %}
+  {% include 'community/pagination.html' %}
+</section>
+{% endblock %}

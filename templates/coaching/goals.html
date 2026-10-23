@@ -1,0 +1,1 @@
+{% extends 'base.html' %}{% load i18n %}{% block content %}{% include 'coaching/nav.html' %}<h1>{% translate "设置私有目标" %}</h1><p>{% translate "选择最多八个概念。保存后生成新的固定版本计划，旧计划保留为私有历史。推荐依据为公开前置关系和本人的可信正式结果。" %}</p><form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">{% translate "生成规则学习计划" %}</button></form>{% endblock %}

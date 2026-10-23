@@ -222,5 +222,75 @@
       "mistake": "错误使用样本方差分母",
       "source": "import json\nimport sys\n\n\ndef interval_sums(values, queries):\n    prefix = [0]\n    for value in values:\n        prefix.append(prefix[-1] + value)\n    return [prefix[right] - prefix[left] for left, right in queries]\n\n\ndef summarize(values):\n    mean = sum(values) / len(values)\n    variance = sum((value - mean) ** 2 for value in values) / max(len(values) - 1, 1)\n    return mean, variance\n\n\ndef integrate(times, values):\n    return sum((times[i + 1] - times[i]) * (values[i] + values[i + 1]) / 2\n               for i in range(len(values) - 1))\n\n\ndata = json.load(sys.stdin)\ntimes, values, queries = data[\"times\"], data[\"values\"], data[\"queries\"]\nmean, variance = summarize(values)\nprint(json.dumps({\"range_sums\": interval_sums(values, queries), \"mean\": mean,\n                  \"variance\": variance, \"integral\": integrate(times, values)}, allow_nan=False))\n"
     }
+  ],
+  "train-linear-model": [
+    {
+      "mistake": "只预测训练标签均值，忽略特征",
+      "source": "def train(features, targets):\n return {\"weights\": [0] * len(features[0]), \"bias\": sum(targets)/len(targets)}\n"
+    },
+    {
+      "mistake": "遗漏非零截距",
+      "source": "def train(features, targets):\n    n, d = len(features), len(features[0])\n    mean_x = [sum(row[j] for row in features) / n for j in range(d)]\n    mean_y = sum(targets) / n\n    centered = [[row[j] - mean_x[j] for j in range(d)] for row in features]\n    centered_y = [value - mean_y for value in targets]\n    matrix = [[sum(row[i] * row[j] for row in centered) for j in range(d)]\n              + [sum(row[i] * value for row, value in zip(centered, centered_y))]\n              for i in range(d)]\n    for column in range(d):\n        pivot = max(range(column, d), key=lambda row: abs(matrix[row][column]))\n        matrix[column], matrix[pivot] = matrix[pivot], matrix[column]\n        scale = matrix[column][column]\n        for j in range(column, d + 1):\n            matrix[column][j] /= scale\n        for row in range(d):\n            if row == column:\n                continue\n            factor = matrix[row][column]\n            for j in range(column, d + 1):\n                matrix[row][j] -= factor * matrix[column][j]\n    weights = [matrix[j][d] for j in range(d)]\n    bias = mean_y - sum(weight * mean for weight, mean in zip(weights, mean_x))\n    return {\"weights\": weights, \"bias\": 0}\n"
+    },
+    {
+      "mistake": "把样本数误当模型维度",
+      "source": "def train(features, targets):\n return {\"weights\": [1] * len(features), \"bias\": 0}\n"
+    },
+    {
+      "mistake": "自报零误差并伪造seed",
+      "source": "def train(features, targets):\n return {\"weights\": [0] * len(features[0]), \"bias\": 0, \"mse\": 0, \"mae\": 0, \"seed\": 11}\n"
+    },
+    {
+      "mistake": "硬编码首个公开场景参数",
+      "source": "def train(features, targets):\n return {\"weights\": [2] + [0]*(len(features[0])-1), \"bias\": 3}\n"
+    },
+    {
+      "mistake": "把布尔值冒充模型数值",
+      "source": "def train(features, targets):\n return {\"weights\": [True] * len(features[0]), \"bias\": False}\n"
+    }
+  ],
+  "weighted-line-fit": [
+    {
+      "mistake": "忽略测量精度差异而做普通最小二乘",
+      "source": "import math\n\n\ndef fit(x, y, sigma):\n    weights = [1.0 for value in sigma]\n    total = math.fsum(weights)\n    center_x = math.fsum(w * value for w, value in zip(weights, x)) / total\n    center_y = math.fsum(w * value for w, value in zip(weights, y)) / total\n    centered = [value - center_x for value in x]\n    xx = math.fsum(w * value * value for w, value in zip(weights, centered))\n    xy = math.fsum(w * dx * (value - center_y) for w, dx, value in zip(weights, centered, y))\n    slope = xy / xx\n    intercept = center_y - slope * center_x\n    return {\n        \"parameters\": [intercept, slope],\n        \"covariance\": [[1 / total + center_x**2 / xx, -center_x / xx], [-center_x / xx, 1 / xx]],\n    }\n"
+    },
+    {
+      "mistake": "把1/sigma误当逆方差权重",
+      "source": "import math\n\n\ndef fit(x, y, sigma):\n    weights = [1 / value for value in sigma]\n    total = math.fsum(weights)\n    center_x = math.fsum(w * value for w, value in zip(weights, x)) / total\n    center_y = math.fsum(w * value for w, value in zip(weights, y)) / total\n    centered = [value - center_x for value in x]\n    xx = math.fsum(w * value * value for w, value in zip(weights, centered))\n    xy = math.fsum(w * dx * (value - center_y) for w, dx, value in zip(weights, centered, y))\n    slope = xy / xx\n    intercept = center_y - slope * center_x\n    return {\n        \"parameters\": [intercept, slope],\n        \"covariance\": [[1 / total + center_x**2 / xx, -center_x / xx], [-center_x / xx, 1 / xx]],\n    }\n"
+    },
+    {
+      "mistake": "已知绝对误差时仍用残差方差缩放协方差",
+      "source": "import math\n\n\ndef correct_fit(x, y, sigma):\n    weights = [1 / value**2 for value in sigma]\n    total = math.fsum(weights)\n    center_x = math.fsum(w * value for w, value in zip(weights, x)) / total\n    center_y = math.fsum(w * value for w, value in zip(weights, y)) / total\n    centered = [value - center_x for value in x]\n    xx = math.fsum(w * value * value for w, value in zip(weights, centered))\n    xy = math.fsum(w * dx * (value - center_y) for w, dx, value in zip(weights, centered, y))\n    slope = xy / xx\n    intercept = center_y - slope * center_x\n    return {\n        \"parameters\": [intercept, slope],\n        \"covariance\": [[1 / total + center_x**2 / xx, -center_x / xx], [-center_x / xx, 1 / xx]],\n    }\n\n\ndef fit(x, y, sigma):\n    model = correct_fit(x, y, sigma)\n    a, b = model[\"parameters\"]\n    factor = sum(((a+b*xx-yy)/ss)**2 for xx, yy, ss in zip(x, y, sigma))/(len(x)-2)\n    model[\"covariance\"] = [[value*factor for value in row] for row in model[\"covariance\"]]\n    return model\n"
+    },
+    {
+      "mistake": "丢弃截距和斜率之间的相关项",
+      "source": "import math\n\n\ndef correct_fit(x, y, sigma):\n    weights = [1 / value**2 for value in sigma]\n    total = math.fsum(weights)\n    center_x = math.fsum(w * value for w, value in zip(weights, x)) / total\n    center_y = math.fsum(w * value for w, value in zip(weights, y)) / total\n    centered = [value - center_x for value in x]\n    xx = math.fsum(w * value * value for w, value in zip(weights, centered))\n    xy = math.fsum(w * dx * (value - center_y) for w, dx, value in zip(weights, centered, y))\n    slope = xy / xx\n    intercept = center_y - slope * center_x\n    return {\n        \"parameters\": [intercept, slope],\n        \"covariance\": [[1 / total + center_x**2 / xx, -center_x / xx], [-center_x / xx, 1 / xx]],\n    }\n\n\ndef fit(x, y, sigma):\n    model = correct_fit(x, y, sigma)\n    model[\"covariance\"][0][1] = model[\"covariance\"][1][0] = 0\n    return model\n"
+    },
+    {
+      "mistake": "输出负方差但自称收敛",
+      "source": "import math\n\n\ndef correct_fit(x, y, sigma):\n    weights = [1 / value**2 for value in sigma]\n    total = math.fsum(weights)\n    center_x = math.fsum(w * value for w, value in zip(weights, x)) / total\n    center_y = math.fsum(w * value for w, value in zip(weights, y)) / total\n    centered = [value - center_x for value in x]\n    xx = math.fsum(w * value * value for w, value in zip(weights, centered))\n    xy = math.fsum(w * dx * (value - center_y) for w, dx, value in zip(weights, centered, y))\n    slope = xy / xx\n    intercept = center_y - slope * center_x\n    return {\n        \"parameters\": [intercept, slope],\n        \"covariance\": [[1 / total + center_x**2 / xx, -center_x / xx], [-center_x / xx, 1 / xx]],\n    }\n\n\ndef fit(x, y, sigma):\n    model = correct_fit(x, y, sigma)\n    model[\"covariance\"][0][0] = -abs(model[\"covariance\"][0][0])\n    return model\n"
+    },
+    {
+      "mistake": "额外字段自报零chi2",
+      "source": "import math\n\n\ndef correct_fit(x, y, sigma):\n    weights = [1 / value**2 for value in sigma]\n    total = math.fsum(weights)\n    center_x = math.fsum(w * value for w, value in zip(weights, x)) / total\n    center_y = math.fsum(w * value for w, value in zip(weights, y)) / total\n    centered = [value - center_x for value in x]\n    xx = math.fsum(w * value * value for w, value in zip(weights, centered))\n    xy = math.fsum(w * dx * (value - center_y) for w, dx, value in zip(weights, centered, y))\n    slope = xy / xx\n    intercept = center_y - slope * center_x\n    return {\n        \"parameters\": [intercept, slope],\n        \"covariance\": [[1 / total + center_x**2 / xx, -center_x / xx], [-center_x / xx, 1 / xx]],\n    }\n\n\ndef fit(x, y, sigma):\n    model = correct_fit(x, y, sigma)\n    model[\"chi2\"] = 0\n    return model\n"
+    }
+  ],
+  "approved-ledger-report": [
+    {
+      "mistake": "把未批准记录也计入报告",
+      "source": "def act(observation, state):\n    if state is None:\n        return {\"tool\": \"list_records\", \"args\": {}, \"state\": {\"phase\": \"listed\"}}\n    result = observation[\"last_result\"]\n    if state[\"phase\"] == \"listed\":\n        ids = result[\"ids\"]\n        return {\"tool\": \"read_record\", \"args\": {\"id\": ids[0]}, \"state\": {\"phase\": \"reading\", \"ids\": ids, \"next\": 1, \"total\": 0, \"count\": 0}}\n    if True:\n        state[\"total\"] += result[\"amount\"]\n        state[\"count\"] += 1\n    if state[\"next\"] < len(state[\"ids\"]):\n        record_id = state[\"ids\"][state[\"next\"]]\n        state[\"next\"] += 1\n        return {\"tool\": \"read_record\", \"args\": {\"id\": record_id}, \"state\": state}\n    return {\"tool\": \"submit_report\", \"args\": {\"total\": state[\"total\"], \"count\": state[\"count\"]}, \"state\": None}\n"
+    },
+    {
+      "mistake": "把金额为正误当作计入条件，遗漏已批准负数和零金额计数",
+      "source": "def act(observation, state):\n    if state is None:\n        return {\"tool\": \"list_records\", \"args\": {}, \"state\": {\"phase\": \"listed\"}}\n    result = observation[\"last_result\"]\n    if state[\"phase\"] == \"listed\":\n        ids = result[\"ids\"]\n        return {\"tool\": \"read_record\", \"args\": {\"id\": ids[0]}, \"state\": {\"phase\": \"reading\", \"ids\": ids, \"next\": 1, \"total\": 0, \"count\": 0}}\n    if result[\"approved\"] and result[\"amount\"] > 0:\n        state[\"total\"] += result[\"amount\"]\n        state[\"count\"] += 1\n    if state[\"next\"] < len(state[\"ids\"]):\n        record_id = state[\"ids\"][state[\"next\"]]\n        state[\"next\"] += 1\n        return {\"tool\": \"read_record\", \"args\": {\"id\": record_id}, \"state\": state}\n    return {\"tool\": \"submit_report\", \"args\": {\"total\": state[\"total\"], \"count\": state[\"count\"]}, \"state\": None}\n"
+    },
+    {
+      "mistake": "不保存或使用阶段，反复列目录直到耗尽六轮",
+      "source": "def act(observation, state):\n    return {\"tool\": \"list_records\", \"args\": {}, \"state\": None}\n"
+    },
+    {
+      "mistake": "抄写公开正确数字并伪造 state，跳过环境要求的真实读取",
+      "source": "def act(observation, state):\n    return {\"tool\": \"submit_report\", \"args\": {\"total\": 105, \"count\": 3}, \"state\": {\"listed\": True, \"read_all\": True}}\n"
+    }
   ]
 }

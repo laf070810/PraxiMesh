@@ -21,7 +21,7 @@ uv sync --frozen --group judge --group browser
 - `PRAXIMESH_MODE=production`、真实 `check --deploy --fail-level WARNING`、关闭 DEBUG；独立临时静态目录。
 - 临时私有 CA 签名的 HTTPS：Python 客户端验证证书链和主机名，拒绝错误 CA/主机名；HTTP 重定向、HSTS、CSP、请求体上限、404 页面和 Host 检查。
 - 实际代理覆盖伪造的协议/IP 头；来自非信任连接地址的 HTTPS 头不能绕过后端重定向；Gunicorn 不从其他代理头独立推断 HTTPS。
-- 21 项真实 WASI 探针，然后经 HTTPS 完成注册、Secure cookie、私有草稿、Run、错误 Submit、Accepted、路径/历史、移动页面与删除账号。
+- 123 项真实 WASI 探针，然后经 HTTPS 完成注册、Secure cookie、私有草稿、Run、错误 Submit、Accepted、路径/历史、移动页面与删除账号。
 - 8 个并发客户端各阶段共 120 次页面请求；6 个账号同时提交正确函数，用真实结果记录排队、执行和总等待分位数，并在判题期间再次测浏览。
 - 停止本次 worker 后等待真实心跳失效，提交返回 503 且不入队；阅读和草稿继续可用。伪造不同 X-Real-IP 不能绕过真实来源 IP 的账号限流。
 

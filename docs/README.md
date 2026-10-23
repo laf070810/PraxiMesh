@@ -3,9 +3,16 @@
 需求基线：[PRD v0.2](../PRD.md)。技术方案可变，产品验收不随实现缩减。
 
 - [阶段计划与安全发布门槛](plan.md)
-- [完整 PRD 需求追踪](requirements.md) — 阶段 A/B/C 全目标实施中
+- [完整 PRD 需求追踪](requirements.md) — 全目标实施中，D 补充筛选、成就与挑战
 - [RFC-006：阶段 B/C 的完整产品实施](rfcs/006-complete-product.md) — 实施中
 - [RFC-007：多语言练习、本地工具、中英界面与公开作品](rfcs/007-b2-practice-and-sharing.md) — B2 本地验收通过
+- [RFC-008：个人博客](rfcs/008-personal-blogs.md)
+- [RFC-009：组织课程与第三方题库](rfcs/009-organizations-and-packages.md)
+- [RFC-010：CPU 专业评测与统一资源预约](rfcs/010-specialist-evaluation.md)
+- [RFC-011：学习规划与可选 AI 提示](rfcs/011-intelligent-learning.md)
+- [RFC-012：挑战活动、私有成就与完整题型发现](rfcs/012-challenges-achievements-and-discovery.md)
+- [挑战、成就与题库筛选指南](challenges.md)
+- [可选自部署模型与本地 CPU 重放](local-coaching.md)
 - [本地公开测试、访问令牌与提交工具](local-practice.md)
 - [中英界面、内容译文与版本回退](localization.md)
 - [多阶段项目发布与版本进度](../projects/README.md)
@@ -24,6 +31,8 @@
 - [ADR-008：维护窗口发布与保留数据的恢复](adr/008-deployment-generations.md) — 接受
 - [ADR-009：学习记录和社区公开边界](adr/009-learning-community.md) — 接受
 - [ADR-010：多语言练习、版本项目和自愿公开成果](adr/010-practice-projects-sharing.md) — 接受，联合本地验收通过
+- [ADR-011：专业实践、机构内容与私有学习规划](adr/011-specialists-organizations-coaching.md) — 接受，C 本地联合验收通过
+- [ADR-012：固定版本挑战与私有成就](adr/012-challenges-achievements-and-discovery.md) — 接受，D 本地联合验收通过
 - [学习记录和社区维护](community.md)
 - [威胁模型](security.md)
 - [内容贡献规范](content.md)
@@ -35,5 +44,7 @@
 - [阶段 A 验收记录](acceptance.md)
 - [B1 学习与社区验收](acceptance-b1.md)
 - [B2 多语言练习、项目与公开成果验收](acceptance-b2.md)
+- [C 专业实践、组织与辅导验收](acceptance-c.md)
+- [D 完整筛选、挑战与成就验收](acceptance-d.md)
 
 修改核心边界时，先更新 RFC 的候选方案/风险，再追加或替代 ADR；保留旧决策及替代链接。验收记录必须区分单元测试、真实沙箱测试、本地体验和公开部署。

@@ -520,6 +520,69 @@
           "Large inputs"
         ]
       }
+    },
+    {
+      "id": "train-linear-model",
+      "source_revision": 1,
+      "source_digest": "95b43f8e0ae41ea62a19368bf4752b57dad3634bc2dbd66ff76279e7e8b0f70e",
+      "revision": 1,
+      "fields": {
+        "title": "Train and validate a linear regression model",
+        "summary": "Estimate coefficients from training data and check predictions on independent held-out data.",
+        "statement": "Implement train(features, targets). Each row of features is one training sample; targets contains its label. Return a dictionary with exactly weights and bias. Prediction is sum(weights[j]*x[j])+bias. The evaluator never passes held-out features or labels into your function. It predicts independently with your model and recomputes MSE=mean((prediction-target)^2) and MAE=mean(abs(prediction-target)). Both metrics must meet each scenario threshold. Training and held-out sets share no feature rows. Data follow a linear relationship with an intercept; some scenarios contain small deterministic noise. Learn a generalizable approximation rather than memorizing training labels. Choose an appropriate optimizer or linear algebra method; no particular optimizer is required.",
+        "constraints": "Python base standard library; 1–8 features; 4–128 rows per training/held-out split. All numbers are finite with absolute value at most 1000000. The training design has full column rank after adding an intercept. weights must match the feature dimension; coefficients and bias must be finite and bounded by 1000000. Booleans, extra fields, wrong dimensions, NaN and infinity are rejected. Train afresh on each independent call. Noiseless thresholds: MSE≤1e-12 and MAE≤1e-6; noisy thresholds: MSE≤0.003 and MAE≤0.06. Only prediction metrics are assessed, not speed. Public scenarios may expose data and metrics; hidden scenarios expose no samples, labels, model or individual metrics.",
+        "outcomes": [
+          "Fit a finite-dimensional model with an intercept.",
+          "Distinguish training error from held-out prediction quality and compute MSE and MAE correctly."
+        ],
+        "hints": [
+          "Include an intercept; centering each feature and the targets separates intercept estimation.",
+          "A fixed linear model can predict new samples that the evaluator does not provide during training.",
+          "With noisy data, training residuals need not all vanish."
+        ],
+        "changelog": "v1: Separate training and held-out sets, fixed LCG32 data generation, explicit noise and two error thresholds; grading uses evaluator-recomputed values only.",
+        "tags": [
+          "Machine learning",
+          "Model training",
+          "Held-out evaluation"
+        ],
+        "examples": [
+          "Public linear relationship",
+          "Public noisy generalization"
+        ]
+      }
+    },
+    {
+      "id": "weighted-line-fit",
+      "source_revision": 1,
+      "source_digest": "53a96b3f7ab48267a7cea31835d556b57f1ba3d55c76ce47cee70b2e580ff274",
+      "revision": 1,
+      "fields": {
+        "title": "Weighted fitting and diagnostics with known measurement errors",
+        "summary": "Check line parameters, covariance and residual scale, separating algorithm correctness from model assumptions.",
+        "statement": "Implement fit(x, y, sigma) for equal-length observation vectors. Treat x as exact and the y errors as independent. sigma gives known absolute standard deviations, not relative weights to estimate. Fit y=a+b*x and return exactly parameters=[a,b] and covariance=[[Var(a),Cov(a,b)],[Cov(a,b),Var(b)]]. Minimize chi2=sum(((a+b*x[i]-y[i])/sigma[i])**2) with weights 1/sigma². Parameter covariance is (XᵀWX)^-1; do not multiply it by chi2/(n-2). The evaluator independently recomputes parameters, covariance, weighted normal-equation residuals, chi-square and degrees of freedom. A correct fit passes even if a straight line poorly describes the data. High chi-square does not imply an incorrect algorithm or identify which experimental assumption is wrong.",
+        "constraints": "4–64 observations; finite |x|,|y|≤10000; 0.01≤sigma≤100 and max(sigma)/min(sigma)≤100 (weight ratio≤10000). Weighted x variance Vx≥1e-6 and |weighted mean x|≤1000*sqrt(Vx); degenerate or out-of-range content is rejected before evaluation. Parameters must be finite with absolute value≤1e8; covariance entries≤1e12. Booleans, nonfinite values, wrong dimensions and extra fields are rejected. Parameter error must be ≤max(1e-8,1e-7*max(|actual|,|oracle|)). Covariance entry tolerance is 1e-8*sqrt(Cii*Cjj)+1e-7*|Cij|, using the oracle covariance C. Covariance must be symmetric positive definite; the standardized weighted normal-equation residual must be≤1e-5. Public scenarios show evaluator diagnostics; hidden observations, fitted parameters, covariance and individual metrics remain private.",
+        "outcomes": [
+          "Distinguish known absolute measurement errors from errors estimated from residuals.",
+          "Check consistency of weights, parameter covariance and unit changes.",
+          "Separate correct fitting calculations from statistical residual diagnostics."
+        ],
+        "hints": [
+          "Center using weights 1/sigma² to avoid subtracting large numbers when x has a large offset.",
+          "For known absolute sigma, covariance depends only on the design and weights.",
+          "Multiplying every sigma by k leaves parameters unchanged, multiplies covariance by k² and divides chi-square by k²."
+        ],
+        "changelog": "v1: Independent weighted analytic oracle, known-error covariance and evaluator diagnostics; includes extreme weights, offsets, near-degeneracy boundaries and model mismatch.",
+        "tags": [
+          "Scientific computing",
+          "Parameter fitting",
+          "Statistical diagnostics"
+        ],
+        "examples": [
+          "Heteroscedastic observations",
+          "Correct fit with model tension"
+        ]
+      }
     }
   ]
 }

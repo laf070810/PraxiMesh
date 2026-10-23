@@ -1,5 +1,6 @@
 """Validation never executes submitted/reference code or loads executable plugins."""
 
+import copy
 import hashlib
 import json
 import math
@@ -163,6 +164,17 @@ def validate_package(data):
         names = [t["name"] for t in problem["tests"]]
         if len(names) != len(set(names)):
             raise ContentError("Duplicate test names.")
+        if problem["evaluator"] in SPECIALIST_EVALUATORS:
+            module = specialist_module(problem["evaluator"])
+            try:
+                (
+                    module.validate_cases
+                    if problem["evaluator"] == "python-agent-tools-v1"
+                    else module.validate_problem
+                )(problem)
+            except ValueError:
+                raise ContentError("Invalid specialist data or evaluation contract.") from None
+            continue
         for case in problem["tests"]:
             input_value = (
                 case["stdin"] if problem["evaluator"] == "python-stdio-v1" else case["args"]
@@ -185,14 +197,16 @@ def validate_package(data):
 @transaction.atomic
 def import_package(data):
     from localization.packages import snapshot
+    from organizations.publishing import official_import_scope
 
     validate_package(data)
+    owned_nodes, owned_problems = official_import_scope(data)
     # Save existing knowledge before replacement; previous problem snapshots stay untouched.
     for previous in KnowledgeNode.objects.select_for_update():
         snapshot(previous)
     # Full replacement publication: absent IDs are withdrawn, never deleted.
-    KnowledgeNode.objects.update(published=False)
-    Problem.objects.update(published=False)
+    KnowledgeNode.objects.exclude(pk__in=owned_nodes).update(published=False)
+    Problem.objects.exclude(pk__in=owned_problems).update(published=False)
     for node in data["nodes"]:
         stored, _ = KnowledgeNode.objects.update_or_create(
             id=node["id"],
@@ -220,6 +234,46 @@ def import_package(data):
         problem.save()
 
 
+SPECIALIST_EVALUATORS = frozenset(
+    {"python-ml-linear-v1", "python-weighted-fit-v1", "python-agent-tools-v1"}
+)
+
+
+def specialist_module(evaluator):
+    from judge import agent, ml, scientific
+
+    return {
+        "python-agent-tools-v1": agent,
+        "python-ml-linear-v1": ml,
+        "python-weighted-fit-v1": scientific,
+    }[evaluator]
+
+
+def public_execution(version):
+    """Explicit public execution data; references and hidden cases never enter it."""
+    source = version.data
+    evaluator = source["evaluator"]
+    if evaluator in SPECIALIST_EVALUATORS:
+        return specialist_module(evaluator).project_public_problem(source)
+    stdio = evaluator == "python-stdio-v1"
+    fields = ("name", "public", "stdin" if stdio else "args", "expected")
+    return {
+        "evaluator": evaluator,
+        "language": source["language"],
+        **(
+            {"output_format": source["output_format"]}
+            if stdio
+            else {"function": source["function"]}
+        ),
+        "comparison": copy.deepcopy(source["comparison"]),
+        "tests": [
+            {key: copy.deepcopy(case[key]) for key in fields}
+            for case in source["tests"]
+            if case["public"]
+        ],
+    }
+
+
 def public_problem(version):
     # An explicit allowlist prevents newly added private fields from leaking.
     fields = (
@@ -240,7 +294,12 @@ def public_problem(version):
         "changelog",
         "tags",
     )
-    data = {key: version.data[key] for key in fields}
+    data = {key: copy.deepcopy(version.data[key]) for key in fields}
+    execution = public_execution(version)
+    if version.data["evaluator"] in SPECIALIST_EVALUATORS:
+        data.update({key: value for key, value in execution.items() if key != "tests"})
+        data["examples"] = execution["tests"]
+        return data
     stdio = version.data["evaluator"] == "python-stdio-v1"
     if stdio:
         data["output_format"] = version.data["output_format"]
@@ -257,7 +316,6 @@ def public_problem(version):
                 }
             ),
         }
-        for case in version.data["tests"]
-        if case["public"]
+        for case in execution["tests"]
     ]
     return data

@@ -1,4 +1,5 @@
 import copy
+import hashlib
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -34,15 +35,32 @@ def next_version(version):
 
 
 def job(user, version=None, verdict="accepted", *, mode="submit", status="finished", at=None):
+    version = version or current()
+    at = at or timezone.now()
+    total = len(version.data["tests"])
+    # Persisted historic worker contract, not a sandbox execution claim.
+    environment = {
+        "policy": "wasi-python-function-v1",
+        "policy_digest": "a" * 64,
+        "bundle": "b" * 64,
+    }
     return Submission.objects.create(
         user=user,
-        version=version or current(),
+        version=version,
         source="PRIVATE SUBMISSION SOURCE",
         source_digest="a" * 64,
         mode=mode,
         status=status,
         verdict=verdict,
-        finished_at=at or timezone.now(),
+        started_at=at - timedelta(seconds=1),
+        finished_at=at,
+        result={
+            "verdict": verdict,
+            "passed": total if verdict == "accepted" else 0,
+            "total": total,
+        },
+        environment=environment,
+        evaluation_fingerprint=hashlib.sha256(f"wasi:{'b' * 64}:{'a' * 64}".encode()).hexdigest(),
     )
 
 

@@ -13,6 +13,7 @@ from core.queue import (
     AdmissionError,
     admission_state,
     available,
+    begin_execution,
     claim,
     configured_fingerprint,
     enqueue,
@@ -55,7 +56,10 @@ def test_pause_keeps_existing_work_and_resume_requires_owner(ready, user):
     assert enqueue(user, version, "after resume", "run").evaluation_fingerprint == ready.fingerprint
 
 
-@pytest.mark.parametrize("problem", ["js-run-length", "sensor-analysis-report"])
+@pytest.mark.parametrize(
+    "problem",
+    ["js-run-length", "sensor-analysis-report", "train-linear-model", "weighted-line-fit"],
+)
 def test_gvisor_does_not_advertise_or_admit_unsupported_languages(
     ready, settings, user, client, problem
 ):
@@ -128,6 +132,7 @@ def test_drain_timeout_preserves_pause_and_jobs(ready, user):
     job.refresh_from_db()
     assert job.status == "queued" and job.verdict == ""
     claimed = claim()
+    assert begin_execution(claimed)
     finish(claimed, {"verdict": "wrong_answer"}, {})
     output = io.StringIO()
     call_command("judge_admission", "drain", token=token, timeout=0, stdout=output)

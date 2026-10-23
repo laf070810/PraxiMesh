@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import math
 import re
 import time
 import uuid
@@ -17,7 +18,39 @@ from scripts.production_acceptance import Client
 PRIVATE = tuple(
     table for app in ("practice_api", "showcase") for table in FEATURE_TABLES[(app, "0001_initial")]
 )
-READ_ONLY = tuple(table for group in FEATURE_READ_TABLES.values() for table in group)
+READ_ONLY = tuple(
+    table
+    for app in ("projects", "localization")
+    for table in FEATURE_READ_TABLES[(app, "0001_initial")]
+)
+
+
+def wait_for_api_result(client, path, headers, *, timeout=120):
+    """Poll within the ordinary bearer quota; rate limiting never renews the deadline."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        status, response_headers, body = client.request(path, headers=headers)
+        if time.monotonic() >= deadline:
+            break
+        delay = 2.0
+        if status == 429:
+            try:
+                retry = float(response_headers.get("Retry-After", "2"))
+            except (TypeError, ValueError):
+                retry = 2.0
+            if math.isfinite(retry):
+                delay = min(60.0, max(2.0, retry))
+        else:
+            assert status == 200, "Unexpected HTTPS result status"
+            result = json.loads(body)
+            if result["status"] == "finished":
+                assert result["verdict"] == "accepted" and result["formal_result"] is True
+                return result
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        time.sleep(min(delay, remaining))
+    raise AssertionError("Real authenticated submission did not complete before its deadline")
 
 
 class B2Rehearsal(Rehearsal):
@@ -260,17 +293,7 @@ class B2Rehearsal(Rehearsal):
             and queued["id"] == replay["id"]
         )
         result_path = f"/api/v1/submissions/{queued['id']}/"
-        deadline = time.monotonic() + 120
-        while time.monotonic() < deadline:
-            status, _, body = client.request(result_path, headers=headers)
-            assert status == 200
-            result = json.loads(body)
-            if result["status"] == "finished":
-                assert result["verdict"] == "accepted" and result["formal_result"] is True
-                break
-            time.sleep(0.5)
-        else:
-            raise AssertionError("Real authenticated submission did not complete")
+        wait_for_api_result(client, result_path, headers)
         assert (
             client.request(
                 "/showcase/settings/",

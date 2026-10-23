@@ -61,6 +61,16 @@ def env_flags(environment):
     return [part for name in environment for part in ["--env", name]]
 
 
+def browser_environment(environment, base):
+    result = dict(environment, BROWSER_URL=base, BROWSER_JUDGE="1")
+    for key in list(result):
+        if key in {"BROWSER_TEST_SPKI", "BROWSER_CA_FILE"} or key.startswith("BROWSER_COACHING"):
+            del result[key]
+    # This isolated release's Web configuration does not enable a model provider.
+    result["BROWSER_COACHING"] = "0"
+    return result
+
+
 def check_admission(base, control):
     """Real tasks drain while reading/drafts remain usable; no injected verdicts."""
     client = Client(base, None)
@@ -343,9 +353,7 @@ def main():
                 capture_output=True,
             ).stdout
         )
-        browser_env = dict(os.environ, BROWSER_URL=base, BROWSER_JUDGE="1")
-        browser_env.pop("BROWSER_TEST_SPKI", None)
-        browser_env.pop("BROWSER_CA_FILE", None)
+        browser_env = browser_environment(os.environ, base)
         with (artifacts / "release-browser.log").open("wb") as log:
             subprocess.run(
                 [sys.executable, "tests/browser_smoke.py"],
@@ -383,6 +391,38 @@ def main():
                     timeout=300,
                 )
             checked_feature_browsers.append(script)
+
+        advanced = None
+        if "coaching/migrations/0001_initial.py" in manifest["source_files"]:
+            from scripts.advanced_browsers import run_advanced_browsers
+
+            def owner_run(*arguments, env=None):
+                assert arguments[0] == "manage.py"
+                name = "praximesh-release-" + uuid.uuid4().hex[:12] + "-fixture"
+                stack.callback(remove_container, name)
+                fixture_env = dict(owner_config)
+                fixture_env.update(
+                    {key: value for key, value in (env or {}).items() if key.startswith("BROWSER_")}
+                )
+                return docker(
+                    "run",
+                    "--rm",
+                    *runtime_args(name, network, "512m", 64),
+                    *env_flags(fixture_env),
+                    manifest["images"]["web"],
+                    "python",
+                    *arguments,
+                    env=dict(os.environ, **fixture_env),
+                    capture_output=True,
+                ).stdout
+
+            advanced = run_advanced_browsers(
+                browser_env,
+                owner_run,
+                artifacts / "release-advanced",
+                include_challenges="challenges/migrations/0001_initial.py"
+                in manifest["source_files"],
+            )
 
         def control(action, token=None, timeout=180, success=True):
             name = "praximesh-release-" + uuid.uuid4().hex[:12] + "-control"
@@ -448,6 +488,7 @@ def main():
             "startup_probes": receipt_summary["count"],
             "startup_probe_suite": receipt_summary["suite"],
             "feature_browser_journeys": checked_feature_browsers,
+            "advanced_browser_journeys": advanced,
             "browser_real_run_wrong_accepted_progress_delete": True,
             "admission_timeout_closed_real_drain_and_resume": True,
             "wrong_runtime_stops_before_worker": True,

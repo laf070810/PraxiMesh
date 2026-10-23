@@ -1,0 +1,13 @@
+{% load i18n %}
+{% if case.metrics %}<dl class="metric-list">
+{% if problem.evaluator == "python-ml-linear-v1" %}
+<dt>{% translate "留出集均方误差 MSE" %}</dt><dd>{{ case.metrics.mse }} ({% translate "上限" %}: {{ case.thresholds.mse }})</dd>
+<dt>{% translate "留出集平均绝对误差 MAE" %}</dt><dd>{{ case.metrics.mae }} ({% translate "上限" %}: {{ case.thresholds.mae }})</dd>
+{% elif problem.evaluator == "python-weighted-fit-v1" %}
+<dt>{% translate "参数、协方差、驻点检查" %}</dt><dd>{{ case.checks.parameters|yesno:"✓,✗" }} / {{ case.checks.covariance|yesno:"✓,✗" }} / {{ case.checks.stationarity|yesno:"✓,✗" }}</dd>
+<dt>χ² / ndof</dt><dd>{{ case.metrics.chi2 }} / {{ case.metrics.ndof }}</dd>
+<dt>χ² / ndof ({% translate "约化卡方" %})</dt><dd>{{ case.metrics.reduced_chi2 }}</dd>
+<dt>{% translate "加权正规方程残差" %}</dt><dd>{{ case.metrics.weighted_normal_residual }}</dd>
+<dt>{% translate "协方差归一化误差" %}</dt><dd>{{ case.metrics.covariance_normalized_error }}</dd>
+<dt>{% translate "模型诊断（独立于解法正确性）" %}</dt><dd>{% if case.model_diagnostic == "above_declared_scale" %}{% translate "残差高于声明误差尺度" %}{% elif case.model_diagnostic == "below_declared_scale" %}{% translate "残差低于声明误差尺度" %}{% elif case.model_diagnostic == "within_declared_scale" %}{% translate "残差位于约定误差尺度区间" %}{% else %}{% translate "解法尚未通过，未作诊断" %}{% endif %}</dd>
+{% endif %}</dl><p class="muted">{% translate "仅展示公开场景由评测端重算的指标；隐藏场景不公开样本、模型或单项分数。这些指标不参与通用通过数榜单。" %}</p>{% endif %}

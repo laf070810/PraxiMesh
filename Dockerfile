@@ -16,6 +16,9 @@ COPY practice_api ./practice_api
 COPY showcase ./showcase
 COPY localization ./localization
 COPY projects ./projects
+COPY organizations ./organizations
+COPY coaching ./coaching
+COPY challenges ./challenges
 COPY locale ./locale
 COPY judge ./judge
 COPY vendor/quickjs ./vendor/quickjs

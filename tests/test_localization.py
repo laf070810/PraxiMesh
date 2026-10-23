@@ -25,7 +25,7 @@ from localization.presentation import localized_node, localized_problem
 @pytest.fixture
 def english(catalog):
     package = load_translations(settings.CONTENT_ROOT / "en.json")
-    assert import_translations(package) == {"nodes": 20, "problems": 8}
+    assert import_translations(package) == {"nodes": 20, "problems": 10}
     return package
 
 

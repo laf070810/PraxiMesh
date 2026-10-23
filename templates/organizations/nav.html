@@ -1,0 +1,1 @@
+{% load i18n %}<nav aria-label="{% translate '组织导航' %}"><a href="{% url 'organizations:index' %}">{% translate "我的组织" %}</a> · <a href="{% url 'organizations:published_packages' %}">{% translate "已发布第三方题库" %}</a>{% if perms.organizations.review_packages %} · <a href="{% url 'organizations:review_queue' %}">{% translate "题库技术审核" %}</a>{% endif %}</nav>

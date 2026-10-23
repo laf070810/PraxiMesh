@@ -27,6 +27,9 @@ INSTALLED_APPS = [
     "showcase",
     "localization",
     "projects",
+    "organizations",
+    "coaching",
+    "challenges",
 ]
 MIDDLEWARE = [
     "core.middleware.ProxyHeadersMiddleware",
@@ -148,6 +151,9 @@ JUDGE_WASI_SHA256 = os.environ.get("JUDGE_WASI_SHA256", "")
 JUDGE_RECEIPT = os.environ.get("JUDGE_RECEIPT", str(BASE_DIR / "var/sandbox-receipt.json"))
 JUDGE_MAX_PENDING = 2
 JUDGE_MAX_QUEUE = 100
+JUDGE_DAILY_CPU_UNITS = int(os.environ.get("JUDGE_DAILY_CPU_UNITS", "120"))
+if not 1 <= JUDGE_DAILY_CPU_UNITS <= 10000:
+    raise ImproperlyConfigured("JUDGE_DAILY_CPU_UNITS must be between 1 and 10000.")
 JUDGE_LEASE_SECONDS = 180
 CONTENT_ROOT = BASE_DIR / "content"
 LOGGING = {
@@ -156,3 +162,17 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "root": {"handlers": ["console"], "level": "INFO"},
 }
+
+# Optional, explicitly configured text-only tutoring. Never enables judging.
+COACHING_ENABLED = os.environ.get("COACHING_ENABLED", "0") == "1"
+COACHING_ENDPOINT = os.environ.get("COACHING_ENDPOINT", "")
+COACHING_MODEL = os.environ.get("COACHING_MODEL", "")
+COACHING_TOKEN = os.environ.get("COACHING_TOKEN", "")
+COACHING_PROVIDER_DESCRIPTION = os.environ.get("COACHING_PROVIDER_DESCRIPTION", "")
+COACHING_ALLOW_LOOPBACK_HTTP = os.environ.get("COACHING_ALLOW_LOOPBACK_HTTP", "0") == "1"
+COACHING_CA_FILE = os.environ.get("COACHING_CA_FILE", "")
+COACHING_CA_PEM = os.environ.get("COACHING_CA_PEM", "")
+COACHING_DISABLE_THINKING = os.environ.get("COACHING_DISABLE_THINKING", "0") == "1"
+COACHING_DAILY_LIMIT = int(os.environ.get("COACHING_DAILY_LIMIT", "5"))
+COACHING_CONCURRENCY = int(os.environ.get("COACHING_CONCURRENCY", "1"))
+COACHING_MAX_TOKENS = int(os.environ.get("COACHING_MAX_TOKENS", "192"))

@@ -42,6 +42,15 @@ BASE_WEB_READ = (
     "django_content_type",
 )
 FEATURE_READ_TABLES = {
+    ("challenges", "0001_initial"): (
+        "challenges_challenge",
+        "challenges_challengerevision",
+        "challenges_challengetask",
+    ),
+    ("organizations", "0002_publication_lock"): (
+        "organizations_managedobject",
+        "organizations_publicationlock",
+    ),
     ("projects", "0001_initial"): (
         "projects_project",
         "projects_projectrevision",
@@ -67,6 +76,26 @@ BASE_WEB_WRITE = (
     "django_session",
 )
 FEATURE_TABLES = {
+    ("challenges", "0001_initial"): ("challenges_participation",),
+    ("coaching", "0002_slot_lock"): (
+        "coaching_learningplan",
+        "coaching_hintrequest",
+        "coaching_dailyusage",
+        "coaching_slotlock",
+        "coaching_executionlease",
+    ),
+    ("organizations", "0002_publication_lock"): (
+        "organizations_organization",
+        "organizations_membership",
+        "organizations_invitation",
+        "organizations_course",
+        "organizations_courserevision",
+        "organizations_courseunit",
+        "organizations_courseenrollment",
+        "organizations_package",
+        "organizations_packagerevision",
+        "organizations_organizationevent",
+    ),
     ("learning", "0001_initial"): (
         "learning_bookmark",
         "learning_note",

@@ -97,15 +97,61 @@ class Submission(models.Model):
     finished_at = models.DateTimeField(null=True)
     lease_until = models.DateTimeField(null=True)
     lease_token = models.UUIDField(null=True)
+    # Legacy rows retain no invented resource accounting or execution timestamp.
+    budget_policy = models.CharField(max_length=32, blank=True, default="")
+    budget_day = models.DateField(null=True)
+    budget_units = models.PositiveIntegerField(default=0)
+    budget_state = models.CharField(
+        max_length=12,
+        default="legacy",
+        choices=[
+            ("legacy", "Legacy"),
+            ("reserved", "Reserved"),
+            ("consumed", "Consumed"),
+            ("released", "Released"),
+        ],
+    )
+    execution_started_at = models.DateTimeField(null=True)
 
     class Meta:
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["user", "status"]),
             models.Index(
+                fields=["user", "budget_day", "budget_state"], name="submission_cpu_budget"
+            ),
+            models.Index(
                 fields=["status", "evaluation_fingerprint", "created_at"],
                 name="submission_policy_queue",
             ),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        budget_state="legacy",
+                        budget_policy="",
+                        budget_day__isnull=True,
+                        budget_units=0,
+                        execution_started_at__isnull=True,
+                    )
+                    | (
+                        models.Q(
+                            budget_policy="cpu-invocations-v1",
+                            budget_day__isnull=False,
+                            budget_units__gte=1,
+                        )
+                        & (
+                            models.Q(
+                                budget_state__in=["reserved", "released"],
+                                execution_started_at__isnull=True,
+                            )
+                            | models.Q(budget_state="consumed", execution_started_at__isnull=False)
+                        )
+                    )
+                ),
+                name="submission_cpu_reservation_shape",
+            )
         ]
 
 

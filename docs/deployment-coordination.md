@@ -24,7 +24,7 @@ docker exec praximesh-postgres pg_isready --username postgres
 
 确认 `pg_isready` 成功后再初始化协调器。保留该持久卷，禁止在升级或故障处理中用 `volume prune` 或删除卷来“重试”。控制器依赖可用 `uv sync --frozen --no-dev` 安装；WASI 运行时位于 worker 镜像，控制器无需执行学习者代码。
 
-复制 [coordinator.json.example](../deploy/coordinator.json.example) 为私有 `config.json`，权限设为 0600，替换全部凭证。两个应用密钥各至少 50 字符且不同；数据库 owner、Web 和 worker 凭证分开。`instance` 为本 PostgreSQL 实例内唯一的短小写标识。首次初始化产生私有站点 UUID，数据库与角色标记绑定该 UUID，另一份状态不能冒领同名实例。应用密钥与数据库凭证不会传入 WASI guest。
+复制 [coordinator.json.example](../deploy/coordinator.json.example) 为私有 `config.json`，权限设为 0600，替换全部凭证。两个应用密钥各至少 50 字符且不同；数据库 owner、Web 和 worker 凭证分开。示例的 `application.registration_open` 为 `false`，此时访客可以阅读，但注册返回 403；私有部署若需要用户自行注册，在首次 `init` 前将它设为 `true`。初始化后不能直接修改该值绕过配置摘要检查。`instance` 为本 PostgreSQL 实例内唯一的短小写标识。首次初始化产生私有站点 UUID，数据库与角色标记绑定该 UUID，另一份状态不能冒领同名实例。应用密钥与数据库凭证不会传入 WASI guest。若首次部署需要可选 AI，在 `init` 前按[AI 辅导指南](local-coaching.md)配置 `application.coaching`；省略即保持关闭。已有实例不能直接修改配置摘要来启用服务。
 
 例子默认只在回环 HTTP 上运行。公网使用明确的 `https://域名[:端口]` 和监听地址，验证 DNS、防火墙、证书及续期。Caddy 可管理公有证书；已有证书可设置绝对路径 `tls_cert`、`tls_key`。私有 CA 验收时另设顶层 `health_ca` 路径；生产不得关闭证书验证。状态目录及其祖先不能使用符号链接；目录 0700、文件 0600。不要把配置、数据库或状态目录提交到仓库。
 
@@ -163,4 +163,38 @@ python scripts/deploy_acceptance.py \
   --artifacts test-results/deployment-upgrade
 ```
 
-两个 digest 必须独立确认。此模式验证明确的阶段 A→B1 迁移组合，不能用同一版本代替，也不能与失败迁移或 worker-restart-only 模式混用。它在隔离临时实例中创建真实用户/草稿/AC，比较迁移前后的身份、数据和目录，实际检查八张新表的权限，并通过 HTTPS 多账号浏览器核验社区流程。只在全部步骤成功后记录 schema 升级通过。
+两个 digest 必须独立确认。上述 A→B1 调用验证该迁移组合，不能用同一版本代替，也不能与失败迁移或 worker-restart-only 模式混用。它在隔离临时实例中创建真实用户/草稿/AC，比较迁移前后的身份、数据和目录，实际检查八张新表的权限，并通过 HTTPS 多账号浏览器核验社区流程。只在全部步骤成功后记录 schema 升级通过。
+
+
+## B2 到 C 的迁移与内容发布
+
+C 增加 CPU 调用预约、博客类型、组织课程/题库和私有学习规划。B2→C 冻结制品联合验收进行中，以下是当前实现的操作与复验入口，不表示该迁移组合已经完成验收。
+
+升级前安装与 C 制品匹配、已审查的新控制器及锁定依赖，保留原配置、状态目录和站点 UUID。旧 B2 控制器的表权限白名单不包含 C 新表，不能只更换应用镜像。使用前述 `deploy.py apply` 命令和独立确认的 C 发布摘要，**不加 `--initial-content`**；协调器依次排空、备份/恢复、迁移、按实际 schema 授权并重启匹配的 Web/worker。
+
+本次新增六项迁移：`core.0003_cpu_reservations`、`community.0002_post_blog_kind`、`organizations.0001_initial`、`organizations.0002_publication_lock`、`coaching.0001_initial`、`coaching.0002_slot_lock`。迁移保留旧提交的源码、结果和版本；既有记录成为零单位 `legacy`，不追溯扣额。新 Run/Submit 使用 `cpu-invocations-v1`，默认每账号每 UTC 日 120 单位；函数/ML/科学每个测试预约 1，完整程序预约 2，Agent 每个 episode 预约 6。这是最大调用次数预约，不是实测 CPU 秒或收费。完整资源和消费/释放规则见[专业评测设计](rfcs/010-specialist-evaluation.md)。
+
+C 新增 17 张表：Web 可写 10 张组织工作流表和 5 张辅导表，只读组织归属表与发布锁表；worker 不获这些新表权限。知识/题目及其他内容表仍沿用只读限制，不能通过全表授权消除权限错误。新 worker 必须在当前实例通过全部 123 项探针后才就绪，不能复用 B2 的 103 项回执。
+
+schema 升级保留原目录，不自动发布 C 新题或改写课程、项目、题目历史版本。只有明确决定以已审查的 C 示例包整体替换本实例的官方目录时，才在独立维护窗口，用配置好**当前代 owner 数据库连接**的可信 C 代码环境执行：
+
+```sh
+.venv/bin/python manage.py content_check content/starter.json
+.venv/bin/python manage.py content_import --translations content/en.json
+```
+
+这一步是显式内容发布，不是迁移的一部分；官方导入会下线其管理范围中缺失的 ID。组织包拥有的内容由归属锁保护，不受官方全量撤回影响，仍通过独立审核及 `org_package_publish` / `org_package_withdraw` 管理。自有官方目录应发布其经过审核的完整包，不要直接用示例目录覆盖。细节见[内容指南](content.md)和[组织题库指南](rfcs/009-organizations-and-packages.md)。
+
+在可销毁环境中复验旧 B2→新 C，使用两个独立可信的发布摘要：
+
+```sh
+.venv/bin/python scripts/deploy_acceptance.py \
+  --release /path/to/c-release --manifest-sha256 TRUSTED_C_DIGEST \
+  --upgrade-only \
+  --previous-release /path/to/b2-release \
+  --previous-manifest-sha256 TRUSTED_B2_DIGEST \
+  --caddy /path/to/caddy-2.11.7 \
+  --artifacts test-results/deployment-c-upgrade
+```
+
+该演练先核对 schema 迁移、旧用户数据、旧目录和权限保留，再单独显式发布已审查 C 内容并验证新提交的真实额度预约。不能将同一发布包用于前后两代，也不能与失败迁移或 worker 重启模式混用；只有实际回执成功才算完成本次验收。

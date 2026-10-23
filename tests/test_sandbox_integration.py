@@ -49,7 +49,7 @@ def test_every_reference_and_constant_mutant(package):
             if problem["language"] == "javascript"
             else "print('null')"
             if problem["evaluator"] == "python-stdio-v1"
-            else "def solve(*args): return None"
+            else f"def {problem['function']}(*args): return None"
         )
         mutant = evaluate(problem, source, "submit", sandbox)
         assert mutant["verdict"] == "wrong_answer", problem["id"]

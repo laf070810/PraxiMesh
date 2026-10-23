@@ -87,6 +87,34 @@ def index(request):
     )
 
 
+def blog_directory(request, username=None):
+    # A public directory is not an account lookup. Private/withdrawn blogs and
+    # accounts without public blog posts do not create a discoverable directory.
+    posts = services.public_posts().filter(kind=Post.Kind.BLOG).select_related("author")
+    if username is not None:
+        posts = posts.filter(author__username=username)
+        if not posts.exists():
+            raise Http404
+    return render(
+        request,
+        "community/blogs.html",
+        {
+            "page": Paginator(posts, 20).get_page(request.GET.get("page")),
+            "blog_author": username,
+        },
+    )
+
+
+@require_GET
+def blogs(request):
+    return blog_directory(request)
+
+
+@require_GET
+def author_blog(request, username):
+    return blog_directory(request, username)
+
+
 @require_GET
 @login_required
 def mine(request):
@@ -162,7 +190,10 @@ def post_edit(request, pk=None):
     return render(
         request,
         "community/edit.html",
-        {"form": form, "heading": gettext("编辑内容") if post else gettext("写讨论、提问或题解")},
+        {
+            "form": form,
+            "heading": gettext("编辑内容") if post else gettext("写讨论、提问、题解或博文"),
+        },
         status=400 if request.method == "POST" else 200,
     )
 

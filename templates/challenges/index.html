@@ -1,0 +1,12 @@
+{% extends 'base.html' %}{% load i18n %}
+{% block title %}{% translate "挑战活动" %} · PraxiMesh{% endblock %}
+{% block content %}
+<section class="page-heading"><h1>{% translate "挑战活动" %}</h1>
+<p>{% translate "自愿加入，按固定题目版本与活动时间记录本人的实践。无需加入也可以自由练习。" %}</p>
+<a href="{% url 'challenges:mine' %}">{% translate "我的挑战" %}</a></section>
+<section class="section compact">
+{% for challenge in challenges %}<article class="card">
+<h2><a href="{% url 'challenges:detail' challenge.id %}">{{ challenge.title }} · v{{ challenge.revision }}</a></h2>
+<p>{{ challenge.state_label }} · {{ challenge.starts_at|date:'c' }} — {{ challenge.ends_at|date:'c' }}</p><p lang="zh-hans">{{ challenge.summary }}</p>
+</article>{% empty %}<p>{% translate "暂未发布挑战活动。" %}</p>{% endfor %}
+{% include 'projects/pagination.html' %}</section>{% endblock %}

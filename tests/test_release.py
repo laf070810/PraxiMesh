@@ -42,6 +42,17 @@ def write_manifest(root, manifest):
     return sha256(root / "release.json")
 
 
+def test_challenge_demo_requires_reviewed_importer_and_preserves_old_release_commands():
+    files = {"content/challenges.json": "digest"}
+    with pytest.raises(ReleaseError):
+        initial_content_commands({"source_files": files})
+    files["challenges/management/commands/challenge_import.py"] = "digest"
+    assert initial_content_commands({"source_files": files}) == [
+        ["content_import"],
+        ["challenge_import", "/app/content/challenges.json"],
+    ]
+
+
 def refresh_payload(root, manifest, name):
     manifest["payloads"][name] = {
         "bytes": (root / name).stat().st_size,

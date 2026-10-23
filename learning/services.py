@@ -3,7 +3,12 @@ from learning.models import Bookmark, Note, TutorialReading
 
 def export_user_data(user):
     """Only this account's records; no problem tests, reference code or other users."""
+    from challenges.progress import export_user_data as challenge_data
+    from learning.achievements import export_user_data as achievement_data
+
     return {
+        "challenges": challenge_data(user),
+        "achievements": achievement_data(user),
         "bookmarks": [
             {"problem": row.problem_id, "created_at": row.created_at.isoformat()}
             for row in Bookmark.objects.filter(user=user).order_by("pk")

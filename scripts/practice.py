@@ -30,8 +30,40 @@ CONTRACTS = {
     "python-function-v1": "python",
     "javascript-function-v1": "javascript",
     "python-stdio-v1": "python",
+    "python-ml-linear-v1": "python",
+    "python-weighted-fit-v1": "python",
+    "python-agent-tools-v1": "python",
 }
 ROOT = Path(__file__).resolve().parent.parent
+SPECIALISTS = {"python-agent-tools-v1", "python-ml-linear-v1", "python-weighted-fit-v1"}
+
+
+def specialist_module(evaluator):
+    sys.path.insert(0, str(ROOT))
+    from judge import agent, ml, scientific
+
+    return {
+        "python-agent-tools-v1": agent,
+        "python-ml-linear-v1": ml,
+        "python-weighted-fit-v1": scientific,
+    }[evaluator]
+
+
+def specialist_payload(package):
+    problem = package["problem"]
+    module = specialist_module(problem["evaluator"])
+    keys = (
+        module.PUBLIC_KEYS
+        if problem["evaluator"] == "python-agent-tools-v1"
+        else module.PUBLIC_FIELDS
+    )
+    payload = {key: problem[key] for key in keys - {"tests"}}
+    payload["tests"] = [{**case, "public": True} for case in package["public_tests"]]
+    # Do not silently replace an untrusted visibility field with True.
+    if any("public" in case for case in package["public_tests"]):
+        raise ValueError("Public cases must not contain a visibility override")
+    module.validate_public_problem(payload)
+    return payload
 
 
 class PracticeError(ValueError):
@@ -233,6 +265,9 @@ def validate_package(package):
         cases = package["public_tests"]
         if not isinstance(cases, list) or not 1 <= len(cases) <= 100:
             raise ValueError
+        if problem["evaluator"] in SPECIALISTS:
+            specialist_payload(package)
+            return package
         for case in cases:
             if (
                 not isinstance(case, dict)
@@ -336,21 +371,26 @@ def local_test(directory, bundle, digest):
     try:
         sandbox = WasiSandbox(bundle, digest)
         environment = sandbox.preflight()
-        result = evaluate(
-            {
-                "evaluator": evaluator,
-                **(
-                    {"output_format": problem["output_format"]}
-                    if evaluator == "python-stdio-v1"
-                    else {"function": problem["function"]}
-                ),
-                "comparison": problem["comparison"],
-                "tests": [{**case, "public": True} for case in package["public_tests"]],
-            },
-            source,
-            "run",
-            sandbox,
-        )
+        if evaluator in SPECIALISTS:
+            result = specialist_module(evaluator).evaluate_public(
+                specialist_payload(package), source, sandbox
+            )
+        else:
+            result = evaluate(
+                {
+                    "evaluator": evaluator,
+                    **(
+                        {"output_format": problem["output_format"]}
+                        if evaluator == "python-stdio-v1"
+                        else {"function": problem["function"]}
+                    ),
+                    "comparison": problem["comparison"],
+                    "tests": [{**case, "public": True} for case in package["public_tests"]],
+                },
+                source,
+                "run",
+                sandbox,
+            )
     except SandboxUnavailable:
         raise PracticeError(
             "Verified local WASI execution is unavailable. Check bundle and dependencies."

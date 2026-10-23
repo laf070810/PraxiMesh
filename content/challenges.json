@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "challenges": [
+    {
+      "id": "practice-2026",
+      "revision": 1,
+      "title": "2026 入门实践挑战",
+      "summary": "在两个独立任务中练习数组处理与统计量。按自己的顺序完成，进度仅本人可见。",
+      "rules": "自愿加入。固定版本的正式通过须在加入后、2026 年 UTC 活动窗口内提交并完成。没有跨任务排名、奖励或证书。结束后仍可正常练习。",
+      "starts_at": "2026-01-01T00:00:00Z",
+      "ends_at": "2027-01-01T00:00:00Z",
+      "tasks": [
+        {
+          "id": "sum-positive",
+          "title": "筛选与累加",
+          "description": "从一个数组任务开始，关注正数与边界。",
+          "problem": "sum-positive",
+          "problem_revision": 3,
+          "problem_digest": "61ecfb32e25e010f7cd43fc7eb55409c22f847a72bbf636248ca536c481adfb3"
+        },
+        {
+          "id": "population-stats",
+          "title": "实现总体统计量",
+          "description": "选择合适的分母，验证均值和总体方差。",
+          "problem": "population-stats",
+          "problem_revision": 1,
+          "problem_digest": "b1d70a1216d32a8463194d6dac305376fd1428d49bd2c8befb47197004284da8"
+        }
+      ]
+    }
+  ]
+}

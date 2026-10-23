@@ -16,7 +16,7 @@ from core.models import KnowledgeNode, Problem, ProblemVersion
 
 def test_starter_contract_and_cross_domain(package):
     validate_package(package)
-    assert len(package["problems"]) == 22
+    assert len(package["problems"]) == 25
     vectors = next(n for n in package["nodes"] if n["id"] == "vectors")
     assert set(vectors["domains"]) == {"numerical", "machine-learning"}
     paths = {n["id"]: n for n in package["nodes"] if n["kind"] == "path"}
@@ -25,6 +25,7 @@ def test_starter_contract_and_cross_domain(package):
         "sequence-to-graph",
         "statistics-to-models",
         "javascript-data-path",
+        "functions-to-tool-workflows",
     }
     exercises = {
         key: [step["target"] for step in path["steps"] if step["kind"] == "problem"]
@@ -42,9 +43,12 @@ def test_starter_contract_and_cross_domain(package):
     ]
     assert len(exercises["sequence-to-graph"]) == len(exercises["statistics-to-models"]) == 5
     assert len(exercises["javascript-data-path"]) == 3
-    assert {p["id"] for p in package["problems"]} - {"sensor-analysis-report"} == {
-        exercise for steps in exercises.values() for exercise in steps
-    }
+    assert exercises["functions-to-tool-workflows"] == ["word-count", "approved-ledger-report"]
+    assert {p["id"] for p in package["problems"]} - {
+        "sensor-analysis-report",
+        "train-linear-model",
+        "weighted-line-fit",
+    } == {exercise for steps in exercises.values() for exercise in steps}
 
 
 def test_every_problem_has_distinct_targeted_mistakes(package):

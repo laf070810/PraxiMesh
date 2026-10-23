@@ -609,6 +609,21 @@ def test_control_timeout_diagnostic_redacts_before_truncating_and_bounds_json(di
     assert path.stat().st_size <= deploy.CONTROL_DIAGNOSTIC_MAX_BYTES
 
 
+def test_control_diagnostic_redacts_optional_provider_token(diagnostic_control):
+    host, fail = diagnostic_control
+    token = "synthetic-model-token/with+reserved=characters"
+    host.config["application"]["coaching"] = {"token": token}
+    encoded = deploy.urllib.parse.quote(token, safe="")
+    error = fail(
+        deploy.subprocess.CalledProcessError(
+            1, ["argv-only-marker"], stderr=f"synthetic failure: {token} {encoded}".encode()
+        )
+    )
+    text = (host.directory / error.diagnostic).read_text()
+    assert token not in text and encoded not in text
+    assert text.count("[REDACTED]") == 2
+
+
 def test_control_diagnostic_write_failure_still_cleans_container(diagnostic_control, monkeypatch):
     host, fail = diagnostic_control
 

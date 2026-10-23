@@ -13,18 +13,23 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
+from coaching.export import export_user_data as export_coaching
 from community.services import export_user_data as export_community
 from core.content import digest
+from core.discovery import EVALUATORS, LIBRARIES, RUNTIMES, choices, filter_resources, metadata
 from core.forms import ProfileForm, RecoveryForm, RegisterForm, SourceForm
 from core.limits import consume
 from core.models import AccountProfile, Draft, Enrollment, KnowledgeNode, Problem, Submission
 from core.queue import AdmissionError, available, enqueue
+from core.resources import reservation_data, reservation_units, usage
+from core.result_evidence import SPECIALISTS, evidence_jobs, is_formal_evidence, safe_result
 from judge.backends import result_environment_label
 from learning.models import Bookmark, TutorialReading
 from learning.services import export_user_data as export_learning
 from localization.presentation import VERDICTS as LABELS
 from localization.presentation import localized_node, localized_public_cases
 from localization.presentation import localized_problem as public_problem
+from organizations.export import export_user_data as export_organizations
 from practice_api.models import AccessToken
 from practice_api.services import export_user_data as export_practice_api
 from showcase.services import export_user_data as export_showcase
@@ -37,11 +42,12 @@ def graph():
 def states(user):
     if not user.is_authenticated:
         return {}, set()
-    jobs = Submission.objects.filter(user=user, mode="submit").exclude(verdict="internal_error")
-    tried = set(jobs.values_list("version__problem_id", flat=True))
-    accepted = set(
-        jobs.filter(status="finished", verdict="accepted").values_list("version_id", flat=True)
-    )
+    tried, accepted = set(), set()
+    for job in evidence_jobs(user).iterator(chunk_size=100):
+        if is_formal_evidence(job):
+            tried.add(job.version.problem_id)
+            if job.verdict == "accepted":
+                accepted.add(job.version_id)
     return {key: "attempted" for key in tried}, accepted
 
 
@@ -50,6 +56,7 @@ def problem_cards(user):
     return [
         {
             **public_problem(p.current),
+            **metadata(p.current),
             "version_id": p.current_id,
             "state": "completed" if p.current_id in accepted else attempted.get(p.id, "new"),
         }
@@ -148,6 +155,12 @@ def enroll(request, slug):
 def practice(request):
     nodes = graph()
     cards = problem_cards(request.user)
+    options = {
+        "evaluator_choices": choices(cards, "evaluator", EVALUATORS),
+        "runtime_choices": choices(cards, "runtime", RUNTIMES),
+        "library_choices": choices(cards, "library", LIBRARIES),
+    }
+    cards = filter_resources(cards, request.GET)
     query = request.GET.get("q", "")[:100].strip().casefold()
     domain = request.GET.get("domain", "")
     topic = request.GET.get("topic", "")
@@ -194,7 +207,7 @@ def practice(request):
     return render(
         request,
         "practice.html",
-        {"page": pagination, "nodes": nodes.values(), "params": params.urlencode()},
+        {"page": pagination, "nodes": nodes.values(), "params": params.urlencode(), **options},
     )
 
 
@@ -226,6 +239,9 @@ def problem_detail(request, slug):
             "problem": data,
             "version_id": problem.current_id,
             "source": source,
+            "cpu_budget": usage(request.user) if request.user.is_authenticated else None,
+            "run_units": reservation_units(problem.current, "run"),
+            "submit_units": reservation_units(problem.current, "submit"),
             "concepts": [nodes[c] for c in data["concepts"]],
             "judge_available": available(problem.current),
             "runtime_description": runtime_description(problem.current),
@@ -323,7 +339,10 @@ def submission_detail(request, job_id):
             "verdict_label": LABELS.get(job.verdict, ""),
             "pending": job.status != "finished",
             "evaluation_image": result_environment_label(job.environment),
-            "public_cases": localized_public_cases(job.version, job.result),
+            "public_cases": localized_public_cases(job.version, safe_result(job)),
+            "reservation": reservation_data(job),
+            "shareable": job.version.data.get("evaluator") not in SPECIALISTS
+            and is_formal_evidence(job),
         },
     )
 
@@ -476,6 +495,7 @@ def export_account(request):
     jobs = Submission.objects.filter(user=request.user).select_related("version")
     profile = AccountProfile.objects.filter(user=request.user).first()
     data = {
+        "cpu_budget": usage(request.user),
         "username": request.user.username,
         "display_name": profile.display_name if profile else "",
         "submissions": [
@@ -488,7 +508,8 @@ def export_account(request):
                 "mode": j.mode,
                 "status": j.status,
                 "verdict": j.verdict,
-                "result": j.result,
+                "result": safe_result(j),
+                "resource_reservation": reservation_data(j),
                 "evaluation_image": result_environment_label(j.environment),
                 "evaluation_fingerprint": j.evaluation_fingerprint,
                 "created_at": j.created_at.isoformat(),
@@ -507,6 +528,8 @@ def export_account(request):
         "community": export_community(request.user),
         "practice_api": export_practice_api(request.user),
         "showcase": export_showcase(request.user),
+        "organizations": export_organizations(request.user),
+        "coaching": export_coaching(request.user),
     }
     response = HttpResponse(
         json.dumps(data, ensure_ascii=False, indent=2), content_type="application/json"
@@ -534,6 +557,9 @@ def delete_account(request):
             "body": gettext(
                 "账号、草稿、提交、学习记录及你发布的社区内容已从当前数据库删除。"
                 "审核事件只保留不含正文的操作记录，操作者关联已清除。备份按站点保留周期清除。"
+            )
+            + gettext(
+                "组织拥有的课程与题库版本继续保留，作者、审核者和操作者关联会清除；你的成员关系、收到的邀请与课程加入记录会删除。"
             ),
         },
     )

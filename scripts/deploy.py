@@ -124,7 +124,10 @@ def configuration(path):
         for value in [database["container"], *config["networks"].values()]
     ):
         raise DeploymentError("Invalid container or network identifier")
-    if set(config["application"]) != {"secret_key", "worker_secret", "registration_open"}:
+    app_fields = {"secret_key", "worker_secret", "registration_open"}
+    if not app_fields <= config["application"].keys() or set(config["application"]) - app_fields - {
+        "coaching"
+    }:
         raise DeploymentError("Application secrets and registration policy must be explicit")
     app = config["application"]
     if type(app["registration_open"]) is not bool:
@@ -139,6 +142,13 @@ def configuration(path):
         raise DeploymentError("Generate independent application secrets of at least 50 characters")
     if app["secret_key"] == app["worker_secret"]:
         raise DeploymentError("Web and worker secrets must differ")
+    if "coaching" in app:
+        from scripts.deploy_coaching import coaching_environment
+
+        try:
+            coaching_environment(app["coaching"])
+        except ValueError:
+            raise DeploymentError("Invalid optional HTTPS coaching configuration") from None
     return config
 
 
@@ -211,6 +221,9 @@ class Deployment:
                 self.config["database"][key]
                 for key in ("owner_password", "web_password", "worker_password")
             ] + [self.config["application"][key] for key in ("secret_key", "worker_secret")]
+            provider = self.config["application"].get("coaching")
+            if provider:
+                secrets.append(provider["token"])
             variants = set()
             for secret in secrets:
                 variants.update(
@@ -324,7 +337,7 @@ class Deployment:
             if entry.get("Gateway")
         ]
         app = self.config["application"]
-        return {
+        environment = {
             "PRAXIMESH_MODE": "production" if origin.scheme == "https" else "local",
             "APP_SECRET_KEY": app["worker_secret"] if role == "worker" else app["secret_key"],
             "APP_ALLOWED_HOSTS": origin.hostname,
@@ -338,6 +351,11 @@ class Deployment:
             "JUDGE_BACKEND": "wasi",
             "JUDGE_WASI_SHA256": generation["manifest"]["judge"]["bundle_sha256"],
         }
+        if role == "web" and "coaching" in app:
+            from scripts.deploy_coaching import coaching_environment
+
+            environment.update(coaching_environment(app["coaching"]))
+        return environment
 
     def runtime(self, generation, role, name):
         return [

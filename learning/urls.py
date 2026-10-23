@@ -6,6 +6,7 @@ app_name = "learning"
 
 urlpatterns = [
     path("", views.index, name="index"),
+    path("achievements/", views.achievements, name="achievements"),
     path("bookmarks/", views.bookmarks, name="bookmarks"),
     path("bookmarks/<slug:slug>/", views.bookmark, name="bookmark"),
     path("notes/", views.notes, name="notes"),

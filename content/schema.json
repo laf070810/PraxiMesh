@@ -269,7 +269,10 @@
           "enum": [
             "python-function-v1",
             "javascript-function-v1",
-            "python-stdio-v1"
+            "python-stdio-v1",
+            "python-ml-linear-v1",
+            "python-weighted-fit-v1",
+            "python-agent-tools-v1"
           ]
         },
         "function": {
@@ -291,7 +294,7 @@
         },
         "tests": {
           "type": "array",
-          "minItems": 4,
+          "minItems": 2,
           "maxItems": 20,
           "items": {
             "oneOf": [
@@ -300,6 +303,15 @@
               },
               {
                 "$ref": "#/$defs/stdio_case"
+              },
+              {
+                "$ref": "#/$defs/ml_case"
+              },
+              {
+                "$ref": "#/$defs/scientific_case"
+              },
+              {
+                "$ref": "#/$defs/agent_case"
               }
             ]
           }
@@ -351,9 +363,131 @@
         },
         "output_format": {
           "const": "json"
+        },
+        "model_kind": {
+          "const": "linear-regression-v1"
+        },
+        "uncertainty_model": {
+          "const": "known-independent-sigma-v1"
+        },
+        "assessment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "resource_profile"
+          ],
+          "properties": {
+            "kind": {
+              "const": "approved-ledger-v1"
+            },
+            "resource_profile": {
+              "const": "wasi-agent-v1"
+            }
+          }
         }
       },
       "allOf": [
+        {
+          "if": {
+            "properties": {
+              "evaluator": {
+                "const": "python-function-v1"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "function"
+            ],
+            "properties": {
+              "language": {
+                "const": "python"
+              },
+              "tests": {
+                "minItems": 4,
+                "maxItems": 20,
+                "items": {
+                  "$ref": "#/$defs/case"
+                }
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "model_kind"
+                  ]
+                },
+                {
+                  "required": [
+                    "output_format"
+                  ]
+                },
+                {
+                  "required": [
+                    "uncertainty_model"
+                  ]
+                },
+                {
+                  "required": [
+                    "assessment"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "evaluator": {
+                "const": "javascript-function-v1"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "function"
+            ],
+            "properties": {
+              "language": {
+                "const": "javascript"
+              },
+              "tests": {
+                "minItems": 4,
+                "maxItems": 20,
+                "items": {
+                  "$ref": "#/$defs/case"
+                }
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "model_kind"
+                  ]
+                },
+                {
+                  "required": [
+                    "output_format"
+                  ]
+                },
+                {
+                  "required": [
+                    "uncertainty_model"
+                  ]
+                },
+                {
+                  "required": [
+                    "assessment"
+                  ]
+                }
+              ]
+            }
+          }
+        },
         {
           "if": {
             "properties": {
@@ -371,31 +505,35 @@
                 "const": "python"
               },
               "tests": {
+                "minItems": 4,
+                "maxItems": 20,
                 "items": {
                   "$ref": "#/$defs/stdio_case"
                 }
               }
             },
             "not": {
-              "required": [
-                "function"
-              ]
-            }
-          },
-          "else": {
-            "required": [
-              "function"
-            ],
-            "properties": {
-              "tests": {
-                "items": {
-                  "$ref": "#/$defs/case"
+              "anyOf": [
+                {
+                  "required": [
+                    "function"
+                  ]
+                },
+                {
+                  "required": [
+                    "model_kind"
+                  ]
+                },
+                {
+                  "required": [
+                    "uncertainty_model"
+                  ]
+                },
+                {
+                  "required": [
+                    "assessment"
+                  ]
                 }
-              }
-            },
-            "not": {
-              "required": [
-                "output_format"
               ]
             }
           }
@@ -404,22 +542,140 @@
           "if": {
             "properties": {
               "evaluator": {
-                "const": "javascript-function-v1"
+                "const": "python-ml-linear-v1"
               }
             }
           },
           "then": {
-            "properties": {
-              "language": {
-                "const": "javascript"
-              }
-            }
-          },
-          "else": {
+            "required": [
+              "function",
+              "model_kind"
+            ],
             "properties": {
               "language": {
                 "const": "python"
+              },
+              "tests": {
+                "minItems": 2,
+                "maxItems": 8,
+                "items": {
+                  "$ref": "#/$defs/ml_case"
+                }
               }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "output_format"
+                  ]
+                },
+                {
+                  "required": [
+                    "uncertainty_model"
+                  ]
+                },
+                {
+                  "required": [
+                    "assessment"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "evaluator": {
+                "const": "python-weighted-fit-v1"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "function",
+              "uncertainty_model"
+            ],
+            "properties": {
+              "language": {
+                "const": "python"
+              },
+              "tests": {
+                "minItems": 2,
+                "maxItems": 8,
+                "items": {
+                  "$ref": "#/$defs/scientific_case"
+                }
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "model_kind"
+                  ]
+                },
+                {
+                  "required": [
+                    "output_format"
+                  ]
+                },
+                {
+                  "required": [
+                    "assessment"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "evaluator": {
+                "const": "python-agent-tools-v1"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "function",
+              "assessment"
+            ],
+            "properties": {
+              "language": {
+                "const": "python"
+              },
+              "function": {
+                "const": "act"
+              },
+              "tests": {
+                "minItems": 2,
+                "maxItems": 8,
+                "items": {
+                  "$ref": "#/$defs/agent_case"
+                }
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "model_kind"
+                  ]
+                },
+                {
+                  "required": [
+                    "uncertainty_model"
+                  ]
+                },
+                {
+                  "required": [
+                    "output_format"
+                  ]
+                }
+              ]
             }
           }
         }
@@ -447,6 +703,241 @@
         "expected": {},
         "public": {
           "type": "boolean"
+        }
+      }
+    },
+    "dataset_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "revision",
+        "seed",
+        "digest"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "ml_split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "features",
+        "targets"
+      ],
+      "properties": {
+        "features": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 128,
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {
+              "type": "number",
+              "minimum": -1000000.0,
+              "maximum": 1000000.0
+            }
+          }
+        },
+        "targets": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 128,
+          "items": {
+            "type": "number",
+            "minimum": -1000000.0,
+            "maximum": 1000000.0
+          }
+        }
+      }
+    },
+    "ml_case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "public",
+        "train",
+        "holdout",
+        "thresholds",
+        "dataset"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "public": {
+          "type": "boolean"
+        },
+        "train": {
+          "$ref": "#/$defs/ml_split"
+        },
+        "holdout": {
+          "$ref": "#/$defs/ml_split"
+        },
+        "thresholds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mse",
+            "mae"
+          ],
+          "properties": {
+            "mse": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000000000.0
+            },
+            "mae": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000000000.0
+            }
+          }
+        },
+        "dataset": {
+          "$ref": "#/$defs/dataset_identity"
+        }
+      }
+    },
+    "scientific_case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "public",
+        "observations",
+        "dataset"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "public": {
+          "type": "boolean"
+        },
+        "observations": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "x",
+            "y",
+            "sigma"
+          ],
+          "properties": {
+            "x": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 64,
+              "items": {
+                "type": "number",
+                "minimum": -10000.0,
+                "maximum": 10000.0
+              }
+            },
+            "y": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 64,
+              "items": {
+                "type": "number",
+                "minimum": -10000.0,
+                "maximum": 10000.0
+              }
+            },
+            "sigma": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 64,
+              "items": {
+                "type": "number",
+                "minimum": 0.01,
+                "maximum": 100
+              }
+            }
+          }
+        },
+        "dataset": {
+          "$ref": "#/$defs/dataset_identity"
+        }
+      }
+    },
+    "agent_case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "public",
+        "environment"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "public": {
+          "type": "boolean"
+        },
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "records"
+          ],
+          "properties": {
+            "records": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "amount",
+                  "approved"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{1,32}$"
+                  },
+                  "amount": {
+                    "type": "integer",
+                    "minimum": -100000,
+                    "maximum": 100000
+                  },
+                  "approved": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }

@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import re
 import secrets
 import socket
 import subprocess
@@ -30,32 +31,55 @@ def bootstrap_moderator(run, environment):
         "manage.py",
         "shell",
         "-c",
-        "import os; from django.contrib.auth import get_user_model; "
-        "user = get_user_model().objects.create_user("
+        "import os\nfrom django.contrib.auth import get_user_model\n"
+        "from django.core.management import call_command\nfrom django.db import transaction\n"
+        "with transaction.atomic():\n"
+        "    user = get_user_model().objects.create_user("
         "username=os.environ['BROWSER_MODERATOR_USERNAME'], "
-        "password=os.environ['BROWSER_MODERATOR_PASSWORD']); "
-        "assert not user.is_staff and not user.is_superuser",
+        "password=os.environ['BROWSER_MODERATOR_PASSWORD'])\n"
+        "    call_command('community_moderator', user.username, grant=True)\n"
+        "    assert not user.is_staff and not user.is_superuser and not user.groups.exists()\n"
+        "    assert set(user.user_permissions.values_list('content_type__app_label', 'codename')) "
+        "== {('community', 'moderate_content')}\n",
         env=private_environment,
     )
-    run(
-        "manage.py",
-        "community_moderator",
-        credentials["BROWSER_MODERATOR_USERNAME"],
-        "--grant",
-        env=private_environment,
-    )
+    return credentials
+
+
+def cleanup_moderator(run, environment, credentials):
+    """Delete only the fixture proved by its exact name, random secret and role.
+
+    Call only after bootstrap returned successfully. A browser may already have
+    deleted it; a replaced or modified account fails closed instead of being removed.
+    """
+    if (
+        set(credentials) != {"BROWSER_MODERATOR_USERNAME", "BROWSER_MODERATOR_PASSWORD"}
+        or not isinstance(credentials["BROWSER_MODERATOR_USERNAME"], str)
+        or not re.fullmatch(
+            r"community-reviewer-[a-f0-9]{12}", credentials["BROWSER_MODERATOR_USERNAME"]
+        )
+        or not isinstance(credentials["BROWSER_MODERATOR_PASSWORD"], str)
+        or len(credentials["BROWSER_MODERATOR_PASSWORD"]) < 32
+    ):
+        raise ValueError("Expected this run's synthetic reviewer credentials")
     run(
         "manage.py",
         "shell",
         "-c",
-        "import os; from django.contrib.auth import get_user_model; "
-        "user = get_user_model().objects.get(username=os.environ['BROWSER_MODERATOR_USERNAME']); "
-        "assert not user.is_staff and not user.is_superuser and not user.groups.exists(); "
-        "assert set(user.user_permissions.values_list('content_type__app_label', 'codename')) "
-        "== {('community', 'moderate_content')}",
-        env=private_environment,
+        "import os\nfrom django.contrib.auth import get_user_model\n"
+        "from django.core.management.base import CommandError\nfrom django.db import transaction\n"
+        "with transaction.atomic():\n"
+        "    user=get_user_model().objects.select_for_update().filter("
+        "username=os.environ['BROWSER_MODERATOR_USERNAME']).first()\n"
+        "    if user is not None:\n"
+        "        if (not user.check_password(os.environ['BROWSER_MODERATOR_PASSWORD']) "
+        "or user.is_staff or user.is_superuser or user.groups.exists() "
+        "or set(user.user_permissions.values_list('content_type__app_label','codename')) "
+        "!= {('community','moderate_content')}):\n"
+        "            raise CommandError('Synthetic reviewer ownership check failed')\n"
+        "        user.delete()\n",
+        env=dict(environment, **credentials),
     )
-    return credentials
 
 
 def main():
@@ -95,7 +119,7 @@ def main():
         run("manage.py", "migrate", "--noinput", "--verbosity=0")
         run("manage.py", "content_import", "--translations", str(root / "content/en.json"))
         run("manage.py", "project_import", str(root / "content/projects.json"))
-        browser_env = dict(env, **bootstrap_moderator(run, env))
+        browser_env = dict(env)
         if options.judge:
             run("manage.py", "sandbox_check")
         with socket.socket() as allocated:
@@ -154,7 +178,15 @@ def main():
                 else:
                     raise RuntimeError("Application or real judge did not become ready.")
                 run("tests/browser_smoke.py", timeout=300)
-                run("tests/browser_community.py", env=browser_env, timeout=300)
+                credentials = bootstrap_moderator(run, env)
+                try:
+                    run(
+                        "tests/browser_community.py",
+                        env=dict(browser_env, **credentials),
+                        timeout=300,
+                    )
+                finally:
+                    cleanup_moderator(run, env, credentials)
                 run("tests/browser_i18n.py", timeout=300)
                 run("tests/browser_projects_i18n.py", timeout=300)
                 if options.judge:

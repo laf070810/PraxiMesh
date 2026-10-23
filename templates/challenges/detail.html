@@ -1,0 +1,28 @@
+{% extends 'base.html' %}{% load i18n %}
+{% block title %}{{ challenge.title }} · {% translate "挑战活动" %}{% endblock %}
+{% block content %}
+<section class="page-heading"><a href="{% url 'challenges:index' %}">{% translate "挑战活动" %}</a>
+<h1>{{ challenge.title }} · v{{ challenge.revision }}{% if challenge.historical %} {% translate "（历史修订）" %}{% endif %}</h1>
+<p lang="zh-hans">{{ challenge.summary }}</p>{% include 'challenges/source_notice.html' %}
+<p>{{ challenge.state_label }} · <time datetime="{{ challenge.starts_at|date:'c' }}">{{ challenge.starts_at|date:'c' }}</time> — <time datetime="{{ challenge.ends_at|date:'c' }}">{{ challenge.ends_at|date:'c' }}</time></p>
+</section><section class="section compact">
+<h2>{% translate "活动规则" %}</h2><p class="note-body" lang="zh-hans">{{ challenge.rules|linebreaksbr }}</p>
+<p class="notice">{% translate "只有加入后且在活动时间内提交并完成的固定版本正式通过才计入。开始时间包含在内，结束时间不包含在内；Run、其他版本和服务错误不计入。任务顺序可以自由选择。" %}</p>
+<p>{% translate "参与记录和进度仅本人可见，不会自动发布到榜单。活动外也可练习；已归档版本仅供阅读。" %}</p>
+{% if participation %}
+<p>{% translate "加入时间" %}：{{ participation.joined_at|date:'c' }}</p>
+<p id="challenge-progress">{% blocktranslate with count=completed total=tasks|length %}本次挑战完成 {{ count }} / {{ total }} 项任务。{% endblocktranslate %}</p>
+<form method="post" action="{% url 'challenges:participate' challenge.id challenge.revision %}">{% csrf_token %}<button name="action" value="leave">{% translate "退出此活动" %}</button></form>
+<p class="muted">{% translate "退出将删除加入记录；重新加入从新的加入时间统计。正式提交仍保留在本人的历史中。" %}</p>
+{% elif user.is_authenticated and can_join %}
+<form method="post" action="{% url 'challenges:participate' challenge.id challenge.revision %}">{% csrf_token %}<button name="action" value="join">{% translate "加入此活动" %}</button></form>
+{% elif not user.is_authenticated %}<p><a href="{% url 'login' %}?next={{ request.path|urlencode }}">{% translate "登录后自愿加入" %}</a></p>
+{% else %}<p>{% translate "此修订已结束或已被更新，不能加入。" %}</p>{% endif %}
+<p><a href="{% url 'challenges:mine' %}">{% translate "我的挑战" %}</a> · <a href="{% url 'learning:achievements' %}">{% translate "我的成就" %}</a></p>
+{% for task in tasks %}<article class="card"><h2>{{ task.position }}. {{ task.title }}</h2>
+{% if task.available %}<p lang="zh-hans">{{ task.description }}</p><p>{{ task.problem_title }} · v{{ task.problem_revision }}{% if task.archived %} {% translate "（已归档版本）" %}{% endif %}</p>
+<a href="{% url 'challenges:task' challenge.id challenge.revision task.key %}">{% translate "查看固定任务" %}</a>
+{% if participation %}<p>{% if task.evidence %}<a href="{% url 'submission' task.evidence.id %}">{% translate "查看计入本次挑战的正式结果" %}</a>{% else %}{% translate "本次挑战尚无符合规则的通过记录。" %}{% endif %}</p>{% endif %}
+{% else %}<p>{% translate "绑定题目已下线，任务内容与进度暂停显示。" %}</p>{% endif %}</article>{% endfor %}
+<h2>{% translate "活动修订" %}</h2><ul>{% for item in history %}<li><a href="{% url 'challenges:revision' challenge.id item.revision %}">v{{ item.revision }}</a></li>{% endfor %}</ul>
+{% include 'projects/pagination.html' with page=history %}</section>{% endblock %}

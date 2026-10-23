@@ -9,7 +9,7 @@ jobs:
   real-wasi:
     # Disposable hosted runner, never a privileged shared execution node.
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,6 +25,8 @@ jobs:
           printf 'JUDGE_BACKEND=wasi\n' >> "$GITHUB_ENV"
           printf 'JUDGE_WASI_BUNDLE=%s/var/wasi-functions\n' "$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
           printf 'JUDGE_WASI_SHA256=%s\n' "$(sha256sum var/wasi-functions/manifest.json | cut -d ' ' -f 1)" >> "$GITHUB_ENV"
+      - name: Record the real startup receipt for queued worker tests
+        run: .venv/bin/python manage.py sandbox_check
       - name: Real isolation, reference, incorrect solution and lifecycle checks
         env:
           RUN_SANDBOX_TESTS: '1'

@@ -3,7 +3,7 @@
 from django.db.models import F
 
 from core.models import Submission
-from core.result_evidence import InvalidResult, verified_metrics
+from core.result_evidence import InvalidResult, verified_evidence
 
 
 def stage_cards(revision, user):
@@ -27,7 +27,7 @@ def stage_cards(revision, user):
         for record in records.iterator(chunk_size=200):
             record.version = versions[record.version_id]
             try:
-                verified_metrics(record)
+                verified_evidence(record)
             except InvalidResult:
                 continue
             accepted.setdefault(record.version_id, {"id": record.pk, "at": record.finished_at})
