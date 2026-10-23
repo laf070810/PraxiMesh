@@ -1,5 +1,6 @@
 {% extends 'base.html' %}{% load i18n localized %}{% block title %}{{ heading }} · PraxiMesh{% endblock %}{% block content %}
 <section class="page-heading">{% include 'community/nav.html' %}<h1>{{ heading }}</h1></section>
-{% if private_case %}<p>{% translate "说明仅本人和具有社区审核权限的审核者可见。请勿填写密码、恢复码或不必要的个人资料。" %}</p>{% else %}<p>{% translate "新内容先保存为私有草稿，需要再主动提交审核。审核通过后，正文及你的用户名将公开；原有私有提交代码不会自动附带。你可以撤回或删除。修改已公开或已送审的内容会立即停止公开并重新等待审核。" %}</p><p>{% translate "只支持纯文本，不执行或渲染投稿 HTML。题解必须绑定明确的题目版本；题目下线时关联内容停止公开。" %}</p>{% endif %}
+{% if private_case %}<p>{% translate "说明仅本人和具有社区审核权限的审核者可见。请勿填写密码、恢复码或不必要的个人资料。" %}</p>{% else %}<p>{% translate "新内容先保存为私有草稿，需要再主动提交审核。审核通过后，正文及你的用户名将公开；原有私有提交代码不会自动附带。你可以撤回或删除。修改已公开或已送审的内容会立即停止公开并重新等待审核。" %}</p><p>{% translate "只支持纯文本，不执行或渲染投稿 HTML。题解和题目反馈必须绑定明确的题目版本；题目下线时关联内容停止公开。" %}</p>{% endif %}
+{% if form.kind.value == 'feedback' %}<section class="card"><h2>{% translate "反馈说明" %}</h2><p>{% translate "报告错误时，请写明出错位置、可复现的公开示例、预期与实际表现；提出修订建议时，请说明改法及理由。" %}</p><p>{% translate "反馈的公开审核不代表题目已修正。维护者可在评论中说明处理结论和修订版本。" %}</p></section>{% endif %}
 <form method="post">{% csrf_token %}{{ form.as_p }}<button class="button" type="submit">{% if private_case %}{% translate "提交说明" %}{% else %}{% translate "保存内容" %}{% endif %}</button></form>
 {% endblock %}

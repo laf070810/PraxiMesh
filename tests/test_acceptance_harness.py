@@ -193,7 +193,10 @@ def test_specialist_poll_interval_retry_scope_and_deadline(monkeypatch, mode):
             assert calls == [0] and sleeps == []
 
 
-@pytest.mark.parametrize("failure", [None, "browser_blogs", "browser_specialists", "organization"])
+@pytest.mark.parametrize(
+    "failure",
+    [None, "browser_blogs", "browser_specialists", "organization", "browser_problem_feedback"],
+)
 @pytest.mark.parametrize("include_api", [False, True])
 def test_advanced_artifacts_failure_cleanup_and_import_path(
     monkeypatch, tmp_path, failure, include_api
@@ -206,6 +209,7 @@ def test_advanced_artifacts_failure_cleanup_and_import_path(
         "organizations-browser.json",
         "coaching-browser.json",
         "object-api-browser.json",
+        "problem-feedback-browser.json",
     )
     for name in receipts:
         (artifacts / name).write_text('{"passed":true}')
@@ -244,19 +248,31 @@ def test_advanced_artifacts_failure_cleanup_and_import_path(
     if failure:
         with pytest.raises((subprocess.TimeoutExpired, RuntimeError)):
             advanced_browsers.run_advanced_browsers(
-                {"BROWSER_JUDGE": "1"}, owner, artifacts, include_object_api=include_api
+                {"BROWSER_JUDGE": "1"},
+                owner,
+                artifacts,
+                include_object_api=include_api,
+                include_feedback=True,
             )
     else:
         result = advanced_browsers.run_advanced_browsers(
-            {"BROWSER_JUDGE": "1"}, owner, artifacts, include_object_api=include_api
+            {"BROWSER_JUDGE": "1"},
+            owner,
+            artifacts,
+            include_object_api=include_api,
+            include_feedback=True,
         )
         assert result["journeys"] == [
             "browser_specialists",
             "browser_blogs",
+            "browser_problem_feedback",
             "browser_organizations",
             "browser_coaching",
         ] + (["browser_object_api"] if include_api else [])
-    assert cleaned == ([] if failure == "browser_specialists" else [credentials])
+    expected_cleanups = (
+        0 if failure == "browser_specialists" else 1 if failure == "browser_blogs" else 2
+    )
+    assert cleaned == [credentials] * expected_cleanups
     assert sys.path == original_path
 
 

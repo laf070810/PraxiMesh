@@ -11,7 +11,13 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def run_advanced_browsers(
-    environment, owner_run, artifacts, *, include_challenges=False, include_object_api=False
+    environment,
+    owner_run,
+    artifacts,
+    *,
+    include_challenges=False,
+    include_object_api=False,
+    include_feedback=False,
 ):
     """Use real browser actions; the trusted runner only manages test fixtures.
 
@@ -29,6 +35,7 @@ def run_advanced_browsers(
         "coaching-browser.json",
         "challenges-browser.json",
         "object-api-browser.json",
+        "problem-feedback-browser.json",
     ):
         (artifacts / filename).unlink(missing_ok=True)
     checked = []
@@ -64,6 +71,13 @@ def run_advanced_browsers(
         browser("browser_blogs", dict(environment, **credentials))
     finally:
         cleanup_moderator(owner_run, environment, credentials)
+    if include_feedback:
+        cohort()
+        credentials = bootstrap_moderator(owner_run, environment)
+        try:
+            browser("browser_problem_feedback", dict(environment, **credentials))
+        finally:
+            cleanup_moderator(owner_run, environment, credentials)
     cohort()
     # The browser module receives the same constrained management runner as the
     # launcher. Neither database credentials nor an owner API enter any page.

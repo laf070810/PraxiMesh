@@ -8,11 +8,14 @@ from django.contrib.auth.models import Permission
 from django.core.exceptions import PermissionDenied
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import IntegrityError, connection, transaction
+from django.db.migrations.executor import MigrationExecutor
 from django.test import Client
 from django.urls import reverse
 
 from community import services
 from community.models import Appeal, Comment, ModerationEvent, Post, Report, State
+from core.content import import_package
 from core.models import AccountProfile, Problem, Submission
 
 pytestmark = pytest.mark.django_db
@@ -593,3 +596,129 @@ def test_problem_entry_filters_and_preselects_only_published_versions(catalog, u
 def test_create_prefill_rejects_invalid_kind_or_version(logged_client, query):
     assert logged_client.get(url("create"), query).status_code == 400
     assert not Post.objects.exists()
+
+
+@pytest.mark.parametrize("locale", ["zh-hans", "en"])
+def test_problem_feedback_entry_requires_version_and_preserves_old_target(
+    catalog, logged_client, user, locale
+):
+    logged_client.defaults["HTTP_ACCEPT_LANGUAGE"] = locale
+    version = Problem.objects.get(pk="sum-positive").current
+    body = logged_client.get(reverse("problem", args=[version.problem_id])).content.decode()
+    assert f"?version={version.pk}&amp;kind=feedback" in body
+    assert "?kind=feedback&amp;problem=sum-positive" in body
+    response = logged_client.get(url("create"), {"kind": "feedback", "version": version.pk})
+    assert response.context["form"].initial["version"] == version
+    assert response.context["form"].initial["kind"] == "feedback"
+    if locale == "en":
+        assert b"Writing feedback" in response.content
+        assert b"does not mean the problem has been corrected" in response.content
+    data = {"kind": "feedback", "title": "Example wording", "body": "Reproduction and proposal"}
+    response = logged_client.post(url("create"), data)
+    assert response.status_code == 400 and not Post.objects.exists()
+    assert "version" in response.context["form"].errors
+    data["version"] = version.pk
+    assert logged_client.post(url("create"), data).status_code == 302
+    feedback = Post.objects.get()
+    assert feedback.state == State.DRAFT and feedback.version_id == version.pk
+    newer = next(p for p in catalog["problems"] if p["id"] == version.problem_id)
+    newer["revision"] += 1
+    newer["changelog"] = "Clarify the example wording."
+    import_package(catalog)
+    feedback.refresh_from_db()
+    assert feedback.version_id == version.pk
+    assert Problem.objects.get(pk=version.problem_id).current_id != version.pk
+    response = logged_client.get(url("edit", feedback.pk))
+    assert response.context["form"].initial["version"] == version
+    # A newly reported issue can still identify an older published revision.
+    assert logged_client.post(url("create"), data).status_code == 302
+
+
+def test_feedback_visibility_queue_filters_and_withdrawal(
+    catalog, logged_client, user, other_user, moderator
+):
+    client = Client()
+    version = Problem.objects.get(pk="sum-positive").current
+    feedback = services.save_post(
+        user,
+        {
+            "kind": "feedback",
+            "title": "Ambiguous example",
+            "body": "Issue details",
+            "version": version,
+        },
+    )
+    unrelated = Post.objects.create(
+        author=user, kind="question", title="Different topic", body="body", state=State.PENDING
+    )
+    target = url("detail", feedback.pk)
+    for reader in (other_user, moderator):
+        client.force_login(reader)
+        assert client.get(target).status_code == 404
+    services.author_action(user, "post", feedback.pk, "submit", feedback.revision)
+    client.force_login(moderator)
+    response = client.get(url("moderation"), {"kind": "post", "post_kind": "feedback"})
+    assert [item.pk for item in response.context["page"]] == [feedback.pk]
+    assert unrelated.title.encode() not in response.content
+    services.moderate(moderator, "post", feedback.pk, "publish", 1, "Feedback can be discussed.")
+    client.logout()
+    response = client.get(url("index"), {"kind": "feedback", "problem": version.problem_id})
+    assert [item.pk for item in response.context["page"]] == [feedback.pk]
+    assert client.get(target).status_code == 200
+    version.problem.published = False
+    version.problem.save()
+    assert client.get(target).status_code == 404
+    assert not services.public_posts().filter(pk=feedback.pk).exists()
+    assert logged_client.get(target).status_code == 200
+    version.problem.published = True
+    version.problem.save()
+    services.author_action(user, "post", feedback.pk, "withdraw", 1)
+    for reader in (other_user, moderator):
+        client.force_login(reader)
+        assert client.get(target).status_code == 404
+    assert logged_client.get(target).status_code == 200
+
+
+@pytest.mark.parametrize(
+    "query", [{"post_kind": "unknown"}, {"kind": "report", "post_kind": "feedback"}]
+)
+def test_feedback_queue_rejects_invalid_filters(client, moderator, query):
+    client.force_login(moderator)
+    assert client.get(url("moderation"), query).status_code == 404
+
+
+@pytest.mark.django_db(transaction=True)
+def test_feedback_migration_preserves_existing_posts_and_enforces_database_version(catalog, user):
+    latest = ("community", "0003_problem_feedback")
+    old = ("community", "0002_post_blog_kind")
+    executor = MigrationExecutor(connection)
+    try:
+        executor.migrate([old])
+        apps = executor.loader.project_state([old]).apps
+        old_post = apps.get_model("community", "Post")
+        version = Problem.objects.get(pk="sum-positive").current
+        for kind in ("discussion", "question", "solution", "blog"):
+            old_post.objects.create(
+                author_id=user.pk,
+                kind=kind,
+                title=kind,
+                body="Retained text",
+                version_id=version.pk if kind == "solution" else None,
+                state=State.PUBLISHED,
+            )
+        before = list(old_post.objects.order_by("id").values())
+        MigrationExecutor(connection).migrate([latest])
+        assert list(Post.objects.order_by("id").values()) == before
+        with pytest.raises(IntegrityError), transaction.atomic():
+            Post.objects.create(
+                author=user, kind="feedback", title="Invalid", body="Missing version"
+            )
+        item = Post.objects.create(
+            author=user, kind="feedback", title="Valid", body="Has version", version=version
+        )
+        with pytest.raises(IntegrityError), transaction.atomic():
+            Post.objects.filter(pk=item.pk).update(version=None)
+        item.refresh_from_db()
+        assert item.version_id == version.pk
+    finally:
+        MigrationExecutor(connection).migrate([latest])

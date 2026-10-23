@@ -64,6 +64,7 @@ C_MIGRATIONS = {
     ("coaching", "0002_slot_lock"),
 }
 D_MIGRATIONS = {("challenges", "0001_initial")}
+F_MIGRATIONS = {("community", "0003_problem_feedback")}
 
 # This trusted administrative program runs only in the labelled worker container.
 # Killing its exact controller models unexpected process death. `docker kill`
@@ -587,7 +588,7 @@ class Rehearsal:
             private_migration_diagnostic_retained=True,
         )
 
-    def browser(self):
+    def browser(self, *, problem_feedback=False):
         environment = dict(
             os.environ, BROWSER_URL=self.base, BROWSER_TEST_SPKI=self.pin, BROWSER_JUDGE="1"
         )
@@ -631,9 +632,10 @@ class Rehearsal:
                 (identity[0], permission),
             )
         environment.update(BROWSER_MODERATOR_USERNAME=reviewer, BROWSER_MODERATOR_PASSWORD=password)
-        with (self.options.artifacts / "community-browser.log").open("wb") as stream:
+        script = "browser_problem_feedback" if problem_feedback else "browser_community"
+        with (self.options.artifacts / (script + ".log")).open("wb") as stream:
             subprocess.run(
-                [sys.executable, str(ROOT / "tests/browser_community.py")],
+                [sys.executable, str(ROOT / "tests" / (script + ".py"))],
                 cwd=self.directory,
                 env=environment,
                 stdout=stream,
@@ -648,10 +650,21 @@ class Rehearsal:
                 ).fetchone()[0]
                 == 0
             )
-        self.result["community_moderation_via_https_browser"] = True
-        receipt = self.directory / "test-results/community-browser.json"
+        self.result[
+            "problem_feedback_via_https_browser"
+            if problem_feedback
+            else "community_moderation_via_https_browser"
+        ] = True
+        receipt = (
+            self.directory
+            / "test-results"
+            / ("problem-feedback-browser.json" if problem_feedback else "community-browser.json")
+        )
         community_result = json.loads(receipt.read_text())
-        assert community_result["passed"] and community_result["https_transport_tested"]
+        assert (
+            community_result["passed"]
+            and community_result["https" if problem_feedback else "https_transport_tested"]
+        )
         (self.options.artifacts / receipt.name).write_bytes(receipt.read_bytes())
         for screenshot in (self.directory / "test-results").glob("*.png"):
             (self.options.artifacts / screenshot.name).write_bytes(screenshot.read_bytes())
@@ -1347,6 +1360,18 @@ def validate_upgrade_manifests(previous, target):
     b2_paths = {f"{app}/migrations/{name}.py" for app, name in B2_MIGRATIONS}
     c_paths = {f"{app}/migrations/{name}.py" for app, name in C_MIGRATIONS}
     d_paths = {f"{app}/migrations/{name}.py" for app, name in D_MIGRATIONS}
+    f_paths = {f"{app}/migrations/{name}.py" for app, name in F_MIGRATIONS}
+    if paths | b2_paths | c_paths | d_paths <= previous["source_files"].keys():
+        if f_paths.intersection(previous["source_files"]):
+            raise ValueError("The previous release must precede the F schema")
+        if not f_paths <= target["source_files"].keys():
+            raise ValueError("The target release must contain all F migrations")
+        for path, digest in previous["source_files"].items():
+            if "/migrations/" in path and target["source_files"].get(path) != digest:
+                raise ValueError("An upgrade must preserve existing migration sources")
+        if previous["images"]["web"] == target["images"]["web"]:
+            raise ValueError("A schema upgrade must exercise a different Web image")
+        return "f"
     if paths | b2_paths | c_paths <= previous["source_files"].keys():
         if d_paths.intersection(previous["source_files"]):
             raise ValueError("The previous release must precede the D schema")
@@ -1434,6 +1459,10 @@ def main():
             from scripts.deploy_d_acceptance import DRehearsal
 
             rehearsal_type = DRehearsal
+        elif upgrade_kind == "f":
+            from scripts.deploy_f_acceptance import FRehearsal
+
+            rehearsal_type = FRehearsal
         docker(
             "image", "load", "--input", str(options.previous_release / "images.tar"), timeout=900
         )

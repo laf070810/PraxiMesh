@@ -13,7 +13,7 @@ from core.models import KnowledgeNode, Problem
 from learning.models import Bookmark, Note, TutorialReading
 
 
-def records(user, other_user):
+def records(user, other_user, kind="solution"):
     problem = Problem.objects.get(pk="sum-positive")
     tutorial = KnowledgeNode.objects.filter(kind="tutorial").first()
     Bookmark.objects.create(user=user, problem=problem)
@@ -28,7 +28,7 @@ def records(user, other_user):
     )
     post = Post.objects.create(
         author=user,
-        kind="solution",
+        kind=kind,
         title="My solution",
         body="MY-POST-CONTENT",
         version=problem.current,
@@ -43,8 +43,11 @@ def records(user, other_user):
     return note, post, event, tutorial
 
 
-def test_account_export_contains_only_owned_extensions(catalog, logged_client, user, other_user):
-    note, post, event, tutorial = records(user, other_user)
+@pytest.mark.parametrize("kind", ["solution", "feedback"])
+def test_account_export_contains_only_owned_extensions(
+    catalog, logged_client, user, other_user, kind
+):
+    note, post, event, tutorial = records(user, other_user, kind)
     response = logged_client.post(reverse("export_account"))
     assert response.status_code == 200 and response["Cache-Control"] == "no-store"
     data = response.json()
@@ -52,16 +55,18 @@ def test_account_export_contains_only_owned_extensions(catalog, logged_client, u
     assert data["learning"]["reading"][0]["self_reported"] is True
     assert data["learning"]["bookmarks"][0]["problem"] == "sum-positive"
     assert data["community"]["posts"][0]["id"] == str(post.pk)
+    assert data["community"]["posts"][0]["kind"] == kind
     assert data["community"]["moderation_events"][0]["action"] == event.action
     assert not data["community"]["comments"] and not data["community"]["reports"]
     for private_text in ("OTHER-COMMENT", "OTHER-PRIVATE-REPORT", "OTHER-PRIVATE-NOTE"):
         assert private_text not in response.content.decode()
 
 
+@pytest.mark.parametrize("kind", ["solution", "feedback"])
 def test_account_delete_removes_extensions_and_anonymizes_actor(
-    catalog, logged_client, user, other_user
+    catalog, logged_client, user, other_user, kind
 ):
-    note, post, event, tutorial = records(user, other_user)
+    note, post, event, tutorial = records(user, other_user, kind)
     assert logged_client.post(reverse("delete_account"), {"confirm": "DELETE"}).status_code == 400
     assert Note.objects.filter(pk=note.pk).exists()
     response = logged_client.post(

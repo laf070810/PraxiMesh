@@ -1,6 +1,6 @@
 # 部署、维护与恢复手册
 
-修订：2026-10-23。初始部署目标 Linux amd64。其他架构必须换用对应镜像 digest 并重新验证；当前不声称支持全部架构。验收状态见 [acceptance.md](acceptance.md)。
+修订：2026-10-24。初始部署目标 Linux amd64。其他架构必须换用对应镜像 digest 并重新验证；当前不声称支持全部架构。当前能力与各批验收状态见[需求追踪](requirements.md)，初始基线见 [acceptance.md](acceptance.md)。
 
 ## 本地应用
 

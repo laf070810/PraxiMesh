@@ -168,7 +168,7 @@ python scripts/deploy_acceptance.py \
 
 ## B2 到 C 的迁移与内容发布
 
-C 增加 CPU 调用预约、博客类型、组织课程/题库和私有学习规划。B2→C 冻结制品联合验收进行中，以下是当前实现的操作与复验入口，不表示该迁移组合已经完成验收。
+C 增加 CPU 调用预约、博客类型、组织课程/题库和私有学习规划。B2→C 冻结制品升级已通过，证据与制品身份见 [C 验收](acceptance-c.md)；C→D 增加挑战表的升级见 [D 验收](acceptance-d.md)。以下保留 B2→C 的操作与复验入口。
 
 升级前安装与 C 制品匹配、已审查的新控制器及锁定依赖，保留原配置、状态目录和站点 UUID。旧 B2 控制器的表权限白名单不包含 C 新表，不能只更换应用镜像。使用前述 `deploy.py apply` 命令和独立确认的 C 发布摘要，**不加 `--initial-content`**；协调器依次排空、备份/恢复、迁移、按实际 schema 授权并重启匹配的 Web/worker。
 
@@ -198,3 +198,21 @@ schema 升级保留原目录，不自动发布 C 新题或改写课程、项目�
 ```
 
 该演练先核对 schema 迁移、旧用户数据、旧目录和权限保留，再单独显式发布已审查 C 内容并验证新提交的真实额度预约。不能将同一发布包用于前后两代，也不能与失败迁移或 worker 重启模式混用；只有实际回执成功才算完成本次验收。
+
+## E 到 F 的版本题目反馈升级
+
+F 新增 `community.0003_problem_feedback`，为题目反馈增加明确版本约束；不增加表或角色权限。E→F 的独立冻结镜像、备份恢复、原数据/目录/权限保留、真实判题和 HTTPS 反馈流程已验证，身份及边界见 [F 验收](acceptance-f.md)。本次没有自动导入新目录。
+
+在可销毁环境中复验，使用各自独立确认的摘要：
+
+```sh
+.venv/bin/python scripts/deploy_acceptance.py \
+  --release /path/to/f-release --manifest-sha256 TRUSTED_F_DIGEST \
+  --upgrade-only \
+  --previous-release /path/to/e-release \
+  --previous-manifest-sha256 TRUSTED_E_DIGEST \
+  --caddy /path/to/caddy-2.11.7 \
+  --artifacts test-results/deployment-f-upgrade
+```
+
+实际站点使用前述 `deploy.py apply`，保留配置、状态目录与站点 UUID，并安装与 F 匹配的控制器；不加 `--initial-content`。此次演练不能替代目标主机的容量、公有证书或监管验收。

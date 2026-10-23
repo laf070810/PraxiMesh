@@ -40,6 +40,7 @@ class Post(Writing):
         QUESTION = "question", _("提问")
         SOLUTION = "solution", _("题解")
         BLOG = "blog", _("博文")
+        FEEDBACK = "feedback", _("题目反馈")
 
     kind = models.CharField(max_length=12, choices=Kind.choices)
     title = models.CharField(max_length=160)
@@ -53,7 +54,11 @@ class Post(Writing):
             models.CheckConstraint(
                 condition=~Q(kind="solution") | Q(version__isnull=False),
                 name="community_solution_has_version",
-            )
+            ),
+            models.CheckConstraint(
+                condition=~Q(kind="feedback") | Q(version__isnull=False),
+                name="community_feedback_has_version",
+            ),
         ]
 
 

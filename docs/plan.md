@@ -1,6 +1,6 @@
 # 阶段计划
 
-修订：2026-10-24。维护者已要求继续完成 PRD 全部内容；当前总目标包含阶段 A/B/C 与 D 补充，尚未完成。[需求追踪表](requirements.md)记录全部范围，后续设计见 [RFC-006](rfcs/006-complete-product.md)。阶段 A 基线结果见[验收记录](acceptance.md)。
+修订：2026-10-24。维护者已要求继续完成 PRD 全部内容；当前总目标包含阶段 A/B/C 与 D/E/F 补充，尚未完成。[需求追踪表](requirements.md)记录全部范围，后续设计见 [RFC-006](rfcs/006-complete-product.md)。当前固定制品及版本题目反馈见 [F 验收](acceptance-f.md)，类/API见 [E 验收](acceptance-e.md)；阶段 A 基线结果见[验收记录](acceptance.md)。
 
 ## 阶段 A：最小完整闭环
 

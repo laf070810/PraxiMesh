@@ -1,6 +1,6 @@
 # 参与贡献
 
-先读 [PRD](PRD.md)、[设计索引](docs/README.md) 和 [内容规范](docs/content.md)。阶段 A 优先于额外题型和社区功能。提交小而完整的变更，说明对应需求、行为变化和验证边界。
+先读 [PRD](PRD.md)、[设计索引](docs/README.md)、[需求追踪](docs/requirements.md) 和 [内容规范](docs/content.md)。提交小而完整的变更，说明对应需求、行为变化和验证边界；扩展题型及社区功能时保留已有评测、隐私和版本约束。
 
 1. `uv sync --frozen`，按 README 初始化数据库和内容。
 2. 对架构、分类、版本、评测/安全/身份/部署边界的改变，先更新 RFC；决定后新增或替代 ADR。

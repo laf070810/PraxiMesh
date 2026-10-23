@@ -14,7 +14,9 @@ class PostForm(forms.Form):
     kind = forms.ChoiceField(choices=Post.Kind.choices, label=_("内容类型"))
     title = forms.CharField(max_length=160, label=_("标题"))
     version = VersionChoice(
-        queryset=ProblemVersion.objects.none(), required=False, label=_("关联题目版本（题解必选）")
+        queryset=ProblemVersion.objects.none(),
+        required=False,
+        label=_("关联题目版本（题解及反馈必选）"),
     )
     body = forms.CharField(max_length=20000, widget=forms.Textarea, label=_("正文（纯文本）"))
     revision = forms.IntegerField(min_value=1, required=False, widget=forms.HiddenInput)
@@ -29,6 +31,8 @@ class PostForm(forms.Form):
         data = super().clean()
         if data.get("kind") == Post.Kind.SOLUTION and not data.get("version"):
             self.add_error("version", _("题解必须选择明确的题目版本。"))
+        if data.get("kind") == Post.Kind.FEEDBACK and not data.get("version"):
+            self.add_error("version", _("题目反馈必须选择明确的题目版本。"))
         return data
 
 

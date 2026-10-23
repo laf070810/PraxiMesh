@@ -721,6 +721,7 @@ def main():
             artifacts / "production-advanced",
             include_challenges=True,
             include_object_api=True,
+            include_feedback=True,
         )
         print("Measuring eight-client browsing and a six-account real submission burst", flush=True)
         baseline = browse(base, context)

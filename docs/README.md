@@ -3,7 +3,7 @@
 需求基线：[PRD v0.2](../PRD.md)。技术方案可变，产品验收不随实现缩减。
 
 - [阶段计划与安全发布门槛](plan.md)
-- [完整 PRD 需求追踪](requirements.md) — 全目标实施中，D 补充筛选、成就与挑战
+- [完整 PRD 需求追踪](requirements.md) — 全目标实施中，当前 F 自部署制品及版本题目反馈已验证
 - [RFC-006：阶段 B/C 的完整产品实施](rfcs/006-complete-product.md) — 实施中
 - [RFC-007：多语言练习、本地工具、中英界面与公开作品](rfcs/007-b2-practice-and-sharing.md) — B2 本地验收通过
 - [RFC-008：个人博客](rfcs/008-personal-blogs.md)
@@ -12,6 +12,7 @@
 - [RFC-011：学习规划与可选 AI 提示](rfcs/011-intelligent-learning.md)
 - [RFC-012：挑战活动、私有成就与完整题型发现](rfcs/012-challenges-achievements-and-discovery.md)
 - [RFC-013：有状态 Python 库/API 实践](rfcs/013-object-api-practice.md)
+- [RFC-014：绑定版本的题目反馈](rfcs/014-versioned-problem-feedback.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)
 - [可选自部署模型与本地 CPU 重放](local-coaching.md)
@@ -51,5 +52,6 @@
 - [D 完整筛选、挑战与成就验收](acceptance-d.md)
 - [D3 Docker 资源能力预检与固定镜像验收](acceptance-d3.md)
 - [E 有状态类/API 验收](acceptance-e.md)
+- [F 版本题目反馈与自部署升级验收](acceptance-f.md)
 
 修改核心边界时，先更新 RFC 的候选方案/风险，再追加或替代 ADR；保留旧决策及替代链接。验收记录必须区分单元测试、真实沙箱测试、本地体验和公开部署。

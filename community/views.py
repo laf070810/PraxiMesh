@@ -192,7 +192,9 @@ def post_edit(request, pk=None):
         "community/edit.html",
         {
             "form": form,
-            "heading": gettext("编辑内容") if post else gettext("写讨论、提问、题解或博文"),
+            "heading": gettext("编辑内容")
+            if post
+            else gettext("写讨论、提问、题解、博文或题目反馈"),
         },
         status=400 if request.method == "POST" else 200,
     )
@@ -396,8 +398,17 @@ def moderation(request):
     }
     if kind not in queries:
         raise Http404
+    post_kind = request.GET.get("post_kind", "")
+    if post_kind:
+        if kind != "post" or post_kind not in Post.Kind.values:
+            raise Http404
+        queries["post"] = queries["post"].filter(kind=post_kind)
     return render(
         request,
         "community/moderation.html",
-        {"kind": kind, "page": Paginator(queries[kind], 20).get_page(request.GET.get("page"))},
+        {
+            "kind": kind,
+            "post_kind": post_kind,
+            "page": Paginator(queries[kind], 20).get_page(request.GET.get("page")),
+        },
     )
