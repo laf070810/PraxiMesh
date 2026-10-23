@@ -8,7 +8,7 @@
 
 社区包含主动送审的题解、讨论和博客；公开主页与普通题型榜单需要本人选择分享。组织课程固定题目版本，第三方题库经过独立审核并由维护者发布。学习规划和综合证据不依赖模型；可选 AI 提示需逐次预览并确认输入，不能修改正式成绩。
 
-阶段 A/B 已通过真实 PostgreSQL/WASI、HTTPS 浏览器与冻结镜像升级验收，见 [B1](docs/acceptance-b1.md) 和 [B2](docs/acceptance-b2.md)。C 的专业评测、组织与智能学习也已完成本地联合验收，范围见 [C 验收](docs/acceptance-c.md)。完整筛选、私有成就及挑战活动已通过真实 HTTPS、冻结镜像和 C→D 升级验收，见 [D 验收](docs/acceptance-d.md)；全部范围与外部待办见[需求追踪](docs/requirements.md)。
+阶段 A/B 已通过真实 PostgreSQL/WASI、HTTPS 浏览器与冻结镜像升级验收，见 [B1](docs/acceptance-b1.md) 和 [B2](docs/acceptance-b2.md)。C 的专业评测、组织与智能学习也已完成本地联合验收，范围见 [C 验收](docs/acceptance-c.md)。完整筛选、私有成就及挑战活动已通过真实 HTTPS、冻结镜像和 C→D 升级验收，见 [D 验收](docs/acceptance-d.md)；后续 Docker 能力预检修正及最新固定镜像见 [D3 验收](docs/acceptance-d3.md)；全部范围与外部待办见[需求追踪](docs/requirements.md)。
 
 ## 本地体验
 

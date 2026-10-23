@@ -118,8 +118,8 @@ class DockerSandbox:
         runtime = info.get("Runtimes", {}).get("runsc", {})
         if Path(runtime.get("path", "")).name != "runsc":
             raise SandboxUnavailable("A runsc runtime must be registered by the operator.")
-        for feature in ("MemoryLimit", "SwapLimit", "PidsLimit", "CPUCfsQuota"):
-            if not info.get(feature):
+        for feature in ("MemoryLimit", "SwapLimit", "PidsLimit", "CpuCfsQuota"):
+            if info.get(feature) is not True:
                 raise SandboxUnavailable(f"Required resource controller unavailable: {feature}")
         image_info = json.loads(self.command(["image", "inspect", self.image]))[0]
         requested_digest = self.image.rsplit("@", 1)[1]

@@ -105,7 +105,7 @@ def test_preflight_accepts_normalized_docker_repo_digest(monkeypatch):
         "MemoryLimit": True,
         "SwapLimit": True,
         "PidsLimit": True,
-        "CPUCfsQuota": True,
+        "CpuCfsQuota": True,
     }
     image_info = [
         {
@@ -118,6 +118,31 @@ def test_preflight_accepts_normalized_docker_repo_digest(monkeypatch):
     responses = iter([json.dumps(info).encode(), json.dumps(image_info).encode()])
     monkeypatch.setattr(sandbox, "command", lambda *a, **kw: next(responses))
     assert sandbox.preflight()["image"] == sandbox.image
+
+
+@pytest.mark.parametrize("feature", ["MemoryLimit", "SwapLimit", "PidsLimit", "CpuCfsQuota"])
+@pytest.mark.parametrize("reported", [False, None, "true", 1, "missing"])
+def test_preflight_requires_explicit_boolean_resource_capability(monkeypatch, feature, reported):
+    sandbox = DockerSandbox("python@sha256:" + "a" * 64)
+    info = {
+        "Runtimes": {"runsc": {"path": "/usr/local/bin/runsc"}},
+        "MemoryLimit": True,
+        "SwapLimit": True,
+        "PidsLimit": True,
+        "CpuCfsQuota": True,
+    }
+    if reported == "missing":
+        del info[feature]
+    else:
+        info[feature] = reported
+    # The obsolete spelling must never stand in for a missing/disabled quota.
+    info["CPUCfsQuota"] = True
+    command = Mock(return_value=json.dumps(info).encode())
+    monkeypatch.setattr(sandbox, "command", command)
+    with pytest.raises(SandboxUnavailable, match=feature):
+        sandbox.preflight()
+    # Failure must precede inspecting an image or creating an execution container.
+    command.assert_called_once_with(["info", "--format", "{{json .}}"], timeout=10)
 
 
 def test_deleted_job_does_not_crash_worker(catalog, user, settings, monkeypatch):

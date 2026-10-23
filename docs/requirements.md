@@ -39,3 +39,5 @@
 
 - C：固定镜像首次安装、B2→C schema 升级、真实失败迁移恢复及隔离源码 HTTPS 联合验收通过；原始全回归的两处失败与针对性修复分别记录，详见 [C 验收](acceptance-c.md)。
 - D：按 PRD §3.3/§7.2 补齐筛选、成就及挑战。修正发布前 PostgreSQL 约束名称冲突后，212 项 PG 检查通过；普通全回归中的 socket 环境失败已全部重放通过，HTTPS、新冻结制品和 C→D 升级通过，详见 [D 验收](acceptance-d.md)。设计见 [RFC-012](rfcs/012-challenges-achievements-and-discovery.md)。
+
+- D3：修正 Docker CPU 配额能力识别，114 项定向回归和新固定镜像的 123 个真实探针/全部浏览器流程通过。实际宿主可见 GPU，但缺少已验收的执行隔离与 CPU 配额能力；完整边界见 [D3 验收](acceptance-d3.md)。

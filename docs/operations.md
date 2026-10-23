@@ -56,6 +56,8 @@ Web 的数据库权限限制为知识/题目/健康记录只读，以及账号�
 
 执行节点必须是专用、可销毁的 Linux 节点，不承载其他用户业务；运行时维护者参考 [gVisor 官方安装说明](https://gvisor.dev/docs/user_guide/install/) 安装受支持版本，并按 [Docker 集成文档](https://gvisor.dev/docs/user_guide/quick_start/docker/) 注册 `runsc`。本项目不自动修改宿主 Docker 配置或重启共享 daemon。记录 runsc 二进制校验、版本、Docker/内核版本、CPU 型号和 cgroup 配置，检查资源限制可用。
 
+预检要求 Docker `info` 的 `MemoryLimit`、`SwapLimit`、`PidsLimit` 和 `CpuCfsQuota` 均为布尔值 `true`。Docker 的字段拼写是 `CpuCfsQuota`；缺失、关闭或非布尔值均拒绝，不能用其他拼写、普通容器或忽略 CPU 限额来绕过。检测到 NVIDIA 设备也不等于已经验证 GPU 执行隔离；gVisor 的 GPU 支持还涉及特定驱动和独立验收，见[官方 GPU 边界说明](https://gvisor.dev/docs/user_guide/gpu/)。
+
 初始 judge 镜像为干净的官方 Python 3.11 image（可使用 `deploy/images.env` 的 digest），**不能使用包含数据库配置/项目源码的 Web 镜像**。guest 只看到镜像、受限临时目录与当前测试输入。预期答案保留在 worker。
 
 在执行节点安装同版本项目依赖以及 Docker CLI。为 worker 创建数据库角色，仅授予：
