@@ -83,6 +83,8 @@ def preview(user, version_id, *, question, hint_level=0, include_source=False, s
     }
     if "function" in public:
         safe["function"] = public["function"]
+    if "interface" in public:
+        safe["interface"] = public["interface"]
     payload = {
         "language": "English" if (get_language() or "").startswith("en") else "简体中文",
         "problem": safe,

@@ -15,6 +15,7 @@ HEX64 = re.compile(r"[a-f0-9]{64}")
 VERDICTS = frozenset(LABELS) - {"internal_error"}
 SEQUENTIAL_EVALUATORS = {
     "python-function-v1": "python",
+    "python-object-api-v1": "python",
     "javascript-function-v1": "javascript",
     "python-stdio-v1": "python",
 }
@@ -39,6 +40,11 @@ def _verified(job, *, specialist=False):
         or not isinstance(job.version.data, dict)
     ):
         raise invalid
+    evaluator = job.version.data.get("evaluator")
+    object_api = evaluator == "python-object-api-v1"
+    if object_api and getattr(job, "budget_state", "legacy") == "legacy":
+        # This contract postdates the reservation ledger and has no legacy results.
+        raise invalid
     if getattr(job, "budget_state", "legacy") != "legacy":
         from core.resources import BUDGET_POLICY, reservation_units
 
@@ -50,7 +56,6 @@ def _verified(job, *, specialist=False):
             or job.budget_units != reservation_units(job.version, "submit")
         ):
             raise invalid
-    evaluator = job.version.data.get("evaluator")
     language = "python" if specialist else SEQUENTIAL_EVALUATORS.get(evaluator)
     if language is None or job.version.data.get("language") != language:
         raise invalid
@@ -72,7 +77,7 @@ def _verified(job, *, specialist=False):
         environment.get("language", language) != language
         or environment.get("evaluator", evaluator) != evaluator
         or (
-            specialist
+            (specialist or object_api)
             and (
                 environment.get("language") != language or environment.get("evaluator") != evaluator
             )

@@ -292,5 +292,39 @@
       "mistake": "抄写公开正确数字并伪造 state，跳过环境要求的真实读取",
       "source": "def act(observation, state):\n    return {\"tool\": \"submit_report\", \"args\": {\"total\": 105, \"count\": 3}, \"state\": {\"listed\": True, \"read_all\": True}}\n"
     }
+  ],
+  "bounded-queue-api": [
+    {
+      "mistake": "把队列实现为后进先出栈",
+      "source": "class BoundedQueue:\n    def __init__(self, capacity):\n        self._capacity = capacity\n        self._values = []\n\n    def put(self, value):\n        if len(self._values) >= self._capacity:\n            raise OverflowError()\n        self._values.append(value)\n        return None\n\n    def get(self):\n        if not self._values:\n            raise IndexError()\n        return self._values.pop()\n\n    def peek(self):\n        if not self._values:\n            raise IndexError()\n        return self._values[0]\n\n    def size(self):\n        return len(self._values)\n"
+    },
+    {
+      "mistake": "实例共享同一份类状态",
+      "source": "class BoundedQueue:\n    def __init__(self, capacity):\n        self._capacity = capacity\n        type(self)._values = []\n\n    def put(self, value):\n        if len(type(self)._values) >= self._capacity:\n            raise OverflowError()\n        type(self)._values.append(value)\n        return None\n\n    def get(self):\n        if not type(self)._values:\n            raise IndexError()\n        return type(self)._values.pop(0)\n\n    def peek(self):\n        if not type(self)._values:\n            raise IndexError()\n        return type(self)._values[0]\n\n    def size(self):\n        return len(type(self)._values)\n"
+    },
+    {
+      "mistake": "空队列抛出错误的异常类型",
+      "source": "class BoundedQueue:\n    def __init__(self, capacity):\n        self._capacity = capacity\n        self._values = []\n\n    def put(self, value):\n        if len(self._values) >= self._capacity:\n            raise OverflowError()\n        self._values.append(value)\n        return None\n\n    def get(self):\n        if not self._values:\n            raise ValueError()\n        return self._values.pop(0)\n\n    def peek(self):\n        if not self._values:\n            raise ValueError()\n        return self._values[0]\n\n    def size(self):\n        return len(self._values)\n"
+    },
+    {
+      "mistake": "容量判断多允许一个元素",
+      "source": "class BoundedQueue:\n    def __init__(self, capacity):\n        self._capacity = capacity\n        self._values = []\n\n    def put(self, value):\n        if len(self._values) > self._capacity:\n            raise OverflowError()\n        self._values.append(value)\n        return None\n\n    def get(self):\n        if not self._values:\n            raise IndexError()\n        return self._values.pop(0)\n\n    def peek(self):\n        if not self._values:\n            raise IndexError()\n        return self._values[0]\n\n    def size(self):\n        return len(self._values)\n"
+    },
+    {
+      "mistake": "peek 错误地移除队首",
+      "source": "class BoundedQueue:\n    def __init__(self, capacity):\n        self._capacity = capacity\n        self._values = []\n\n    def put(self, value):\n        if len(self._values) >= self._capacity:\n            raise OverflowError()\n        self._values.append(value)\n        return None\n\n    def get(self):\n        if not self._values:\n            raise IndexError()\n        return self._values.pop(0)\n\n    def peek(self):\n        if not self._values:\n            raise IndexError()\n        return self._values.pop(0)\n\n    def size(self):\n        return len(self._values)\n"
+    },
+    {
+      "mistake": "get 返回布尔值而不是整数元素",
+      "source": "class BoundedQueue:\n    def __init__(self, capacity):\n        self._capacity = capacity\n        self._values = []\n\n    def put(self, value):\n        if len(self._values) >= self._capacity:\n            raise OverflowError()\n        self._values.append(value)\n        return None\n\n    def get(self):\n        if not self._values:\n            raise IndexError()\n        return bool(self._values.pop(0))\n\n    def peek(self):\n        if not self._values:\n            raise IndexError()\n        return self._values[0]\n\n    def size(self):\n        return len(self._values)\n"
+    },
+    {
+      "mistake": "size 返回容量而不是当前长度",
+      "source": "class BoundedQueue:\n    def __init__(self, capacity):\n        self._capacity = capacity\n        self._values = []\n\n    def put(self, value):\n        if len(self._values) >= self._capacity:\n            raise OverflowError()\n        self._values.append(value)\n        return None\n\n    def get(self):\n        if not self._values:\n            raise IndexError()\n        return self._values.pop(0)\n\n    def peek(self):\n        if not self._values:\n            raise IndexError()\n        return self._values[0]\n\n    def size(self):\n        return self._capacity\n"
+    },
+    {
+      "mistake": "put 返回放入的值而不是 None",
+      "source": "class BoundedQueue:\n    def __init__(self, capacity):\n        self._capacity = capacity\n        self._values = []\n\n    def put(self, value):\n        if len(self._values) >= self._capacity:\n            raise OverflowError()\n        self._values.append(value)\n        return value\n\n    def get(self):\n        if not self._values:\n            raise IndexError()\n        return self._values.pop(0)\n\n    def peek(self):\n        if not self._values:\n            raise IndexError()\n        return self._values[0]\n\n    def size(self):\n        return len(self._values)\n"
+    }
   ]
 }

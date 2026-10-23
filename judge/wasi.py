@@ -116,7 +116,12 @@ class WasiSandbox:
             "python": PYTHON_VERSION,
             "quickjs": QUICKJS_VERSION,
             "languages": list(LANGUAGES),
-            "evaluators": ["python-function-v1", "javascript-function-v1", "python-stdio-v1"],
+            "evaluators": [
+                "python-function-v1",
+                "javascript-function-v1",
+                "python-stdio-v1",
+                "python-object-api-v1",
+            ],
             "wasmtime": version,
             "wasmtime_library": self.runtime_digest,
             "driver_python": platform.python_version(),
@@ -127,6 +132,15 @@ class WasiSandbox:
 
     def execute(self, source, function, args):
         return self._execute(source, function, args, "python")
+
+    def execute_api(self, source, interface, operations):
+        from judge.object_api import DRIVER, ENTRYPOINT, validate_request
+
+        try:
+            validate_request(source, interface, operations)
+        except (ValueError, TypeError, OverflowError, RecursionError) as exc:
+            raise SandboxUnavailable("Invalid Python object API request.") from exc
+        return self._execute(DRIVER, ENTRYPOINT, [source, interface, operations], "python")
 
     def execute_javascript(self, source, function, args):
         from judge.javascript import validate_request

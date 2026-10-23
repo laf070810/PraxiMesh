@@ -13,6 +13,7 @@ BUDGET_POLICY = "cpu-invocations-v1"
 # separate compile and execution calls; content cannot override these costs.
 CALLS_PER_CASE = {
     "python-function-v1": 1,
+    "python-object-api-v1": 1,
     "javascript-function-v1": 1,
     "python-stdio-v1": 2,
     "python-ml-linear-v1": 1,

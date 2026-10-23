@@ -1,5 +1,6 @@
 from judge.agent import python_agent_tools_v1
 from judge.ml import python_ml_linear_v1
+from judge.object_api import python_object_api_v1
 from judge.results import LABELS, matches
 from judge.scientific import python_weighted_fit_v1
 
@@ -60,6 +61,7 @@ def function_v1(version, source, mode, execute, on_case, program=False):
 EVALUATORS = {
     "python-agent-tools-v1": python_agent_tools_v1,
     "python-function-v1": python_function_v1,
+    "python-object-api-v1": python_object_api_v1,
     "javascript-function-v1": javascript_function_v1,
     "python-stdio-v1": python_stdio_v1,
     "python-ml-linear-v1": python_ml_linear_v1,

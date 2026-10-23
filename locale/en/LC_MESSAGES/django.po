@@ -3346,3 +3346,24 @@ msgstr "Pass all pinned tasks within the required window of an activity revision
 
 msgid "活动标题与任务说明由发布者提供，不随界面语言自动翻译。"
 msgstr "Activity titles and task descriptions are provided by the publisher and are not automatically translated with the interface language."
+
+msgid "Python 库/API"
+msgstr "Python library/API"
+
+msgid "调用序列："
+msgstr "Call sequence:"
+
+msgid "预期返回值或异常："
+msgstr "Expected return values or exceptions:"
+
+msgid "按顺序验证构造和方法调用的返回值与内置异常类型，多个实例必须保持独立。异常消息不参与评分。"
+msgstr "Constructor and method calls are checked in order for return values and built-in exception types. Instances must remain independent. Exception messages are not graded."
+
+msgid "实现场景中的类与方法；同一场景保留实例状态，场景之间重置。"
+msgstr "Implement the class and its methods. Instance state persists within a scenario and resets between scenarios."
+
+msgid "库/API 类"
+msgstr "Library/API class"
+
+msgid "定义 %(class_name)s 类及声明的方法 · Tab 可离开编辑区 · 草稿仅自己可见"
+msgstr "Define the %(class_name)s class and its declared methods · Tab leaves the editor · Drafts are private"

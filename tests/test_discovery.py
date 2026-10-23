@@ -12,6 +12,7 @@ pytestmark = pytest.mark.django_db
         ("python-ml-linear-v1", "train-linear-model"),
         ("python-weighted-fit-v1", "weighted-line-fit"),
         ("python-agent-tools-v1", "approved-ledger-report"),
+        ("python-object-api-v1", "bounded-queue-api"),
     ],
 )
 def test_specialist_contract_is_selectable_and_does_not_leak_hidden_content(

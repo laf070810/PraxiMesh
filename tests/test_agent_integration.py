@@ -184,7 +184,8 @@ def test_inconsistent_or_private_agent_trace_is_not_progress(version, user, dama
 def test_all_professional_probes_are_part_of_receipt_identity():
     identity = {"policy": "wasi-functions-v2"}
     probes = probes_for(identity)
-    assert len(probes) == 123
+    assert len(probes) == 129
+    assert len([p for p in probes if p[0].startswith("api/")]) == 6
     assert len([p for p in probes if p[0].startswith("agent/")]) == 16
     assert {p[0] for p in probes if p[0].startswith(("ml/", "science/"))} == {
         "ml/reference",
@@ -217,7 +218,7 @@ def test_receipt_without_any_specialist_group_cannot_start_worker(settings, tmp_
     path = tmp_path / "receipt.json"
     settings.JUDGE_RECEIPT = str(path)
     names = [probe[0] for probe in probes_for(identity)]
-    for group in ("agent/", "ml/", "science/"):
+    for group in ("agent/", "ml/", "science/", "api/"):
         path.write_text(
             json.dumps(
                 {

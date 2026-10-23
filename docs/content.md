@@ -10,20 +10,21 @@
 
 ## 一道题的完整契约
 
-每题必须有任务、输入/输出/约束、目标、知识点、难度、语言、起始代码、参考实现、提示、公开和受保护测试、比较规则、修订说明、署名和授权来源。整个内容包最多 5 MB；用例应覆盖普通输入、声明上限、关键边界和典型错误。当前六种评测器的调用与测试数据不同：
+每题必须有任务、输入/输出/约束、目标、知识点、难度、语言、起始代码、参考实现、提示、公开和受保护测试、比较规则、修订说明、署名和授权来源。整个内容包最多 5 MB；用例应覆盖普通输入、声明上限、关键边界和典型错误。当前七种评测器的调用与测试数据不同：
 
 | evaluator | 语言与执行契约 | 正式测试数量 |
 | --- | --- | --- |
 | `python-function-v1` | Python；声明 `function`，用例为 JSON `args` 与 `expected` | 4–20 |
 | `javascript-function-v1` | JavaScript；同步 JSON 函数，声明 `function`，用例为 `args` 与 `expected` | 4–20 |
 | `python-stdio-v1` | Python 完整程序；声明 `output_format: "json"`，用例为 `stdin` 与 `expected`，不声明 `function` | 4–20 |
+| `python-object-api-v1` | Python 类；声明 `interface`，用例为构造/方法 `operations` 与逐项 `expected`，场景内保持实例状态 | 2–20 |
 | `python-ml-linear-v1` | Python 训练函数；接收训练特征/标签，返回权重与偏置，控制器在独立留出数据上计算 MSE/MAE | 2–8 |
 | `python-weighted-fit-v1` | Python 拟合函数；接收 x/y/sigma，返回参数与协方差，控制器核对加权拟合与公开诊断 | 2–8 |
 | `python-agent-tools-v1` | Python `act(observation, state)`；固定账本工具与资源策略，控制器验证实际动作和最终报告 | 2–8 episodes |
 
 所有正式题目必须同时含公开与受保护场景，测试名称不能重复。函数和完整程序用例的输入 UTF-8 JSON 最多 100,000 字节，预期结果的 ASCII 转义 JSON 最多 32,000 字节；`numeric` 必须显式声明绝对/相对容差。专业题型使用各自严格的数据、指标和资源字段，不能上传 checker 或自报分数；ML/科学数据集声明稳定 ID、revision、seed 与内容 digest。所有类型拒绝非有限数值。
 
-完整字段和边界以 [JSON Schema](../content/schema.json)、[ML 验证器](../judge/ml.py)、[科学计算验证器](../judge/scientific.py)为准。调用、反馈与资源语义见[WASI 指南](wasi.md)、[完整程序契约](stdio-contract.md)、[Agent 契约](agent-contract.md)和[专业评测设计](rfcs/010-specialist-evaluation.md)。六种评测器均支持 WASI；保留的 gVisor 后端只支持 Python JSON 函数。
+完整字段和边界以 [JSON Schema](../content/schema.json)、[ML 验证器](../judge/ml.py)、[科学计算验证器](../judge/scientific.py)为准。调用、反馈与资源语义见[WASI 指南](wasi.md)、[完整程序契约](stdio-contract.md)、[类/API 契约](object-api-contract.md)、[Agent 契约](agent-contract.md)和[专业评测设计](rfcs/010-specialist-evaluation.md)。七种评测器均支持 WASI；保留的 gVisor 后端只支持 Python JSON 函数。
 
 Python/JavaScript 函数模式只支持 JSON 参数和 JSON 返回值。题页显示实际后端支持的标准库边界，无网络或第三方包。JSON 不表达 tuple、集合、自定义对象。`exact` 要求数值类型一致（布尔不等于整数）；`numeric` 允许 int/float 在容差内相等，仍检查形状、键和有限性。
 

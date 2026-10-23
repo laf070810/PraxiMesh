@@ -7,6 +7,7 @@ from core.resources import reservation_units
 
 EVALUATORS = {
     "python-function-v1": _("Python 函数"),
+    "python-object-api-v1": _("Python 库/API"),
     "javascript-function-v1": _("JavaScript 函数"),
     "python-stdio-v1": _("Python 完整程序"),
     "python-ml-linear-v1": _("ML 训练"),

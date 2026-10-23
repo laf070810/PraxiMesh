@@ -272,7 +272,8 @@
             "python-stdio-v1",
             "python-ml-linear-v1",
             "python-weighted-fit-v1",
-            "python-agent-tools-v1"
+            "python-agent-tools-v1",
+            "python-object-api-v1"
           ]
         },
         "function": {
@@ -312,6 +313,9 @@
               },
               {
                 "$ref": "#/$defs/agent_case"
+              },
+              {
+                "$ref": "#/$defs/api_case"
               }
             ]
           }
@@ -383,6 +387,63 @@
             },
             "resource_profile": {
               "const": "wasi-agent-v1"
+            }
+          }
+        },
+        "interface": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "class_name",
+            "constructor_arity",
+            "methods"
+          ],
+          "properties": {
+            "class_name": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Za-z0-9_]{0,59}$"
+            },
+            "constructor_arity": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 8
+            },
+            "methods": {
+              "type": "object",
+              "minProperties": 1,
+              "maxProperties": 16,
+              "propertyNames": {
+                "pattern": "^[a-z][a-z0-9_]{0,39}$"
+              },
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "arity",
+                  "raises"
+                ],
+                "properties": {
+                  "arity": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 8
+                  },
+                  "raises": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {
+                      "enum": [
+                        "IndexError",
+                        "KeyError",
+                        "ValueError",
+                        "TypeError",
+                        "OverflowError",
+                        "ZeroDivisionError"
+                      ]
+                    }
+                  }
+                }
+              }
             }
           }
         }
@@ -678,6 +739,75 @@
               ]
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "evaluator": {
+                "const": "python-object-api-v1"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "interface"
+            ],
+            "properties": {
+              "language": {
+                "const": "python"
+              },
+              "comparison": {
+                "const": {
+                  "kind": "exact",
+                  "absolute": 0,
+                  "relative": 0
+                }
+              },
+              "tests": {
+                "minItems": 4,
+                "maxItems": 20,
+                "items": {
+                  "$ref": "#/$defs/api_case"
+                }
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "function"
+                  ]
+                },
+                {
+                  "required": [
+                    "output_format"
+                  ]
+                },
+                {
+                  "required": [
+                    "model_kind"
+                  ]
+                },
+                {
+                  "required": [
+                    "uncertainty_model"
+                  ]
+                },
+                {
+                  "required": [
+                    "assessment"
+                  ]
+                }
+              ]
+            }
+          },
+          "else": {
+            "not": {
+              "required": [
+                "interface"
+              ]
+            }
+          }
         }
       ]
     },
@@ -937,6 +1067,42 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "api_case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "public",
+        "operations",
+        "expected"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "public": {
+          "type": "boolean"
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 64,
+          "items": {
+            "type": "object"
+          }
+        },
+        "expected": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 64,
+          "items": {
+            "type": "object"
           }
         }
       }

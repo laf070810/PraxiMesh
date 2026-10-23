@@ -49,6 +49,15 @@ def test_every_reference_and_constant_mutant(package):
             if problem["language"] == "javascript"
             else "print('null')"
             if problem["evaluator"] == "python-stdio-v1"
+            else (
+                f"class {problem['interface']['class_name']}:\n"
+                " def __init__(self, *args): pass\n"
+                + "".join(
+                    f" def {name}(self, *args): return None\n"
+                    for name in problem["interface"]["methods"]
+                )
+            )
+            if problem["evaluator"] == "python-object-api-v1"
             else f"def {problem['function']}(*args): return None"
         )
         mutant = evaluate(problem, source, "submit", sandbox)

@@ -194,7 +194,10 @@ def test_specialist_poll_interval_retry_scope_and_deadline(monkeypatch, mode):
 
 
 @pytest.mark.parametrize("failure", [None, "browser_blogs", "browser_specialists", "organization"])
-def test_advanced_artifacts_failure_cleanup_and_import_path(monkeypatch, tmp_path, failure):
+@pytest.mark.parametrize("include_api", [False, True])
+def test_advanced_artifacts_failure_cleanup_and_import_path(
+    monkeypatch, tmp_path, failure, include_api
+):
     artifacts = tmp_path / "cohort"
     artifacts.mkdir()
     receipts = (
@@ -202,6 +205,7 @@ def test_advanced_artifacts_failure_cleanup_and_import_path(monkeypatch, tmp_pat
         "blogs-browser.json",
         "organizations-browser.json",
         "coaching-browser.json",
+        "object-api-browser.json",
     )
     for name in receipts:
         (artifacts / name).write_text('{"passed":true}')
@@ -239,15 +243,19 @@ def test_advanced_artifacts_failure_cleanup_and_import_path(monkeypatch, tmp_pat
     )
     if failure:
         with pytest.raises((subprocess.TimeoutExpired, RuntimeError)):
-            advanced_browsers.run_advanced_browsers({"BROWSER_JUDGE": "1"}, owner, artifacts)
+            advanced_browsers.run_advanced_browsers(
+                {"BROWSER_JUDGE": "1"}, owner, artifacts, include_object_api=include_api
+            )
     else:
-        result = advanced_browsers.run_advanced_browsers({"BROWSER_JUDGE": "1"}, owner, artifacts)
+        result = advanced_browsers.run_advanced_browsers(
+            {"BROWSER_JUDGE": "1"}, owner, artifacts, include_object_api=include_api
+        )
         assert result["journeys"] == [
             "browser_specialists",
             "browser_blogs",
             "browser_organizations",
             "browser_coaching",
-        ]
+        ] + (["browser_object_api"] if include_api else [])
     assert cleaned == ([] if failure == "browser_specialists" else [credentials])
     assert sys.path == original_path
 

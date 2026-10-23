@@ -1365,6 +1365,101 @@
       ],
       "license": "LicenseRef-Pending-Maintainer-Approval",
       "attribution": "PraxiMesh 原创练习草案，2026-10-23；正式公开授权待维护者确认。"
+    },
+    {
+      "domains": [
+        "programming",
+        "algorithms"
+      ],
+      "topics": [
+        "python-basics",
+        "search-data"
+      ],
+      "concepts": [],
+      "outcomes": [
+        "按构造与方法序列追踪对象状态。",
+        "区分实例状态、类共享状态和接口异常。"
+      ],
+      "aliases": [
+        "Object API Contract"
+      ],
+      "relations": [
+        {
+          "kind": "recommended",
+          "target": "functions"
+        },
+        {
+          "kind": "recommended",
+          "target": "sequences"
+        }
+      ],
+      "steps": [],
+      "license": "LicenseRef-Pending-Maintainer-Approval",
+      "attribution": "PraxiMesh 原创示例，2026-10-24；正式公开授权待维护者确认。",
+      "id": "object-api-contracts",
+      "kind": "concept",
+      "title": "对象状态与 API 契约",
+      "summary": "把对象的构造、方法、返回值、异常和状态变化一起视作接口。",
+      "body": "函数调用关注一次输入与输出；有状态对象还要保证前一次操作对后一次操作的影响。每个实例应拥有自己的状态，除非接口明确规定共享。\n\n接口契约至少包含构造参数、方法参数、成功返回值、失败异常和失败后的状态。例如，满队列的 put 需要抛出 OverflowError，并保留原有元素；仅返回一个错误字符串不能代替规定异常。\n\n检查多个实例交错调用，可以发现误把实例数据放在类属性中的实现。检查失败后再次调用，可以发现先修改状态再检查边界的问题。通过一组行为测试仍不等于证明所有输入或渐近复杂度。"
+    },
+    {
+      "domains": [
+        "programming",
+        "algorithms"
+      ],
+      "topics": [
+        "python-basics",
+        "search-data"
+      ],
+      "concepts": [
+        "object-api-contracts",
+        "functions",
+        "sequences"
+      ],
+      "outcomes": [
+        "把接口说明转换为覆盖成功、失败和多实例的测试序列。"
+      ],
+      "aliases": [],
+      "relations": [],
+      "steps": [],
+      "license": "LicenseRef-Pending-Maintainer-Approval",
+      "attribution": "PraxiMesh 原创示例，2026-10-24；正式公开授权待维护者确认。",
+      "id": "tutorial-object-interfaces",
+      "kind": "tutorial",
+      "title": "从函数结果走向对象接口",
+      "summary": "用小型计数器理解实例状态，再为队列列出行为检查表。",
+      "body": "一、实例保存什么\nclass Counter:\n    def __init__(self, initial):\n        self.value = initial\n    def add(self, amount):\n        self.value += amount\n        return self.value\n\na = Counter(1)\nb = Counter(10)\na.add(2) 返回 3；b.value 仍是 10。self.value 属于当前实例。不要把两个对象的数据都写到同一个类属性中。\n\n二、把失败也写进契约\n有界队列达到容量时，put 应抛出约定异常，不能悄悄删除旧元素。失败后再查看大小和队首，能够验证原状态是否保留。\n\n三、为操作排序\n先检查新实例为空，再放入两个不同元素、查看队首、取出并核对顺序。随后检查空队列、满队列、重复元素、交错构造的两个实例和取空后复用。peek 与 get 的返回值可能相同，但只有 get 移除元素。\n\n四、选择自己的实现\n可以用列表、标准库容器或自己维护索引。当前练习验证声明的可见接口行为，不依据小样本运行时间声称某种渐近复杂度。可以跳过本文直接做题。"
+    },
+    {
+      "domains": [
+        "programming",
+        "algorithms"
+      ],
+      "topics": [
+        "python-basics",
+        "search-data"
+      ],
+      "concepts": [],
+      "outcomes": [],
+      "aliases": [],
+      "relations": [],
+      "steps": [
+        {
+          "kind": "tutorial",
+          "target": "tutorial-object-interfaces"
+        },
+        {
+          "kind": "problem",
+          "target": "bounded-queue-api"
+        }
+      ],
+      "license": "LicenseRef-Pending-Maintainer-Approval",
+      "attribution": "PraxiMesh 原创示例，2026-10-24；正式公开授权待维护者确认。",
+      "id": "python-object-api-path",
+      "kind": "path",
+      "title": "Python：对象与可验证接口",
+      "summary": "从实例状态和异常契约，走到可交错调用的有界队列类。",
+      "body": "一篇教程和一道有状态 API 练习。可直接进入练习；进度只记录正式通过，不把阅读或一次通过称为完全掌握。"
     }
   ],
   "problems": [
@@ -56821,6 +56916,1595 @@
       "changelog": "首次发布：明确三种工具的精确参数、真实读取前置条件、显式状态及六轮预算；覆盖批准与金额符号、空批准集合、四条记录和整数/ID上限。",
       "license": "LicenseRef-Pending-Maintainer-Approval",
       "attribution": "PraxiMesh 原创练习草案，2026-10-23；正式公开授权待维护者确认。"
+    },
+    {
+      "id": "bounded-queue-api",
+      "revision": 1,
+      "title": "实现有界队列的对象 API",
+      "summary": "实现独立实例、FIFO 顺序和明确异常，使调用者能依赖同一套接口。",
+      "statement": "实现 Python 类 BoundedQueue。\n\nBoundedQueue(capacity)：创建空队列，容量为 capacity。每个实例的数据独立。\nput(value)：将整数放到队尾，成功返回 None；如果已满，抛出 OverflowError，保持队列不变。\nget()：移除并返回最早放入的元素；为空时抛出 IndexError，状态不变。\npeek()：返回队首元素但不移除；为空时抛出 IndexError，状态不变。\nsize()：返回当前元素数量，必须是整数。\n\n同一场景会对同一实例多次调用，也会交错使用多个实例。异常只检查规定的内置异常类型，不检查消息。定义类即可，不读取标准输入、不自行打印结果。只验证上述可见行为，不限定内部容器或声称复杂度测试。",
+      "constraints": "capacity 为 1–8 的整数；value 为 −1,000,000 到 1,000,000 的整数。每个场景 2–64 个构造/调用操作，最多 8 个实例；构造的名称不重复，只调用已有实例和上述方法。场景之间对象状态重置。样例中 value 表示返回值，raises 表示预期异常类型。",
+      "outcomes": [
+        "实现有界 FIFO 队列的类接口。",
+        "保持多个实例独立，并保证失败操作不改变状态。"
+      ],
+      "concepts": [
+        "object-api-contracts",
+        "sequences"
+      ],
+      "difficulty": "基础",
+      "language": "python",
+      "evaluator": "python-object-api-v1",
+      "interface": {
+        "class_name": "BoundedQueue",
+        "constructor_arity": 1,
+        "methods": {
+          "put": {
+            "arity": 1,
+            "raises": [
+              "OverflowError"
+            ]
+          },
+          "get": {
+            "arity": 0,
+            "raises": [
+              "IndexError"
+            ]
+          },
+          "peek": {
+            "arity": 0,
+            "raises": [
+              "IndexError"
+            ]
+          },
+          "size": {
+            "arity": 0,
+            "raises": []
+          }
+        }
+      },
+      "starter": "class BoundedQueue:\n    def __init__(self, capacity):\n        # 为这个实例保存容量和独立的数据状态。\n        pass\n\n    def put(self, value):\n        pass\n\n    def get(self):\n        pass\n\n    def peek(self):\n        pass\n\n    def size(self):\n        pass\n",
+      "reference": "class BoundedQueue:\n    def __init__(self, capacity):\n        self._capacity = capacity\n        self._values = []\n\n    def put(self, value):\n        if len(self._values) >= self._capacity:\n            raise OverflowError()\n        self._values.append(value)\n        return None\n\n    def get(self):\n        if not self._values:\n            raise IndexError()\n        return self._values.pop(0)\n\n    def peek(self):\n        if not self._values:\n            raise IndexError()\n        return self._values[0]\n\n    def size(self):\n        return len(self._values)\n",
+      "hints": [
+        "先列出每个方法成功和失败后的队列内容与长度。",
+        "容量和数据应属于当前实例；先检查空/满，再修改状态。",
+        "用两个不同容量的实例交错测试，确认构造新实例不会清空旧实例。"
+      ],
+      "tests": [
+        {
+          "name": "FIFO 顺序与不移除的 peek",
+          "public": true,
+          "operations": [
+            {
+              "new": "q",
+              "args": [
+                2
+              ]
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                7
+              ]
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                -3
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "size",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "size",
+              "args": []
+            }
+          ],
+          "expected": [
+            {
+              "value": null
+            },
+            {
+              "value": null
+            },
+            {
+              "value": null
+            },
+            {
+              "value": 7
+            },
+            {
+              "value": 2
+            },
+            {
+              "value": 7
+            },
+            {
+              "value": -3
+            },
+            {
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "空队列、满队列与失败后的状态",
+          "public": true,
+          "operations": [
+            {
+              "new": "q",
+              "args": [
+                1
+              ]
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                0
+              ]
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                99
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "size",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "size",
+              "args": []
+            }
+          ],
+          "expected": [
+            {
+              "value": null
+            },
+            {
+              "raises": "IndexError"
+            },
+            {
+              "raises": "IndexError"
+            },
+            {
+              "value": null
+            },
+            {
+              "raises": "OverflowError"
+            },
+            {
+              "value": 0
+            },
+            {
+              "value": 1
+            },
+            {
+              "value": 0
+            },
+            {
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "两个实例独立存储和容量",
+          "public": false,
+          "operations": [
+            {
+              "new": "left",
+              "args": [
+                2
+              ]
+            },
+            {
+              "new": "right",
+              "args": [
+                1
+              ]
+            },
+            {
+              "call": "left",
+              "method": "put",
+              "args": [
+                4
+              ]
+            },
+            {
+              "call": "right",
+              "method": "put",
+              "args": [
+                9
+              ]
+            },
+            {
+              "call": "left",
+              "method": "put",
+              "args": [
+                5
+              ]
+            },
+            {
+              "call": "left",
+              "method": "size",
+              "args": []
+            },
+            {
+              "call": "right",
+              "method": "size",
+              "args": []
+            },
+            {
+              "call": "right",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "left",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "left",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "right",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "left",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "left",
+              "method": "size",
+              "args": []
+            }
+          ],
+          "expected": [
+            {
+              "value": null
+            },
+            {
+              "value": null
+            },
+            {
+              "value": null
+            },
+            {
+              "value": null
+            },
+            {
+              "value": null
+            },
+            {
+              "value": 2
+            },
+            {
+              "value": 1
+            },
+            {
+              "value": 9
+            },
+            {
+              "value": 4
+            },
+            {
+              "value": 5
+            },
+            {
+              "raises": "IndexError"
+            },
+            {
+              "value": 5
+            },
+            {
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "容量一的多次复用",
+          "public": false,
+          "operations": [
+            {
+              "new": "q",
+              "args": [
+                1
+              ]
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                -2
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "size",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                -1
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "size",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                0
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "size",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                1
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "size",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                2
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "size",
+              "args": []
+            }
+          ],
+          "expected": [
+            {
+              "value": null
+            },
+            {
+              "value": null
+            },
+            {
+              "value": -2
+            },
+            {
+              "value": -2
+            },
+            {
+              "value": 0
+            },
+            {
+              "value": null
+            },
+            {
+              "value": -1
+            },
+            {
+              "value": -1
+            },
+            {
+              "value": 0
+            },
+            {
+              "value": null
+            },
+            {
+              "value": 0
+            },
+            {
+              "value": 0
+            },
+            {
+              "value": 0
+            },
+            {
+              "value": null
+            },
+            {
+              "value": 1
+            },
+            {
+              "value": 1
+            },
+            {
+              "value": 0
+            },
+            {
+              "value": null
+            },
+            {
+              "value": 2
+            },
+            {
+              "value": 2
+            },
+            {
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "容量八及重复和极值元素",
+          "public": false,
+          "operations": [
+            {
+              "new": "q",
+              "args": [
+                8
+              ]
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                1000000
+              ]
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                -1000000
+              ]
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                3
+              ]
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                3
+              ]
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                0
+              ]
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                -8
+              ]
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                42
+              ]
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                1
+              ]
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                22
+              ]
+            },
+            {
+              "call": "q",
+              "method": "size",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "size",
+              "args": []
+            }
+          ],
+          "expected": [
+            {
+              "value": null
+            },
+            {
+              "value": null
+            },
+            {
+              "value": null
+            },
+            {
+              "value": null
+            },
+            {
+              "value": null
+            },
+            {
+              "value": null
+            },
+            {
+              "value": null
+            },
+            {
+              "value": null
+            },
+            {
+              "value": null
+            },
+            {
+              "raises": "OverflowError"
+            },
+            {
+              "value": 8
+            },
+            {
+              "value": 1000000
+            },
+            {
+              "value": 1000000
+            },
+            {
+              "value": -1000000
+            },
+            {
+              "value": -1000000
+            },
+            {
+              "value": 3
+            },
+            {
+              "value": 3
+            },
+            {
+              "value": 3
+            },
+            {
+              "value": 3
+            },
+            {
+              "value": 0
+            },
+            {
+              "value": 0
+            },
+            {
+              "value": -8
+            },
+            {
+              "value": -8
+            },
+            {
+              "value": 42
+            },
+            {
+              "value": 42
+            },
+            {
+              "value": 1
+            },
+            {
+              "value": 1
+            },
+            {
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "交错进出时保持相对顺序",
+          "public": false,
+          "operations": [
+            {
+              "new": "q",
+              "args": [
+                3
+              ]
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                2
+              ]
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                0
+              ]
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                -4
+              ]
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                2
+              ]
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                7
+              ]
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                -4
+              ]
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "size",
+              "args": []
+            }
+          ],
+          "expected": [
+            {
+              "value": null
+            },
+            {
+              "value": null
+            },
+            {
+              "value": null
+            },
+            {
+              "value": 2
+            },
+            {
+              "value": null
+            },
+            {
+              "value": null
+            },
+            {
+              "raises": "OverflowError"
+            },
+            {
+              "value": 0
+            },
+            {
+              "value": null
+            },
+            {
+              "value": -4
+            },
+            {
+              "value": 2
+            },
+            {
+              "value": -4
+            },
+            {
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "失败调用与后来构造不能重置已有实例",
+          "public": false,
+          "operations": [
+            {
+              "new": "a",
+              "args": [
+                2
+              ]
+            },
+            {
+              "call": "a",
+              "method": "put",
+              "args": [
+                5
+              ]
+            },
+            {
+              "new": "b",
+              "args": [
+                3
+              ]
+            },
+            {
+              "call": "b",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "a",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "a",
+              "method": "size",
+              "args": []
+            },
+            {
+              "call": "b",
+              "method": "size",
+              "args": []
+            },
+            {
+              "call": "a",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "a",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "a",
+              "method": "size",
+              "args": []
+            },
+            {
+              "call": "b",
+              "method": "put",
+              "args": [
+                -6
+              ]
+            },
+            {
+              "call": "b",
+              "method": "get",
+              "args": []
+            }
+          ],
+          "expected": [
+            {
+              "value": null
+            },
+            {
+              "value": null
+            },
+            {
+              "value": null
+            },
+            {
+              "raises": "IndexError"
+            },
+            {
+              "value": 5
+            },
+            {
+              "value": 1
+            },
+            {
+              "value": 0
+            },
+            {
+              "value": 5
+            },
+            {
+              "raises": "IndexError"
+            },
+            {
+              "value": 0
+            },
+            {
+              "value": null
+            },
+            {
+              "value": -6
+            }
+          ]
+        },
+        {
+          "name": "完整六十四步状态序列",
+          "public": false,
+          "operations": [
+            {
+              "new": "q",
+              "args": [
+                1
+              ]
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                -10
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                -9
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                -8
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                -7
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                -6
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                -5
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                -4
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                -3
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                -2
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                -1
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                0
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                1
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                2
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                3
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                4
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                5
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                6
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                7
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                8
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                9
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "put",
+              "args": [
+                10
+              ]
+            },
+            {
+              "call": "q",
+              "method": "peek",
+              "args": []
+            },
+            {
+              "call": "q",
+              "method": "get",
+              "args": []
+            }
+          ],
+          "expected": [
+            {
+              "value": null
+            },
+            {
+              "value": null
+            },
+            {
+              "value": -10
+            },
+            {
+              "value": -10
+            },
+            {
+              "value": null
+            },
+            {
+              "value": -9
+            },
+            {
+              "value": -9
+            },
+            {
+              "value": null
+            },
+            {
+              "value": -8
+            },
+            {
+              "value": -8
+            },
+            {
+              "value": null
+            },
+            {
+              "value": -7
+            },
+            {
+              "value": -7
+            },
+            {
+              "value": null
+            },
+            {
+              "value": -6
+            },
+            {
+              "value": -6
+            },
+            {
+              "value": null
+            },
+            {
+              "value": -5
+            },
+            {
+              "value": -5
+            },
+            {
+              "value": null
+            },
+            {
+              "value": -4
+            },
+            {
+              "value": -4
+            },
+            {
+              "value": null
+            },
+            {
+              "value": -3
+            },
+            {
+              "value": -3
+            },
+            {
+              "value": null
+            },
+            {
+              "value": -2
+            },
+            {
+              "value": -2
+            },
+            {
+              "value": null
+            },
+            {
+              "value": -1
+            },
+            {
+              "value": -1
+            },
+            {
+              "value": null
+            },
+            {
+              "value": 0
+            },
+            {
+              "value": 0
+            },
+            {
+              "value": null
+            },
+            {
+              "value": 1
+            },
+            {
+              "value": 1
+            },
+            {
+              "value": null
+            },
+            {
+              "value": 2
+            },
+            {
+              "value": 2
+            },
+            {
+              "value": null
+            },
+            {
+              "value": 3
+            },
+            {
+              "value": 3
+            },
+            {
+              "value": null
+            },
+            {
+              "value": 4
+            },
+            {
+              "value": 4
+            },
+            {
+              "value": null
+            },
+            {
+              "value": 5
+            },
+            {
+              "value": 5
+            },
+            {
+              "value": null
+            },
+            {
+              "value": 6
+            },
+            {
+              "value": 6
+            },
+            {
+              "value": null
+            },
+            {
+              "value": 7
+            },
+            {
+              "value": 7
+            },
+            {
+              "value": null
+            },
+            {
+              "value": 8
+            },
+            {
+              "value": 8
+            },
+            {
+              "value": null
+            },
+            {
+              "value": 9
+            },
+            {
+              "value": 9
+            },
+            {
+              "value": null
+            },
+            {
+              "value": 10
+            },
+            {
+              "value": 10
+            }
+          ]
+        }
+      ],
+      "comparison": {
+        "kind": "exact",
+        "absolute": 0,
+        "relative": 0
+      },
+      "tags": [
+        "Python",
+        "API",
+        "队列",
+        "实例状态",
+        "异常契约"
+      ],
+      "changelog": "v1：首次发布有状态对象 API；含多实例、容量边界、失败后状态和64步序列。",
+      "license": "LicenseRef-Pending-Maintainer-Approval",
+      "attribution": "PraxiMesh 原创示例，2026-10-24；正式公开授权待维护者确认。"
     }
   ]
 }

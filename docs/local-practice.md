@@ -1,6 +1,6 @@
 # 本地练习与提交
 
-状态：B2 开发中。API 与 CLI 已实现，正式 B2 镜像、联合运行时和 HTTPS 端到端验收仍需完成。
+API 与 CLI 的 B2 联合运行时、镜像及 HTTPS 验收见 [B2 验收](acceptance-b2.md)；后续专业题型见 [C 验收](acceptance-c.md)。类/API 扩展的实际CLI、HTTPS及固定镜像结果见 [E 验收](acceptance-e.md)。
 
 本地公开样例帮助调试，不增加服务端完成记录，也不能上传本地分数。正式提交由平台按题目固定版本、受保护测试与当前可用评测环境重新执行。
 
@@ -27,6 +27,8 @@ python scripts/practice.py --server https://your-instance.example download sum-p
 ```
 
 目标目录必须不存在，父目录必须存在。工具创建私有目录、`exercise.json` 和对应语言的解答文件。JSON 含公开题意、公开测试、固定版本身份及来源服务器；不含参考实现和受保护用例。编辑 `solution.py`（JavaScript 题为 `solution.js`），不要改变版本元数据。
+
+类/API 题（例如 `bounded-queue-api`）也使用 `solution.py`，实现题目声明的类和方法。公开包含构造与方法调用序列；同一场景保留状态，场景之间重置。无需编写 `solve` 函数或宿主测试脚本。语义与异常规则见[类/API 契约](object-api-contract.md)。
 
 ## 在本地沙箱运行公开样例
 

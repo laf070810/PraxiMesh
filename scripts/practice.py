@@ -28,6 +28,7 @@ LANGUAGES = {
 }
 CONTRACTS = {
     "python-function-v1": "python",
+    "python-object-api-v1": "python",
     "javascript-function-v1": "javascript",
     "python-stdio-v1": "python",
     "python-ml-linear-v1": "python",
@@ -68,6 +69,24 @@ def specialist_payload(package):
 
 class PracticeError(ValueError):
     """A safe error without credentials, source code or server response bodies."""
+
+
+def api_payload(package):
+    sys.path.insert(0, str(ROOT))
+    from judge.object_api import validate_problem
+
+    problem = package["problem"]
+    if any(
+        key in problem
+        for key in ("function", "output_format", "assessment", "model_kind", "uncertainty_model")
+    ):
+        raise ValueError("Mixed object API contract")
+    payload = {key: problem[key] for key in ("evaluator", "language", "interface", "comparison")}
+    if any("public" in case for case in package["public_tests"]):
+        raise ValueError("Public cases must not contain a visibility override")
+    payload["tests"] = [{**case, "public": True} for case in package["public_tests"]]
+    validate_problem(payload, public_only=True)
+    return payload
 
 
 def validate_json_tree(value):
@@ -239,9 +258,13 @@ def validate_package(package):
         ):
             raise ValueError
         stdio = problem["evaluator"] == "python-stdio-v1"
+        if problem["evaluator"] != "python-object-api-v1" and "interface" in problem:
+            raise ValueError
         if stdio:
             if "function" in problem or problem.get("output_format") != "json":
                 raise ValueError
+        elif problem["evaluator"] == "python-object-api-v1":
+            api_payload(package)
         elif "output_format" in problem or not re.fullmatch(
             r"[A-Za-z_][A-Za-z0-9_]{0,79}", problem["function"]
         ):
@@ -267,6 +290,8 @@ def validate_package(package):
             raise ValueError
         if problem["evaluator"] in SPECIALISTS:
             specialist_payload(package)
+            return package
+        if problem["evaluator"] == "python-object-api-v1":
             return package
         for case in cases:
             if (
@@ -375,6 +400,10 @@ def local_test(directory, bundle, digest):
             result = specialist_module(evaluator).evaluate_public(
                 specialist_payload(package), source, sandbox
             )
+        elif evaluator == "python-object-api-v1":
+            from judge.object_api import evaluate_public
+
+            result = evaluate_public(api_payload(package), source, sandbox)
         else:
             result = evaluate(
                 {

@@ -76,6 +76,8 @@ def probes_for(identity):
         from judge.agent_probes import PROBES as agent_probes
         from judge.agent_probes import PROBLEM as agent_problem
         from judge.javascript_probes import PROBES as javascript_probes
+        from judge.object_api_probes import PROBES as api_probes
+        from judge.object_api_probes import PROBLEM as api_problem
         from judge.specialist_probes import probes as specialist_probes
         from judge.stdio_probes import PROBES as stdio_probes
         from judge.wasi_probes import PROBES as wasi_probes
@@ -107,6 +109,16 @@ def probes_for(identity):
                 for name, source, verdict in agent_probes
             ]
             + specialist_probes()
+            + [
+                (
+                    f"api/{name}",
+                    {"problem": api_problem, "source": source},
+                    verdict,
+                    None,
+                    "specialist",
+                )
+                for name, source, verdict in api_probes
+            ]
         )
     if identity.get("policy") != "gvisor-python-function-v1":
         raise SandboxUnavailable("Unknown isolation policy.")

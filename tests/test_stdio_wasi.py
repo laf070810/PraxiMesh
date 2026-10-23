@@ -207,4 +207,5 @@ def test_actual_receipt_covers_function_and_program_modes(settings, tmp_path):
         "agent",
         "ml",
         "science",
+        "api",
     }

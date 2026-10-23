@@ -164,6 +164,14 @@ def validate_package(data):
         names = [t["name"] for t in problem["tests"]]
         if len(names) != len(set(names)):
             raise ContentError("Duplicate test names.")
+        if problem["evaluator"] == "python-object-api-v1":
+            from judge.object_api import validate_problem
+
+            try:
+                validate_problem(problem)
+            except ValueError:
+                raise ContentError("Invalid object API contract.") from None
+            continue
         if problem["evaluator"] in SPECIALIST_EVALUATORS:
             module = specialist_module(problem["evaluator"])
             try:
@@ -253,6 +261,10 @@ def public_execution(version):
     """Explicit public execution data; references and hidden cases never enter it."""
     source = version.data
     evaluator = source["evaluator"]
+    if evaluator == "python-object-api-v1":
+        from judge.object_api import project_public_problem
+
+        return project_public_problem(source)
     if evaluator in SPECIALIST_EVALUATORS:
         return specialist_module(evaluator).project_public_problem(source)
     stdio = evaluator == "python-stdio-v1"
@@ -296,6 +308,15 @@ def public_problem(version):
     )
     data = {key: copy.deepcopy(version.data[key]) for key in fields}
     execution = public_execution(version)
+    if version.data["evaluator"] == "python-object-api-v1":
+        from judge.object_api import display_operations
+
+        data["interface"] = execution["interface"]
+        data["examples"] = [
+            {**case, "call": display_operations(data["interface"], case["operations"])}
+            for case in execution["tests"]
+        ]
+        return data
     if version.data["evaluator"] in SPECIALIST_EVALUATORS:
         data.update({key: value for key, value in execution.items() if key != "tests"})
         data["examples"] = execution["tests"]

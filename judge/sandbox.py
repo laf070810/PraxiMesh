@@ -68,6 +68,8 @@ def policy_digest(root=None):
         "judge/javascript_probes.py",
         "vendor/quickjs/wasi.patch",
         "judge/evaluator.py",
+        "judge/object_api.py",
+        "judge/object_api_probes.py",
         "judge/agent.py",
         "judge/agent_driver.py",
         "judge/agent_runtime.py",
@@ -228,6 +230,9 @@ class DockerSandbox:
 
     def execute_program(self, source, stdin):
         raise SandboxUnavailable("Complete programs require the reviewed WASI backend.")
+
+    def execute_api(self, source, interface, operations):
+        raise SandboxUnavailable("Object APIs require the reviewed WASI backend.")
 
     def execute_javascript(self, source, function, args):
         raise SandboxUnavailable("JavaScript requires the reviewed WASI backend.")

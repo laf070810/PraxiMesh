@@ -10,7 +10,9 @@ from scripts.browser_acceptance import bootstrap_moderator, cleanup_moderator
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def run_advanced_browsers(environment, owner_run, artifacts, *, include_challenges=False):
+def run_advanced_browsers(
+    environment, owner_run, artifacts, *, include_challenges=False, include_object_api=False
+):
     """Use real browser actions; the trusted runner only manages test fixtures.
 
     Each independent functional journey gets a fresh rate-limit window in this
@@ -26,6 +28,7 @@ def run_advanced_browsers(environment, owner_run, artifacts, *, include_challeng
         "organizations-browser.json",
         "coaching-browser.json",
         "challenges-browser.json",
+        "object-api-browser.json",
     ):
         (artifacts / filename).unlink(missing_ok=True)
     checked = []
@@ -80,6 +83,9 @@ def run_advanced_browsers(environment, owner_run, artifacts, *, include_challeng
         cohort()
         run_journey(environment, owner_run, artifacts)
         checked.append("browser_challenges")
+    if include_object_api and environment.get("BROWSER_JUDGE") == "1":
+        cohort()
+        browser("browser_object_api", environment)
     return {
         "journeys": checked,
         "independent_functional_rate_windows": True,

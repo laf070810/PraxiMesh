@@ -422,6 +422,7 @@ def main():
                 artifacts / "release-advanced",
                 include_challenges="challenges/migrations/0001_initial.py"
                 in manifest["source_files"],
+                include_object_api="judge/object_api.py" in manifest["source_files"],
             )
 
         def control(action, token=None, timeout=180, success=True):
