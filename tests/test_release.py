@@ -61,13 +61,13 @@ def refresh_payload(root, manifest, name):
     return write_manifest(root, manifest)
 
 
-@pytest.fixture
-def release(tmp_path):
+@pytest.fixture(params=[False, True], ids=["legacy", "with-development-guide"])
+def release(tmp_path, request):
     root, source = tmp_path / "release", tmp_path / "source"
     root.mkdir()
     source.mkdir()
     files = {}
-    for name in SOURCE_FILES:
+    for name in SOURCE_FILES | ({"AGENTS.md"} if request.param else set()):
         data = name.encode()
         (source / name).write_bytes(data)
         files[name] = hashlib.sha256(data).hexdigest()
@@ -183,12 +183,15 @@ def test_snapshot_omits_state_and_rejects_config_or_links(tmp_path):
     source.mkdir()
     for name in SOURCE_FILES:
         (source / name).write_text(name)
+    (source / "AGENTS.md").write_text("Development guidance")
     (source / ".env").write_text("must not be copied")
     (source / "var").mkdir()
     (source / "var/secret").write_text("must not be copied")
     captured = tmp_path / "captured"
     files = snapshot(source, captured)
     assert ".env" not in files and not (captured / "var").exists()
+    assert files["AGENTS.md"] == sha256(captured / "AGENTS.md")
+    assert (captured / "AGENTS.md").read_text() == "Development guidance"
     (source / "core").mkdir()
     (source / "core/private.env").write_text("must fail")
     with pytest.raises(ReleaseError):
@@ -197,6 +200,20 @@ def test_snapshot_omits_state_and_rejects_config_or_links(tmp_path):
     (source / "core/link.py").symlink_to(source / "manage.py")
     with pytest.raises(ReleaseError, match="symlink"):
         snapshot(source, tmp_path / "refused-link")
+
+
+@pytest.mark.parametrize("target_exists", [False, True], ids=["dangling", "existing"])
+def test_snapshot_rejects_optional_guide_symlinks(tmp_path, target_exists):
+    source = tmp_path / "source"
+    source.mkdir()
+    for name in SOURCE_FILES:
+        (source / name).write_text(name)
+    outside = tmp_path / "outside.md"
+    if target_exists:
+        outside.write_text("Must not enter the release")
+    (source / "AGENTS.md").symlink_to(outside)
+    with pytest.raises(ReleaseError, match="Source symlink forbidden: AGENTS.md"):
+        snapshot(source, tmp_path / "captured")
 
 
 @pytest.mark.parametrize("change", ["missing", "modified"])

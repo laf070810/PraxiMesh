@@ -16,6 +16,8 @@ uv sync --frozen --group judge --group browser
 
 输出目录必须不存在。工具复制允许的源码目录与文件，排除运行状态、环境凭证、私钥、数据库和缓存，拒绝符号链接；从捕获的字节构建，不让工作区后续修改影响正在构建的版本。这不是通用秘密扫描器：维护者仍须审查源码和内容，不能把凭证写进正常代码文件。
 
+仓库存在 `AGENTS.md` 时，源码快照同时保留这份开发指南。旧发布包可以没有它；新增指南不改变旧清单的必填文件或运行策略。
+
 两个镜像共享固定基础镜像及依赖。默认 Docker target 仍为 Web；独立的 `worker` target 增加带 hash 的 `requirements-judge.lock` 和固定 WASI 制品。解释器摘要位于依赖安装层之后，更新制品不必重新下载应用依赖。镜像使用 UID/GID 65532，不包含运行数据库、receipt 或配置密钥。
 
 发布目录只包含三个文件：
@@ -41,7 +43,7 @@ uv sync --frozen --group judge --group browser
 
 `verify` 先检查可信 manifest，再检查文件白名单/大小/摘要、源码档案的路径/类型/内容、Docker archive 中的实际镜像配置及每个 layer 的 diff ID；验证不依赖本机已缓存的镜像层，不会解包到工作区或启动容器。`load` 在验证后导入镜像，并检查实际 image ID、平台、非 root 用户、角色、源码/策略标签及解释器配置。后续部署应使用输出的不可变 image ID。
 
-Web 不含 Wasmtime 或解释器，只记录匹配的制品摘要；worker 包含运行时。worker 的 `wasi_service` 入口要求显式 `JUDGE_ENABLED=1`，先在当前实例运行 123 项真实探针，再启动 worker。失败不发布健康记录。所有 guest 代码仍只在 WASI 内执行；打包成普通容器不改变隔离策略，不引入宿主执行回退。
+Web 不含 Wasmtime 或解释器，只记录匹配的制品摘要；worker 包含运行时。worker 的 `wasi_service` 入口要求显式 `JUDGE_ENABLED=1`，先在当前实例运行完整策略的真实探针，再启动 worker；E/F 策略为 129 项。失败不发布健康记录。所有 guest 代码仍只在 WASI 内执行；打包成普通容器不改变隔离策略，不引入宿主执行回退。
 
 ## 重放镜像验收
 

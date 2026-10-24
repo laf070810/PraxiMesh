@@ -67,6 +67,8 @@ SOURCE_FILES = {
     ".gitignore",
     ".python-version",
 }
+# Development guidance is captured when present without invalidating older releases.
+OPTIONAL_SOURCE_FILES = {"AGENTS.md"}
 MAX_SOURCE_BYTES = 40 * 1024 * 1024
 MAX_SOURCE_ARCHIVE_BYTES = MAX_SOURCE_BYTES + 4 * 1024 * 1024
 MAX_IMAGE_BYTES = 4 * 1024 * 1024 * 1024
@@ -115,7 +117,10 @@ def allowed_source(name):
         not path.is_absolute()
         and str(path) == name
         and ".." not in path.parts
-        and (name in SOURCE_FILES or (len(path.parts) > 1 and path.parts[0] in SOURCE_DIRS))
+        and (
+            name in SOURCE_FILES | OPTIONAL_SOURCE_FILES
+            or (len(path.parts) > 1 and path.parts[0] in SOURCE_DIRS)
+        )
         and not any(
             part.startswith(".env") or part in {"__pycache__", ".git"} for part in path.parts
         )
@@ -129,6 +134,11 @@ def snapshot(source, destination):
     """Copy once, then hash the captured bytes; never build from live directories."""
     files = {}
     candidates = [source / name for name in SOURCE_FILES]
+    candidates.extend(
+        source / name
+        for name in OPTIONAL_SOURCE_FILES
+        if (source / name).exists() or (source / name).is_symlink()
+    )
     for name in SOURCE_DIRS:
         directory = source / name
         if directory.is_symlink():
