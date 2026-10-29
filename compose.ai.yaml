@@ -1,0 +1,41 @@
+# Optional CPU model: docker compose -f compose.yaml -f compose.ai.yaml up --build -d
+services:
+  web:
+    environment:
+      PRAXIMESH_LOCAL_AI: "1"
+    volumes:
+      - ai-credentials:/ai
+  tutor:
+    build:
+      context: .
+      dockerfile: deploy/tutor.Dockerfile
+      args:
+        HTTP_PROXY:
+        HTTPS_PROXY:
+        ALL_PROXY:
+        NO_PROXY:
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.11.15-slim-bookworm@sha256:77923445c077d8eb971b14b2b114a1d9cd4a87edb4c75654820ca4832ee8cb15}
+    depends_on:
+      web:
+        condition: service_healthy
+        restart: true
+    network_mode: service:web
+    volumes:
+      - ai-credentials:/ai:ro
+    read_only: true
+    init: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 3g
+    pids_limit: 64
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      start_period: 90s
+      retries: 3
+volumes:
+  ai-credentials:

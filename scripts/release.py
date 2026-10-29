@@ -68,7 +68,7 @@ SOURCE_FILES = {
     ".python-version",
 }
 # Development guidance is captured when present without invalidating older releases.
-OPTIONAL_SOURCE_FILES = {"AGENTS.md"}
+OPTIONAL_SOURCE_FILES = {"AGENTS.md", "compose.ai.yaml"}
 MAX_SOURCE_BYTES = 40 * 1024 * 1024
 MAX_SOURCE_ARCHIVE_BYTES = MAX_SOURCE_BYTES + 4 * 1024 * 1024
 MAX_IMAGE_BYTES = 4 * 1024 * 1024 * 1024

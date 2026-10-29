@@ -8,7 +8,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 PRODUCTION = os.environ.get("PRAXIMESH_MODE", "local") == "production"
-DEBUG = not PRODUCTION
+DEBUG = not PRODUCTION and os.environ.get("APP_DEBUG", "1") == "1"
 SECRET_KEY = os.environ.get("APP_SECRET_KEY", "local-development-only-not-for-public-use")
 ALLOWED_HOSTS = os.environ.get("APP_ALLOWED_HOSTS", "localhost,127.0.0.1,[::1]").split(",")
 if PRODUCTION and (len(SECRET_KEY) < 50 or SECRET_KEY.startswith("local-") or "*" in ALLOWED_HOSTS):

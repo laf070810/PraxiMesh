@@ -1,10 +1,15 @@
-# One-command local preview: docker compose up --build -d
-# Real judging remains an explicitly configured WASI service; no Docker socket.
+# Complete single-host CPU practice: docker compose up --build -d
+# Add -f compose.yaml -f compose.ai.yaml for the optional local CPU tutor.
 services:
   web:
     build:
       context: .
+      target: compose-web
       args:
+        HTTP_PROXY:
+        HTTPS_PROXY:
+        ALL_PROXY:
+        NO_PROXY:
         PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.11.15-slim-bookworm@sha256:77923445c077d8eb971b14b2b114a1d9cd4a87edb4c75654820ca4832ee8cb15}
     ports:
       - "${PRAXIMESH_BIND:-0.0.0.0}:${PRAXIMESH_PORT:-8000}:8000"
@@ -12,11 +17,22 @@ services:
       SQLITE_PATH: /data/praximesh.sqlite3
       APP_SECRET_KEY: ${APP_SECRET_KEY:-}
       APP_ALLOWED_HOSTS: ${APP_ALLOWED_HOSTS:-*}
+      APP_DEBUG: "0"
       PRAXIMESH_MODE: local
       DATABASE_URL: ""
       REGISTRATION_OPEN: "1"
-      JUDGE_ENABLED: "0"
-      COACHING_ENABLED: "0"
+      JUDGE_ENABLED: "1"
+      JUDGE_DAILY_CPU_UNITS: ${JUDGE_DAILY_CPU_UNITS:-120}
+      COACHING_ENABLED: ${COACHING_ENABLED:-0}
+      COACHING_ENDPOINT: ${COACHING_ENDPOINT:-}
+      COACHING_MODEL: ${COACHING_MODEL:-}
+      COACHING_TOKEN: ${COACHING_TOKEN:-}
+      COACHING_PROVIDER_DESCRIPTION: ${COACHING_PROVIDER_DESCRIPTION:-}
+      COACHING_CA_PEM: ${COACHING_CA_PEM:-}
+      COACHING_DAILY_LIMIT: ${COACHING_DAILY_LIMIT:-5}
+      COACHING_CONCURRENCY: ${COACHING_CONCURRENCY:-1}
+      COACHING_MAX_TOKENS: ${COACHING_MAX_TOKENS:-192}
+      COACHING_DISABLE_THINKING: ${COACHING_DISABLE_THINKING:-0}
     volumes:
       - app-data:/data
     read_only: true
@@ -27,12 +43,52 @@ services:
     security_opt: [no-new-privileges:true]
     mem_limit: 512m
     pids_limit: 64
-    command: ["python", "-m", "core.preview"]
+    restart: unless-stopped
+    command: ["python", "-m", "core.selfhost", "web"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/', timeout=3)"]
       interval: 5s
       timeout: 5s
       start_period: 30s
       retries: 12
+  worker:
+    build:
+      context: .
+      target: compose-worker
+      args:
+        HTTP_PROXY:
+        HTTPS_PROXY:
+        ALL_PROXY:
+        NO_PROXY:
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.11.15-slim-bookworm@sha256:77923445c077d8eb971b14b2b114a1d9cd4a87edb4c75654820ca4832ee8cb15}
+    environment:
+      PRAXIMESH_MODE: local
+      DATABASE_URL: ""
+      APP_SECRET_KEY: ${APP_SECRET_KEY:-}
+      JUDGE_DAILY_CPU_UNITS: ${JUDGE_DAILY_CPU_UNITS:-120}
+    volumes:
+      - app-data:/data
+    depends_on:
+      web:
+        condition: service_healthy
+        restart: true
+    network_mode: none
+    read_only: true
+    init: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 2g
+    pids_limit: 64
+    restart: unless-stopped
+    stop_grace_period: 30s
+    command: ["python", "-m", "core.selfhost", "worker"]
+    healthcheck:
+      test: ["CMD", "python", "-m", "core.selfhost", "health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10m
+      retries: 3
 volumes:
   app-data:

@@ -17,7 +17,6 @@ import sys
 import sysconfig
 import tarfile
 import tempfile
-import urllib.request
 import zipfile
 from pathlib import Path
 
@@ -29,6 +28,7 @@ from judge.wasi_policy import (  # noqa: E402
     WASMTIME_VERSION,
     engine_config,
 )
+from scripts.fetch_verified import download  # noqa: E402
 
 SOURCES = {
     "python": (
@@ -73,10 +73,7 @@ def main():
     for name, (url, expected) in SOURCES.items():
         archive = work / url.rsplit("/", 1)[-1]
         print(f"Downloading and verifying {name}", flush=True)
-        with urllib.request.urlopen(url, timeout=60) as source, archive.open("wb") as target:
-            shutil.copyfileobj(source, target)
-        if sha256(archive) != expected:
-            raise ValueError(f"Digest mismatch: {name}")
+        download(url, archive, expected)
         with tarfile.open(archive) as source:
             source.extractall(work, filter="data")
     source = work / f"Python-{PYTHON_VERSION}"

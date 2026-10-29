@@ -55,13 +55,13 @@ def manage(environment, *arguments):
     )
 
 
-def prepare(directory):
+def prepare(directory, *, services=False):
     environment = dict(os.environ)
     if (
         environment.get("PRAXIMESH_MODE", "local") != "local"
         or environment.get("DATABASE_URL")
-        or environment.get("JUDGE_ENABLED", "0") != "0"
-        or environment.get("COACHING_ENABLED", "0") != "0"
+        or (not services and environment.get("JUDGE_ENABLED", "0") != "0")
+        or (not services and environment.get("COACHING_ENABLED", "0") != "0")
     ):
         raise PreviewError("Preview requires local SQLite mode with judging and AI disabled.")
     if directory.is_symlink() or not directory.is_dir():
@@ -77,8 +77,8 @@ def prepare(directory):
             DATABASE_URL="",
             SQLITE_PATH=str(database),
             APP_SECRET_KEY=secret_key(directory, environment.get("APP_SECRET_KEY", "")),
-            JUDGE_ENABLED="0",
-            COACHING_ENABLED="0",
+            JUDGE_ENABLED="1" if services else "0",
+            COACHING_ENABLED=environment.get("COACHING_ENABLED", "0") if services else "0",
         )
         if database.exists():
             manage(environment, "migrate", "--noinput")

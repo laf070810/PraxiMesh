@@ -2,6 +2,8 @@
 
 本方案面向 Linux x86_64、非 root 账号。需要 C 编译器、make、uv 及约 1 GB 构建空间。使用官方固定版本源码和工具链；不要求 Docker、runsc 或修改共享主机配置。决策和限制见 [ADR-004](adr/004-wasi.md)。
 
+默认 `docker compose up --build -d` 已自动构建本文的固定制品并启动独立 worker，见 [Compose 指南](compose.md)。以下步骤供原生开发或正式发布时单独构建使用。
+
 ## 构建
 
 ```sh

@@ -16,15 +16,15 @@ docker compose logs -f web
 
 默认监听 `0.0.0.0:8000`，健康后在其他电脑打开 `http://服务器IP:8000`；同机也可使用 `http://127.0.0.1:8000`。可用 `PRAXIMESH_BIND`、`PRAXIMESH_PORT` 调整宿主监听地址和端口；容器内仍监听 8000。Compose 的 `APP_ALLOWED_HOSTS` 默认 `*`，接受直接 IP/主机名访问；显式限制时使用逗号分隔的主机名或 IP，并保留 `127.0.0.1` 供健康检查。它不修改 Python 开发环境或生产设置的默认主机规则，也不关闭 CSRF 校验。
 
-Compose 使用固定的 Python 基础镜像，`PYTHON_IMAGE` 仍可由操作者显式覆盖。应用非 root、只读根、带 init、删除 capabilities，有内存/PID 限额；不挂宿主目录或 Docker socket。判题和 AI 关闭，不要求 GPU 或模型服务。该入口使用 HTTP 体验配置；正式公开服务继续按下述生产流程部署。
+Compose 使用固定的 Python 基础镜像，`PYTHON_IMAGE` 仍可由操作者显式覆盖。应用非 root、只读根、带 init、删除 capabilities，有内存/PID 限额；不挂宿主目录或 Docker socket。默认构建可信 WASI bundle 并启动无网络的独立 worker，真实自检通过后开放评测。可选本地 CPU 模型或既有 HTTPS 模型配置见 [Compose 指南](compose.md)。该入口使用单机 SQLite/HTTP；正式公开服务继续按下述生产流程部署。
 
-`core.preview` 在 `app-data` 命名卷中生成并保留 0600 的随机密钥 `/data/preview-secret.key`。旧配置若提供 `APP_SECRET_KEY`，继续使用该值，重启时保持相同配置。密钥丢失或更换会使原会话失效，不能将重新生成密钥当作恢复操作。密钥与 SQLite 一起备份，备份按私有数据保护。
+`core.selfhost` 复用 `core.preview`，在 `app-data` 命名卷中生成并保留 0600 的随机密钥 `/data/preview-secret.key`。旧配置若提供 `APP_SECRET_KEY`，继续使用该值，重启时保持相同配置。密钥丢失或更换会使原会话失效，不能将重新生成密钥当作恢复操作。密钥与 SQLite 一起备份，备份按私有数据保护。
 
 仅当 `/data/praximesh.sqlite3` 不存在时，才在同一卷的临时目录运行迁移，并导入基础题库、英文译文、项目及挑战；全部成功后发布新数据库。失败会退出，修复后再次启动即可重试。已有数据库只迁移，不重导或撤回已有内容。旧版 Compose 卷若缺少译文、项目或挑战，应由维护者按内容规范审查后显式导入，不能通过删除原数据库“补齐”。
 
 `docker compose down` 保留卷；`docker compose up -d` 使用已有镜像重新启动；源码更新后用 `up --build -d`。`down -v` 会删除数据，请勿用于日常停止或恢复。这里的自动迁移面向本地体验；生产使用下述协调器的备份、排空与代际恢复流程。
 
-本地重放该入口的检查：`python3 scripts/compose_acceptance.py`。只要求宿主 Docker/Compose 与 Python 标准库；脚本使用唯一项目名、临时端口和合成数据，通过宿主非回环 IP 验证页面与同源草稿 POST，确认跨站 POST 仍被拒绝，验证初始化、账号/草稿/会话/自定义内容与密钥保留，并清理自有容器、网络和卷。设计见 [RFC-015](rfcs/015-compose-preview.md)。
+本地重放该入口的检查：`python3 scripts/compose_acceptance.py`。只要求宿主 Docker/Compose 与 Python 标准库；脚本使用唯一项目名、临时端口和合成数据，通过宿主非回环 IP 验证页面与同源草稿 POST，确认跨站 POST 仍被拒绝，验证七种真实 CPU 评测、worker 离线关闭提交、初始化及账号/成绩/草稿/会话/自定义内容与密钥保留，并清理自有容器、网络和卷。`--ai --browsers` 另需 Playwright 环境，会实际运行本地模型和浏览器闭环。设计见 [RFC-016](rfcs/016-compose-selfhost.md)。
 
 更新依赖：`uv lock --upgrade-package PACKAGE` → `uv sync --frozen` → 所有相关测试与审计 → `uv export --frozen --no-dev --no-emit-project --format requirements-txt --no-header --quiet -o requirements.lock`。基础镜像也要跟随安全更新，不因 digest 固定而停止升级。记录更新前后镜像摘要及验收。
 

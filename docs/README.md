@@ -14,6 +14,8 @@
 - [RFC-013：有状态 Python 库/API 实践](rfcs/013-object-api-practice.md)
 - [RFC-014：绑定版本的题目反馈](rfcs/014-versioned-problem-feedback.md)
 - [RFC-015：Compose 一键本地体验](rfcs/015-compose-preview.md)
+- [RFC-016：可直接做题的 Compose 单机部署](rfcs/016-compose-selfhost.md)
+- [Docker Compose 单机部署与可选 AI](compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)
 - [可选自部署模型与本地 CPU 重放](local-coaching.md)

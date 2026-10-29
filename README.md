@@ -2,7 +2,7 @@
 
 通过真实编程练习学习计算知识：用结构化知识导航找到学习方向，也可以直接筛题、写代码、运行和提交。
 
-当前交付为**已完成本地验收的自部署版本**。在线评测和 AI 辅导默认关闭，配置并通过各自门槛后才能使用。GPU 评测尚未实现；公开运营和项目许可证仍待维护者决定。产品需求见 [PRD.md](PRD.md)，完整范围与未完成项见[需求追踪](docs/requirements.md)。
+当前交付为**已完成本地验收的自部署版本**。默认 Docker Compose 包含真实 CPU/WASI 评测；可选覆盖文件提供本地 CPU AI 辅导。GPU 评测尚未实现；公开运营和项目许可证仍待维护者决定。产品需求见 [PRD.md](PRD.md)，完整范围与未完成项见[需求追踪](docs/requirements.md)。
 
 ## 可以做什么
 
@@ -16,7 +16,7 @@
 
 | 目标 | 入口 |
 | --- | --- |
-| 用 Docker 体验导航、编辑、草稿和社区 | 下方“Docker Compose 一键体验”，无需宿主 Python 或模型服务 |
+| 用 Docker 直接做题、评测和使用可选 AI | 下方“Docker Compose 启动”，无需宿主 Python 或预先构建 WASI |
 | 用 Python 环境开发和体验 | 下方“Python 开发环境启动”，无需 Docker |
 | 在本机运行真实评测 | [WASI 构建与判题](docs/wasi.md) |
 | 部署到自己的主机 | [发布包](docs/releases.md) → [部署、升级与恢复](docs/deployment-coordination.md) |
@@ -24,27 +24,39 @@
 | 新增题目、课程或学习路径 | [内容规范](docs/content.md)、[工程项目](projects/README.md)、[组织题库](docs/rfcs/009-organizations-and-packages.md) |
 | 修改代码或查看设计 | [贡献指南](CONTRIBUTING.md)、[AGENTS.md](AGENTS.md)、[设计索引](docs/README.md) |
 
-## Docker Compose 一键体验
+## Docker Compose 启动
 
-准备 Docker Engine 和 Docker Compose，在仓库根目录执行：
+在 Linux x86_64 主机准备 Docker Engine 和 Docker Compose，于仓库根目录执行：
 
 ```sh
 docker compose up --build -d
 ```
 
-等待 `docker compose ps` 显示 `healthy`，在其他电脑打开 `http://服务器IP:8000`；同机浏览器也可打开 <http://127.0.0.1:8000>。首次构建需要下载固定基础镜像和依赖。容器自动迁移新数据库，并导入题库、英文译文、项目及挑战；注册后可体验草稿、学习记录和社区。无需手工设置密钥，随机密钥保存在私有数据卷中，重建容器后仍可使用原账号和会话。
+默认启动 Web 和真实 WASI worker。首次自动构建固定版本的 Python/JavaScript 解释器、初始化数据库并导入题库、译文、项目及挑战；无需手工设置密钥、bundle 摘要或安装宿主 Python。首次下载和编译需要时间，后续复用构建缓存。
+
+需要同时体验本地 CPU AI 辅导，使用：
 
 ```sh
-docker compose logs -f web  # 查看启动日志；Ctrl+C 退出日志
-docker compose down         # 停止服务，保留数据卷
-docker compose up -d        # 使用已有镜像再次启动
+docker compose -f compose.yaml -f compose.ai.yaml up --build -d
 ```
 
-数据在 Compose 的 `app-data` 命名卷中，与仓库的 `db.sqlite3` 分开。已有数据库只迁移，不自动重导内容；`down -v` 会删除体验数据，请勿用于日常停止。端口占用时可用 `PRAXIMESH_PORT=8001 docker compose up --build -d`；后续启动保持同一端口配置。
+这会额外构建模型服务并下载约 640 MB 的固定模型。AI 先预览再发送，输出仅作建议，不改正式成绩；模型端口不对外开放。已有 HTTPS 模型服务也可通过私有配置接入。
 
-Compose 默认监听 `0.0.0.0:8000`，允许通过服务器 IP 或主机名直接访问，无需 SSH 端口转发；服务器网络需允许访问该端口。可用 `PRAXIMESH_BIND=127.0.0.1 docker compose up --build -d` 改为仅本机监听。`APP_ALLOWED_HOSTS` 可设置允许的主机名/IP 列表，显式配置时保留 `127.0.0.1` 供容器健康检查。
+打开 **`http://服务器IP:8000`**，注册后进入 Practice →「只累加正数」。Web 就绪即可浏览；worker 完成全部真实隔离自检后，才能运行样例和正式提交。
 
-此入口为 HTTP 体验环境，真实判题和 AI 默认关闭。体验 Run/Submit 的真实结果按 [WASI 指南](docs/wasi.md)配置；长期部署按下方发布与部署流程操作。Compose 启动及数据保留说明见[运维手册](docs/operations.md)。
+```sh
+docker compose ps                # worker 显示 healthy 后可评测
+docker compose logs -f worker    # 首次隔离检查及运行日志
+curl http://127.0.0.1:8000/health/ # evaluation 应为 available
+docker compose down             # 停止，保留数据
+docker compose up -d            # 使用已有镜像再次启动
+```
+
+使用 AI 时，后续命令也带 `-f compose.yaml -f compose.ai.yaml`。默认监听 `0.0.0.0:8000`，无需端口转发；用 `PRAXIMESH_PORT=8001` 改端口，或 `PRAXIMESH_BIND=127.0.0.1` 限定同机访问。
+
+账号、会话、草稿和成绩保存在 `app-data` 命名卷，与仓库的 `db.sqlite3` 分开。原 Compose 页面体验版可直接升级并保留数据；已有库只迁移，不重导目录。`down -v` 会删除数据，勿用于日常停止。
+
+完整配置、资源、可选模型、恢复与验收见 [Compose 指南](docs/compose.md)。这是包含已有功能的单机 SQLite/HTTP 入口；长期 PostgreSQL、HTTPS 和受控升级使用下方发布与部署流程。GPU 评测尚未实现。
 
 ## Python 开发环境启动
 
