@@ -7,10 +7,11 @@ services:
       args:
         PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.11.15-slim-bookworm@sha256:77923445c077d8eb971b14b2b114a1d9cd4a87edb4c75654820ca4832ee8cb15}
     ports:
-      - "127.0.0.1:${PRAXIMESH_PORT:-8000}:8000"
+      - "${PRAXIMESH_BIND:-0.0.0.0}:${PRAXIMESH_PORT:-8000}:8000"
     environment:
       SQLITE_PATH: /data/praximesh.sqlite3
       APP_SECRET_KEY: ${APP_SECRET_KEY:-}
+      APP_ALLOWED_HOSTS: ${APP_ALLOWED_HOSTS:-*}
       PRAXIMESH_MODE: local
       DATABASE_URL: ""
       REGISTRATION_OPEN: "1"

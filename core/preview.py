@@ -1,4 +1,4 @@
-"""Initialize the loopback-only Compose preview before importing Django settings."""
+"""Initialize the Compose preview before importing Django settings."""
 
 import fcntl
 import os

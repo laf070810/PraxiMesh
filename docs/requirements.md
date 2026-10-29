@@ -50,6 +50,7 @@
 
 ## 分批结果
 
+- 2026-10-30 Compose 直接 IP 访问：按维护者要求默认发布 `0.0.0.0:8000`，仅体验配置接受 IP/主机名；真实非回环 IP 页面访问、同源草稿保存、跨站拒绝和重建后的数据保留均通过，范围见 [RFC-015](rfcs/015-compose-preview.md)。
 - 2026-10-30 本地 Compose 入口：使用 `docker compose up --build -d` 自动准备新库和持久密钥，首次完整导入题库/译文/项目/挑战；已有内容不重导。55 项定向检查及实际容器删除重建验证通过，账号、草稿、会话、自定义知识与撤回状态保留。该增量新增本地启动器并修改当前源码的 Compose 配置，F 固定发布包保持原状；未重新验收正式发布镜像或真实判题。设计和证据见 [RFC-015](rfcs/015-compose-preview.md)及 [ADR-014](adr/014-compose-preview.md)。
 
 - 阶段 A 基线：提交 `e9d7bf1`，普通回归 310 passed/18 skipped、PostgreSQL/WASI 327 passed/1 skipped，以及真实 HTTPS 与失败迁移恢复。证据范围详见既有验收记录。

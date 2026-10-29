@@ -32,7 +32,7 @@
 docker compose up --build -d
 ```
 
-等待 `docker compose ps` 显示 `healthy`，打开 <http://127.0.0.1:8000>。首次构建需要下载固定基础镜像和依赖。容器自动迁移新数据库，并导入题库、英文译文、项目及挑战；注册后可体验草稿、学习记录和社区。无需手工设置密钥，随机密钥保存在私有数据卷中，重建容器后仍可使用原账号和会话。
+等待 `docker compose ps` 显示 `healthy`，在其他电脑打开 `http://服务器IP:8000`；同机浏览器也可打开 <http://127.0.0.1:8000>。首次构建需要下载固定基础镜像和依赖。容器自动迁移新数据库，并导入题库、英文译文、项目及挑战；注册后可体验草稿、学习记录和社区。无需手工设置密钥，随机密钥保存在私有数据卷中，重建容器后仍可使用原账号和会话。
 
 ```sh
 docker compose logs -f web  # 查看启动日志；Ctrl+C 退出日志
@@ -42,9 +42,9 @@ docker compose up -d        # 使用已有镜像再次启动
 
 数据在 Compose 的 `app-data` 命名卷中，与仓库的 `db.sqlite3` 分开。已有数据库只迁移，不自动重导内容；`down -v` 会删除体验数据，请勿用于日常停止。端口占用时可用 `PRAXIMESH_PORT=8001 docker compose up --build -d`；后续启动保持同一端口配置。
 
-如果 Docker 运行在远程服务器上，在自己电脑执行 `ssh -N -L 8000:127.0.0.1:8000 user@server`，将 `user@server` 换成平时的 SSH 登录地址，再访问上述本机网址。
+Compose 默认监听 `0.0.0.0:8000`，允许通过服务器 IP 或主机名直接访问，无需 SSH 端口转发；服务器网络需允许访问该端口。可用 `PRAXIMESH_BIND=127.0.0.1 docker compose up --build -d` 改为仅本机监听。`APP_ALLOWED_HOSTS` 可设置允许的主机名/IP 列表，显式配置时保留 `127.0.0.1` 供容器健康检查。
 
-此入口仅监听回环地址，真实判题和 AI 默认关闭。体验 Run/Submit 的真实结果按 [WASI 指南](docs/wasi.md)配置；长期部署按下方发布与部署流程操作。Compose 启动及数据保留说明见[运维手册](docs/operations.md)。
+此入口为 HTTP 体验环境，真实判题和 AI 默认关闭。体验 Run/Submit 的真实结果按 [WASI 指南](docs/wasi.md)配置；长期部署按下方发布与部署流程操作。Compose 启动及数据保留说明见[运维手册](docs/operations.md)。
 
 ## Python 开发环境启动
 
