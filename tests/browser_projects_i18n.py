@@ -21,7 +21,7 @@ def main():
     if not re.fullmatch(r"[a-z][a-z0-9-]{0,79}", slug):
         raise SystemExit("Invalid project identifier.")
     arguments = launch_arguments(base, os.environ.get("BROWSER_TEST_SPKI", ""))
-    artifacts = Path("test-results")
+    artifacts = Path(os.environ.get("BROWSER_ARTIFACTS", "test-results"))
     artifacts.mkdir(exist_ok=True)
     receipt = {
         "passed": False,

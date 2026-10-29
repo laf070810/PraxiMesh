@@ -46,7 +46,7 @@ CMD ["python", "manage.py", "wasi_service"]
 # Keep this stage independent of application edits so its expensive build is cached.
 FROM ${PYTHON_IMAGE} AS wasi-build
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 RAYON_NUM_THREADS=1 TOKIO_WORKER_THREADS=1
-RUN apt-get update && apt-get install -y --no-install-recommends build-essential pkg-config patch ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential pkg-config patch git ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY requirements-judge.lock ./
 RUN python -m pip install --require-hashes -r requirements-judge.lock

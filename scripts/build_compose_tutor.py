@@ -1,5 +1,6 @@
 """Download and compile the pinned optional CPU tutor, checking every source digest."""
 
+import shutil
 import subprocess
 import tarfile
 from pathlib import Path
@@ -23,6 +24,12 @@ def main():
     )
     with tarfile.open(archive) as source:
         source.extractall(root, filter="data")
+    source_root = root / f"llama.cpp-{COMMIT}"
+    for path in source_root.rglob("*"):
+        if path.is_file() and path.name.lower().startswith(("license", "copying")):
+            destination = root / "licenses" / path.relative_to(source_root)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(path, destination)
     subprocess.run(
         [
             "cmake",

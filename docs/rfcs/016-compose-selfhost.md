@@ -1,6 +1,6 @@
 # RFC-016：可直接做题的 Compose 单机部署
 
-状态：实施中，2026-10-30。承接 [RFC-015](015-compose-preview.md)。
+状态：实现完成、容器验收进行中，2026-10-30。承接 [RFC-015](015-compose-preview.md)，决定见 [ADR-015](../adr/015-compose-selfhost.md)。
 
 ## 问题与决定
 
@@ -29,3 +29,11 @@ Compose 的依赖、网络命名空间和健康语义以 [Docker 官方文档](h
 ## 验证计划
 
 验证首次构建无需宿主制品、完整真实探针、HTTP 的 Run/Submit 正确和错误结果、各 CPU 题型、worker 停止后的关闭状态与恢复、重建后的历史/会话/草稿/目录保留。检查容器权限、网络、无 Docker socket、Web 无 Wasmtime、模型凭证不传 worker。重放可选模型真实提示及既有浏览器功能。记录原始失败和修复结果，清理测试自有资源；不把历史验收算作此次复测。
+
+## 构建与启动修正
+
+首次 SDK 下载因未继承宿主构建代理超时；增加预定义代理 build args 与有界、校验后原子发布的下载。交叉编译补齐 Git 依赖后，Web/worker 镜像构建成功。
+
+真实隔离检查暴露 Agent 正确程序在每轮一秒 CPU 上限附近不稳定。相同容器内的新旧 bundle 均出现该问题，冻结 F 镜像重放也接近边界；不能单凭旧验收假定当前主机总能通过。保持题目与执行策略预算不变，在可信构建中用同版 CPython 构建解释器预编译其标准库字节码，连同源码一起纳入固定 ZIP 与 manifest 摘要，减少每次 guest 启动重复解析标准库的成本。字节码只来自已核验的标准库，学员代码仍只在 WASI 内编译和执行。该修正须重跑完整真实探针与题型闭环，不能用部分诊断结果开放提交。
+
+标准库缓存采用 Python 官方的 [py_compile](https://docs.python.org/3.14/library/py_compile.html) 与 [ZIP 模块导入](https://docs.python.org/3.14/library/zipimport.html) 机制；由构建系统和不可变制品摘要保证缓存与固定源码的一致性，运行时不写缓存。

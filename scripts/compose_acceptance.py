@@ -28,6 +28,8 @@ os.environ['APP_SECRET_KEY'] = key.read_text()
 os.environ['DJANGO_SETTINGS_MODULE'] = 'praximesh.settings'
 import django
 django.setup()
+from django.conf import settings
+assert not settings.DEBUG
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from django.contrib.sessions.backends.db import SessionStore
@@ -82,7 +84,7 @@ def main():
     options.browsers = options.browsers or options.ai
     project = "px-compose-" + uuid.uuid4().hex[:12]
     artifacts = ROOT / "test-results" / project
-    artifacts.mkdir(parents=True)
+    artifacts.mkdir(parents=True, mode=0o700)
     environment = dict(os.environ, PRAXIMESH_PORT="0")
     for name in (
         "APP_SECRET_KEY",
@@ -255,6 +257,11 @@ def main():
         report["real_submissions"] = [*results, wrong, public]
 
     def browser_journeys(base):
+        # The local CLI exercises the exact trusted bundle built in this run,
+        # copied out only for this disposable acceptance environment.
+        bundle = artifacts / "wasi"
+        compose("cp", "worker:/opt/praximesh/wasi", str(bundle))
+        bundle_digest = hashlib.sha256((bundle / "manifest.json").read_bytes()).hexdigest()
         scripts = [
             "browser_smoke",
             "browser_projects_i18n",
@@ -273,6 +280,8 @@ def main():
                         BROWSER_JUDGE="1",
                         BROWSER_COACHING="1" if options.ai else "0",
                         BROWSER_ARTIFACTS=str(artifacts),
+                        JUDGE_WASI_BUNDLE=str(bundle),
+                        JUDGE_WASI_SHA256=bundle_digest,
                     ),
                     stdout=log,
                     stderr=subprocess.STDOUT,
@@ -343,6 +352,7 @@ def main():
         assert worker_info["Config"]["User"] == "65532:65532"
         assert worker_info["HostConfig"]["NetworkMode"] == "none"
         assert worker_info["HostConfig"]["ReadonlyRootfs"]
+        assert worker_info["RestartCount"] == 0, "Worker must pass its first complete probe run"
         assert not any(value.startswith("COACHING_") for value in worker_info["Config"]["Env"])
         assert {item["Destination"] for item in worker_info["Mounts"]} <= {"/data", "/tmp"}
         receipt = json.loads(
@@ -358,6 +368,15 @@ def main():
         )
         assert receipt["probes"] >= 129
         report["real_isolation"] = receipt
+        if options.ai:
+            tutor = json.loads(run("inspect", compose("ps", "--quiet", "tutor"), private=True))[0]
+            assert tutor["Config"]["User"] == "65532:65532"
+            assert tutor["RestartCount"] == 0
+            assert tutor["HostConfig"]["ReadonlyRootfs"]
+            assert tutor["HostConfig"]["NetworkMode"] == "container:" + container
+            assert not tutor["HostConfig"]["PortBindings"]
+            assert {item["Destination"] for item in tutor["Mounts"]} <= {"/ai", "/tmp"}
+            assert not next(item for item in tutor["Mounts"] if item["Destination"] == "/ai")["RW"]
         paths = [
             "/",
             "/learn/",
@@ -431,6 +450,9 @@ def main():
                     "scripts/compose_tutor.py",
                     "requirements.lock",
                     "requirements-judge.lock",
+                    "scripts/build_wasi.py",
+                    "scripts/fetch_verified.py",
+                    "praximesh/settings.py",
                 )
             },
         )

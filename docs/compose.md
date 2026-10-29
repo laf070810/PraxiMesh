@@ -4,7 +4,7 @@
 
 ## 启动与使用
 
-需要 Linux x86_64 的 Docker Engine、Docker Compose 和可访问固定依赖来源的构建网络。宿主无需 Python、WASI、模型服务或 Docker socket 挂载。基础运行建议留出 3 GiB 可用内存，带 AI 建议 6 GiB；首次构建还需编译工具链、约数 GB 磁盘与下载时间，后续复用 Docker 构建缓存。
+需要 Linux x86_64 的 Docker Engine、Docker Compose 和可访问固定依赖来源的构建网络。宿主无需 Python、WASI、模型服务或 Docker socket 挂载。基础运行建议留出 3 GiB 可用内存，带 AI 建议 6 GiB；首次构建还需编译工具链、约数 GB 磁盘与下载时间，后续复用 Docker 构建缓存。构建继承宿主的 `HTTP_PROXY`、`HTTPS_PROXY`、`ALL_PROXY`、`NO_PROXY`，不将代理写进运行镜像；代理必须能从构建容器访问。
 
 ```sh
 # Web + 真实评测
@@ -66,4 +66,4 @@ COACHING_PROVIDER_DESCRIPTION=填写实际服务方、发送范围和数据保�
 .venv/bin/python scripts/compose_acceptance.py --ai --browsers
 ```
 
-第二条需要已有 Playwright 环境及 Chromium。验收覆盖真实正确/错误提交、Run/Submit、全部 CPU 评测器、worker 离线关闭提交、重建后的数据与历史保留；浏览器检查包括注册、私有草稿、社区、项目、中英界面、类/API 和真实 AI 提示。结果在忽略目录 `test-results/px-compose-*/`，测试结束清理其自有容器、卷及网络。
+第二条需要独立开发环境的 judge/browser 依赖组及 Chromium；`--ai` 会自动包含浏览器检查。验收覆盖真实正确/错误提交、Run/Submit、全部 CPU 评测器、worker 离线关闭提交、重建后的数据与历史保留；浏览器检查包括注册、私有草稿、社区、项目、中英界面、类/API 和真实 AI 提示。结果在忽略目录 `test-results/px-compose-*/`，测试结束清理其自有容器、卷及网络。

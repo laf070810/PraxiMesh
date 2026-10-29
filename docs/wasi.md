@@ -1,6 +1,6 @@
 # Python、JavaScript / WASI 构建与本地判题
 
-本方案面向 Linux x86_64、非 root 账号。需要 C 编译器、make、uv 及约 1 GB 构建空间。使用官方固定版本源码和工具链；不要求 Docker、runsc 或修改共享主机配置。决策和限制见 [ADR-004](adr/004-wasi.md)。
+本方案面向 Linux x86_64、非 root 账号。需要 C/C++ 编译器、make、Git、pkg-config、patch、uv 及约 1 GB 构建空间。使用官方固定版本源码和工具链；不要求 Docker、runsc 或修改共享主机配置。决策和限制见 [ADR-004](adr/004-wasi.md)。
 
 默认 `docker compose up --build -d` 已自动构建本文的固定制品并启动独立 worker，见 [Compose 指南](compose.md)。以下步骤供原生开发或正式发布时单独构建使用。
 
@@ -18,7 +18,7 @@ curl --fail --location --max-time 60 --output /tmp/praximesh-quickjs.tar.xz http
   --workdir /tmp/praximesh-functions-build --output var/wasi-functions
 ```
 
-两个目录都应是新的；脚本拒绝覆盖已部署制品。下载地址及 SHA-256 固定在脚本中。CPython 源码、随发行版要求的 WASI SDK 24、构建用 Wasmtime CLI 均校验后解包；标准库 ZIP 无压缩且条目排序、时间固定。编译后的 raw Wasm 和本机 native cache 都纳入 manifest，保留 Python 许可。具体编译器/构建目录可能影响二进制摘要；这里保证固定来源和可重建步骤，不承诺跨主机逐字节相同。
+两个目录都应是新的；脚本拒绝覆盖已部署制品。下载地址及 SHA-256 固定在脚本中。CPython 源码、随发行版要求的 WASI SDK 24、构建用 Wasmtime CLI 均校验后解包；标准库 ZIP 无压缩且条目排序、时间固定；包含源码以及由同版本可信 CPython 构建解释器生成的哈希字节码，减少 guest 的重复解析成本。整个 ZIP 受 manifest 摘要保护，不能加入用户提供的缓存；学员代码仍只在 WASI 内编译和执行。编译后的 raw Wasm 和本机 native cache 都纳入 manifest，保留 Python 许可。具体编译器/构建目录可能影响二进制摘要；这里保证固定来源和可重建步骤，不承诺跨主机逐字节相同。
 
 当前使用 format 3 联合 bundle：CPython 3.14.9、QuickJS 2026-06-04 与 Wasmtime 50.0.1。第一步生成 format 2 Python 构建输入，第二步校验其文件及 QuickJS/SDK 固定摘要，在当前引擎策略下重新生成两个 cache。format 2 不能直接供 B2 worker 使用。显式 target 为 `x86_64-unknown-linux-gnu`，不推断构建机 CPU 特性；关闭未使用的 component model。`THIRD_PARTY_NOTICES.txt` 保存 wasi-libc、musl、cloudlibc、LLVM compiler-rt 的声明，`LICENSE.quickjs` 保存 QuickJS 的 MIT 许可。固定来源、WASI 兼容补丁见 `vendor/wasi/` 和 `vendor/quickjs/`。旧 bundle 与 receipt 不能手改 manifest 升级。
 

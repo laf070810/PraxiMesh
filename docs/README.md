@@ -41,6 +41,7 @@
 - [ADR-012：固定版本挑战与私有成就](adr/012-challenges-achievements-and-discovery.md) — 接受，D 本地联合验收通过
 - [ADR-013：在 WASI 内验证类实例与 API 行为](adr/013-object-api-practice.md)
 - [ADR-014：持久数据的一键 Compose 本地体验](adr/014-compose-preview.md)
+- [ADR-015：默认 Compose 包含真实 CPU 评测](adr/015-compose-selfhost.md)
 - [学习记录和社区维护](community.md)
 - [威胁模型](security.md)
 - [内容贡献规范](content.md)

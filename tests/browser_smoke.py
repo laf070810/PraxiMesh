@@ -61,7 +61,7 @@ def main():
     base = os.environ.get("BROWSER_URL", "http://127.0.0.1:8765")
     username = f"browser-{uuid.uuid4().hex[:12]}"
     password = "Browser-only-secret-9162"
-    artifacts = Path("test-results")
+    artifacts = Path(os.environ.get("BROWSER_ARTIFACTS", "test-results"))
     artifacts.mkdir(exist_ok=True)
     errors = []
     launch_args = []

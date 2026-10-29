@@ -112,9 +112,17 @@ def main():
     with (work / "build.log").open("w") as log:
         for command in commands:
             print("Building:", " ".join(command), flush=True)
-            subprocess.run(
-                command, cwd=source, env=env, stdout=log, stderr=subprocess.STDOUT, check=True
-            )
+            try:
+                subprocess.run(
+                    command, cwd=source, env=env, stdout=log, stderr=subprocess.STDOUT, check=True
+                )
+            except subprocess.CalledProcessError:
+                log.flush()
+                print(
+                    "\n".join((work / "build.log").read_text(errors="replace").splitlines()[-30:]),
+                    flush=True,
+                )
+                raise
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=output.parent, prefix=".wasi-build-") as temporary:
         bundle = Path(temporary) / "bundle"
@@ -137,31 +145,77 @@ def main():
         ):
             raise ValueError("WASI runtime notice provenance mismatch")
         shutil.copyfile(notices / "LICENSES.txt", bundle / "THIRD_PARTY_NOTICES.txt")
+        library_files = []
+        for file in sorted((source / "Lib").rglob("*")):
+            relative = file.relative_to(source / "Lib")
+            if (
+                file.is_file()
+                and not any(
+                    part
+                    in {
+                        "test",
+                        "tests",
+                        "__pycache__",
+                        "ensurepip",
+                        "idlelib",
+                        "tkinter",
+                        "turtledemo",
+                    }
+                    for part in relative.parts
+                )
+                and file.suffix not in {".pyc", ".pyo"}
+            ):
+                library_files.append(relative.as_posix())
+        (work / "stdlib-files.json").write_text(json.dumps(library_files))
+        # Compile only the pinned, trusted standard library using its exact
+        # CPython version. Learner code is never part of this host build.
+        # Unchecked hash bytecode is safe here: the immutable ZIP is verified
+        # by the bundle digest, and never accepts user-provided cache entries.
+        subprocess.run(
+            [
+                str(source / native / "python"),
+                "-c",
+                """
+import json
+import pathlib
+import py_compile
+import sys
+
+root, output, listing = map(pathlib.Path, sys.argv[1:4])
+if sys.version.split()[0] != sys.argv[4]:
+    raise ValueError("Standard library bytecode requires the exact pinned Python version")
+for name in json.loads(listing.read_text()):
+    if not name.endswith('.py'):
+        continue
+    destination = output / (name + 'c')
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    py_compile.compile(
+        str(root / name), cfile=str(destination),
+        dfile='/python/lib/python314.zip/' + name,
+        doraise=True, optimize=0,
+        invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH,
+    )
+""",
+                str(source / "Lib"),
+                str(work / "stdlib-bytecode"),
+                str(work / "stdlib-files.json"),
+                PYTHON_VERSION,
+            ],
+            check=True,
+            timeout=120,
+        )
         with zipfile.ZipFile(
             bundle / "stdlib/python314.zip", "w", compression=zipfile.ZIP_STORED
         ) as archive:
-            for file in sorted((source / "Lib").rglob("*")):
-                relative = file.relative_to(source / "Lib")
-                if (
-                    file.is_file()
-                    and not any(
-                        part
-                        in {
-                            "test",
-                            "tests",
-                            "__pycache__",
-                            "ensurepip",
-                            "idlelib",
-                            "tkinter",
-                            "turtledemo",
-                        }
-                        for part in relative.parts
-                    )
-                    and file.suffix not in {".pyc", ".pyo"}
-                ):
+            for relative in library_files:
+                archive.writestr(
+                    zipfile.ZipInfo(relative, (1980, 1, 1, 0, 0, 0)),
+                    (source / "Lib" / relative).read_bytes(),
+                )
+                if relative.endswith(".py"):
                     archive.writestr(
-                        zipfile.ZipInfo(relative.as_posix(), (1980, 1, 1, 0, 0, 0)),
-                        file.read_bytes(),
+                        zipfile.ZipInfo(relative + "c", (1980, 1, 1, 0, 0, 0)),
+                        (work / "stdlib-bytecode" / (relative + "c")).read_bytes(),
                     )
         import wasmtime
 
