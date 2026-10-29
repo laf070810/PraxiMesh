@@ -13,6 +13,7 @@
 - [RFC-012：挑战活动、私有成就与完整题型发现](rfcs/012-challenges-achievements-and-discovery.md)
 - [RFC-013：有状态 Python 库/API 实践](rfcs/013-object-api-practice.md)
 - [RFC-014：绑定版本的题目反馈](rfcs/014-versioned-problem-feedback.md)
+- [RFC-015：Compose 一键本地体验](rfcs/015-compose-preview.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)
 - [可选自部署模型与本地 CPU 重放](local-coaching.md)
@@ -37,6 +38,7 @@
 - [ADR-011：专业实践、机构内容与私有学习规划](adr/011-specialists-organizations-coaching.md) — 接受，C 本地联合验收通过
 - [ADR-012：固定版本挑战与私有成就](adr/012-challenges-achievements-and-discovery.md) — 接受，D 本地联合验收通过
 - [ADR-013：在 WASI 内验证类实例与 API 行为](adr/013-object-api-practice.md)
+- [ADR-014：持久数据的一键 Compose 本地体验](adr/014-compose-preview.md)
 - [学习记录和社区维护](community.md)
 - [威胁模型](security.md)
 - [内容贡献规范](content.md)

@@ -1,30 +1,37 @@
-# Local content/account preview. Deliberately has no judge or Docker socket.
+# One-command local preview: docker compose up --build -d
+# Real judging remains an explicitly configured WASI service; no Docker socket.
 services:
   web:
     build:
       context: .
       args:
-        PYTHON_IMAGE: ${PYTHON_IMAGE:?Set a digest-pinned Python 3.11 image}
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.11.15-slim-bookworm@sha256:77923445c077d8eb971b14b2b114a1d9cd4a87edb4c75654820ca4832ee8cb15}
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${PRAXIMESH_PORT:-8000}:8000"
     environment:
       SQLITE_PATH: /data/praximesh.sqlite3
-      APP_SECRET_KEY: ${APP_SECRET_KEY:?Set a random local instance secret}
+      APP_SECRET_KEY: ${APP_SECRET_KEY:-}
+      PRAXIMESH_MODE: local
+      DATABASE_URL: ""
+      REGISTRATION_OPEN: "1"
       JUDGE_ENABLED: "0"
+      COACHING_ENABLED: "0"
     volumes:
       - app-data:/data
     read_only: true
+    init: true
     tmpfs:
       - /tmp:size=64m,mode=1777
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     mem_limit: 512m
     pids_limit: 64
-    command: ["sh", "-c", "python manage.py migrate --noinput && python manage.py content_import && exec gunicorn praximesh.wsgi:application --bind 0.0.0.0:8000 --workers 1 --threads 2 --worker-tmp-dir /tmp --access-logfile -"]
+    command: ["python", "-m", "core.preview"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/', timeout=3)"]
-      interval: 30s
+      interval: 5s
       timeout: 5s
-      retries: 3
+      start_period: 30s
+      retries: 12
 volumes:
   app-data:

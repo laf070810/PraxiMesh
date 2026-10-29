@@ -16,14 +16,37 @@
 
 | 目标 | 入口 |
 | --- | --- |
-| 先体验导航、编辑、草稿和社区 | 下方“快速体验”，无需 Docker 或模型服务 |
+| 用 Docker 体验导航、编辑、草稿和社区 | 下方“Docker Compose 一键体验”，无需宿主 Python 或模型服务 |
+| 用 Python 环境开发和体验 | 下方“Python 开发环境启动”，无需 Docker |
 | 在本机运行真实评测 | [WASI 构建与判题](docs/wasi.md) |
 | 部署到自己的主机 | [发布包](docs/releases.md) → [部署、升级与恢复](docs/deployment-coordination.md) |
 | 在自己的编辑器中做题 | [本地公开测试与提交工具](docs/local-practice.md) |
 | 新增题目、课程或学习路径 | [内容规范](docs/content.md)、[工程项目](projects/README.md)、[组织题库](docs/rfcs/009-organizations-and-packages.md) |
 | 修改代码或查看设计 | [贡献指南](CONTRIBUTING.md)、[AGENTS.md](AGENTS.md)、[设计索引](docs/README.md) |
 
-## 快速体验
+## Docker Compose 一键体验
+
+准备 Docker Engine 和 Docker Compose，在仓库根目录执行：
+
+```sh
+docker compose up --build -d
+```
+
+等待 `docker compose ps` 显示 `healthy`，打开 <http://127.0.0.1:8000>。首次构建需要下载固定基础镜像和依赖。容器自动迁移新数据库，并导入题库、英文译文、项目及挑战；注册后可体验草稿、学习记录和社区。无需手工设置密钥，随机密钥保存在私有数据卷中，重建容器后仍可使用原账号和会话。
+
+```sh
+docker compose logs -f web  # 查看启动日志；Ctrl+C 退出日志
+docker compose down         # 停止服务，保留数据卷
+docker compose up -d        # 使用已有镜像再次启动
+```
+
+数据在 Compose 的 `app-data` 命名卷中，与仓库的 `db.sqlite3` 分开。已有数据库只迁移，不自动重导内容；`down -v` 会删除体验数据，请勿用于日常停止。端口占用时可用 `PRAXIMESH_PORT=8001 docker compose up --build -d`；后续启动保持同一端口配置。
+
+如果 Docker 运行在远程服务器上，在自己电脑执行 `ssh -N -L 8000:127.0.0.1:8000 user@server`，将 `user@server` 换成平时的 SSH 登录地址，再访问上述本机网址。
+
+此入口仅监听回环地址，真实判题和 AI 默认关闭。体验 Run/Submit 的真实结果按 [WASI 指南](docs/wasi.md)配置；长期部署按下方发布与部署流程操作。Compose 启动及数据保留说明见[运维手册](docs/operations.md)。
+
+## Python 开发环境启动
 
 当前验证环境为 Linux x86_64、Python 3.11；仓库的 `.python-version` 和 `uv.lock` 固定开发环境。准备 [uv](https://docs.astral.sh/uv/)，在仓库根目录运行：
 

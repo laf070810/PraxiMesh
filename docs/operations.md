@@ -1,22 +1,28 @@
 # 部署、维护与恢复手册
 
-修订：2026-10-24。初始部署目标 Linux amd64。其他架构必须换用对应镜像 digest 并重新验证；当前不声称支持全部架构。当前能力与各批验收状态见[需求追踪](requirements.md)，初始基线见 [acceptance.md](acceptance.md)。
+修订：2026-10-30。初始部署目标 Linux amd64。其他架构必须换用对应镜像 digest 并重新验证；当前不声称支持全部架构。当前能力与各批验收状态见[需求追踪](requirements.md)，初始基线见 [acceptance.md](acceptance.md)。
 
 ## 本地应用
 
 README 的 uv 命令运行非执行功能。SQLite 默认位于仓库忽略文件 `db.sqlite3`。在禁止写用户缓存的环境可设置 `UV_CACHE_DIR=/tmp/praximesh-uv`。依赖输入为 `pyproject.toml`，完整解析锁为 `uv.lock`，容器用带 hash 的 `requirements.lock`。
 
-本地容器启动：
+本地容器一键启动，无需宿主 Python 或手工生成密钥：
 
 ```sh
-set -a
-. deploy/images.env
-set +a
-export APP_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(64))')"
-docker compose up --build
+docker compose up --build -d
+docker compose ps
+docker compose logs -f web
 ```
 
-仅监听 `127.0.0.1:8000`，判题关闭；默认 SQLite 卷持久化，应用非 root、根文件系统只读。首次启动执行迁移并导入默认完整内容包。**生产不要自动导入示例覆盖运营内容，也不要使用开发设置。** `docker compose down` 保留数据卷，`down -v` 会删除数据，恢复前不要使用。
+默认仅监听 `127.0.0.1:8000`，健康后可在浏览器打开。可用 `PRAXIMESH_PORT` 调整宿主端口；容器内仍监听 8000。Compose 使用固定的 Python 基础镜像，`PYTHON_IMAGE` 仍可由操作者显式覆盖。应用非 root、只读根、带 init、删除 capabilities，有内存/PID 限额；不挂宿主目录或 Docker socket。判题和 AI 关闭，不要求 GPU 或模型服务。
+
+`core.preview` 在 `app-data` 命名卷中生成并保留 0600 的随机密钥 `/data/preview-secret.key`。旧配置若提供 `APP_SECRET_KEY`，继续使用该值，重启时保持相同配置。密钥丢失或更换会使原会话失效，不能将重新生成密钥当作恢复操作。密钥与 SQLite 一起备份，备份按私有数据保护。
+
+仅当 `/data/praximesh.sqlite3` 不存在时，才在同一卷的临时目录运行迁移，并导入基础题库、英文译文、项目及挑战；全部成功后发布新数据库。失败会退出，修复后再次启动即可重试。已有数据库只迁移，不重导或撤回已有内容。旧版 Compose 卷若缺少译文、项目或挑战，应由维护者按内容规范审查后显式导入，不能通过删除原数据库“补齐”。
+
+`docker compose down` 保留卷；`docker compose up -d` 使用已有镜像重新启动；源码更新后用 `up --build -d`。`down -v` 会删除数据，请勿用于日常停止或恢复。这里的自动迁移面向本地体验；生产使用下述协调器的备份、排空与代际恢复流程。
+
+本地重放该入口的检查：`python3 scripts/compose_acceptance.py`。只要求宿主 Docker/Compose 与 Python 标准库；脚本使用唯一项目名、临时回环端口和合成数据，验证初始化、账号/草稿/会话/自定义内容与密钥保留，并清理自有容器、网络和卷。设计见 [RFC-015](rfcs/015-compose-preview.md)。
 
 更新依赖：`uv lock --upgrade-package PACKAGE` → `uv sync --frozen` → 所有相关测试与审计 → `uv export --frozen --no-dev --no-emit-project --format requirements-txt --no-header --quiet -o requirements.lock`。基础镜像也要跟随安全更新，不因 digest 固定而停止升级。记录更新前后镜像摘要及验收。
 

@@ -1,6 +1,6 @@
 # 全部 PRD 要求的实施与证据
 
-更新：2026-10-24。目标：按 PRD 实施阶段 A/B/C 与 D/E/F 补充。维护者已明确当前先交付可本地验证的自部署版本；公开运营、许可证选择及真实 GPU 验收留待后续。**C 的专业评测、组织与辅导，D 的完整筛选、私有成就与挑战，E 的类/API，以及 F 的版本题目反馈均已通过本地验收。外部部署与授权事项仍未完成。** 当前固定制品及 E→F HTTPS 升级见 [F 验收](acceptance-f.md)，类/API见 [E 验收](acceptance-e.md)，筛选与挑战见 [D 验收](acceptance-d.md)，既有阶段 A 验收见 [acceptance.md](acceptance.md)，架构见 [RFC-006](rfcs/006-complete-product.md)和 [ADR-011](adr/011-specialists-organizations-coaching.md)。
+更新：2026-10-30。目标：按 PRD 实施阶段 A/B/C 与 D/E/F 补充。维护者已明确当前先交付可本地验证的自部署版本；公开运营、许可证选择及真实 GPU 验收留待后续。**C 的专业评测、组织与辅导，D 的完整筛选、私有成就与挑战，E 的类/API，以及 F 的版本题目反馈均已通过本地验收。外部部署与授权事项仍未完成。** 当前固定制品及 E→F HTTPS 升级见 [F 验收](acceptance-f.md)，类/API见 [E 验收](acceptance-e.md)，筛选与挑战见 [D 验收](acceptance-d.md)，既有阶段 A 验收见 [acceptance.md](acceptance.md)，架构见 [RFC-006](rfcs/006-complete-product.md)和 [ADR-011](adr/011-specialists-organizations-coaching.md)。
 
 ## 功能要求
 
@@ -35,7 +35,7 @@
 
 2026-10-24 在 F 交付后复核 PRD、源码、冻结制品、原始测试与实际升级回执。该次运行代码、迁移、内容和测试与已验收 F 制品一致；差异仅为交付文档。F 清单和载荷重新校验通过，首次安装、七组扩展浏览器与 E→F 升级回执均通过且已清理。此复核不把历史测试当作当前全矩阵重新执行，也不把本地验收外推为公网运营成功。
 
-后续开发指南增量（`a3e433c`、`9c823d9`）完善 README、AGENTS 和贡献说明，并修改 `scripts/release.py` 及对应测试，使未来源码包可包含 AGENTS，同时接受没有此文件的旧发布包。新虚拟环境中的锁定依赖安装、迁移、内容/译文/项目/挑战导入、健康检查与六个主要页面均实际通过；36 项发布检查及原 F 制品校验通过。应用代码、评测策略、迁移和题库仍与 F 一致；F 固定镜像未重建。证据见 `test-results/onboarding-final.json` 和 `test-results/onboarding-quickstart/result.json`。
+2026-10-24 的后续开发指南增量（`a3e433c`、`9c823d9`）完善 README、AGENTS 和贡献说明，并修改 `scripts/release.py` 及对应测试，使未来源码包可包含 AGENTS，同时接受没有此文件的旧发布包。新虚拟环境中的锁定依赖安装、迁移、内容/译文/项目/挑战导入、健康检查与六个主要页面均实际通过；36 项发布检查及原 F 制品校验通过。应用代码、评测策略、迁移和题库仍与 F 一致；F 固定镜像未重建。证据见 `test-results/onboarding-final.json` 和 `test-results/onboarding-quickstart/result.json`。
 
 | 未完成项 | 当前证据与限制 | 后续完成所需条件 |
 | --- | --- | --- |
@@ -49,6 +49,8 @@
 开发指南交付后再次只读查询，runsc 缺失、CPU 配额不可用和 Git 无远端的条件仍未改变，记录在 `test-results/post-onboarding-blockers-1.json`。GPU 验收还需针对所选 runsc 核对驱动的严格版本兼容性；nvproxy 会将受支持的 GPU 调用转交宿主 NVIDIA 驱动，驱动本身仍在信任边界内，详见 [gVisor GPU 官方指南](https://gvisor.dev/docs/user_guide/gpu/)。此处未选定 GPU 运行时版本，也不声称本机驱动已通过兼容性或隔离验收。
 
 ## 分批结果
+
+- 2026-10-30 本地 Compose 入口：使用 `docker compose up --build -d` 自动准备新库和持久密钥，首次完整导入题库/译文/项目/挑战；已有内容不重导。55 项定向检查及实际容器删除重建验证通过，账号、草稿、会话、自定义知识与撤回状态保留。该增量新增本地启动器并修改当前源码的 Compose 配置，F 固定发布包保持原状；未重新验收正式发布镜像或真实判题。设计和证据见 [RFC-015](rfcs/015-compose-preview.md)及 [ADR-014](adr/014-compose-preview.md)。
 
 - 阶段 A 基线：提交 `e9d7bf1`，普通回归 310 passed/18 skipped、PostgreSQL/WASI 327 passed/1 skipped，以及真实 HTTPS 与失败迁移恢复。证据范围详见既有验收记录。
 - B1：最终普通回归 412 passed/18 skipped；PostgreSQL 与真实 WASI 回归 405 passed/1 SQLite-only skipped（`test-results/application-b1-final.xml`、`test-results/postgres-b1.xml`）。18 题参考解、125 参考用例、36 针对性错解、18 个恒空变体与隔离探针实测通过。升级 CLI 前置契约另有 20 项通过；真实浏览器、镜像首次安装与阶段 A→B1 schema 升级通过，旧数据与旧目录保留。最后边界修复专项 PostgreSQL 118 passed。详见 [B1 验收](acceptance-b1.md)。完整 PRD 目标仍未完成。
