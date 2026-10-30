@@ -29,6 +29,7 @@
 - [ADR-019：CUDA 会话协议与控制器批次时间](adr/019-gpu-session-protocol.md)
 - [G5 非 GPU 任务服务与数据库控制检查](acceptance-g5.md) — 实际进程树、独立期限、接管及 PG 超时通过，正式 GPU worker 待接入
 - [ADR-020：任务服务硬期限与有界控制回调](adr/020-gpu-task-control.md)
+- [G6 GPU 控制连接与占用监测组件](acceptance-g6.md) — 本机 socket 与拒绝路径检查通过，完整运行适配器待连接
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)
