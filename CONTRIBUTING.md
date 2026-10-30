@@ -2,7 +2,7 @@
 
 先读 [PRD](PRD.md)、[设计索引](docs/README.md)、[需求追踪](docs/requirements.md) 和 [内容规范](docs/content.md)。提交小而完整的变更，说明对应需求、行为变化和验证边界；扩展题型及社区功能时保留已有评测、隐私和版本约束。
 
-1. `uv sync --frozen`，按 README 初始化数据库和内容。
+1. 按[源码开发环境](docs/deployment/README.md#development)同步依赖、初始化新的开发数据库和内容；服务部署从[统一部署指南](docs/deployment/README.md)选择方案。
 2. 对架构、分类、版本、评测/安全/身份/部署边界的改变，先更新 RFC；决定后新增或替代 ADR。
 3. 增加能捕获真实失败的测试；不写只重复实现的断言。用户代码、题解与参考实现均不能在宿主无隔离执行。
 4. 执行 `pytest`、`ruff check`、`ruff format --check`、`content_check` 和迁移漂移检查。修改锁文件后重新审计依赖并导出 `requirements.lock`。

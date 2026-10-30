@@ -11,7 +11,7 @@
 - worker image：`sha256:8ca7917608f5df1cad60b08441d422c9a1aacd95d824bfe32655d50d8de54f23`。
 - WASI bundle：`56d8e49398f508f793c71f5c350efbc27d27d219502aa8f9a7b8ca06b24c1c0b`；策略：`b3914277f73f6a8fc4c6bda98501d155844e9a58ce2df812d19d37cedce50877`。
 
-最终源码先冻结再构建，并逐文件核对与工作区一致。D1 通过固定镜像首次安装；第一次 C→D 演练在访问隔离断言失败：游客会被引导登录，脚本却期待 404。D2 改用另一个已登录账号验证 404，另更新命令帮助和历史文档状态。实际比较确认 D1/D2 的 Web、worker RootFS 层和运行配置（除发布标签）完全相同，因此首次安装证据复用 D1，实际升级在 D2 上重新执行。未将 D1 初装回执改写为 D2 回执；映射见 `test-results/d2-runtime-comparison.json`。随后仅补写验收和交付文档，不将后写文档算入旧 source ID。制品导入与部署入口见[发布指南](releases.md)和[部署协调指南](deployment-coordination.md)。示例挑战有固定的 2026 年 UTC 窗口，不会在过期后自动续期。
+最终源码先冻结再构建，并逐文件核对与工作区一致。D1 通过固定镜像首次安装；第一次 C→D 演练在访问隔离断言失败：游客会被引导登录，脚本却期待 404。D2 改用另一个已登录账号验证 404，另更新命令帮助和历史文档状态。实际比较确认 D1/D2 的 Web、worker RootFS 层和运行配置（除发布标签）完全相同，因此首次安装证据复用 D1，实际升级在 D2 上重新执行。未将 D1 初装回执改写为 D2 回执；映射见 `test-results/d2-runtime-comparison.json`。随后仅补写验收和交付文档，不将后写文档算入旧 source ID。制品导入与部署入口见[发布指南](deployment/releases.md)和[部署协调指南](deployment/production.md)。示例挑战有固定的 2026 年 UTC 窗口，不会在过期后自动续期。
 
 ## 功能、权限与真实执行
 

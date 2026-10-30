@@ -1,6 +1,6 @@
 # Compose 单机部署验收
 
-日期：2026-10-30。范围为 [RFC-016](rfcs/016-compose-selfhost.md) 的 Web、真实 CPU/WASI worker 与可选本地 CPU 模型，使用 Linux x86_64、Docker Engine 29.9.2 和 Compose 5.6.1。基础组合与带模型组合均已通过完整容器验收。使用方法见 [Compose 指南](compose.md)。
+日期：2026-10-30。范围为 [RFC-016](rfcs/016-compose-selfhost.md) 的 Web、真实 CPU/WASI worker 与可选本地 CPU 模型，使用 Linux x86_64、Docker Engine 29.9.2 和 Compose 5.6.1。基础组合与带模型组合均已通过完整容器验收。使用方法见 [Compose 指南](deployment/compose.md)。
 
 ## 已验证结果
 
@@ -15,7 +15,7 @@
 
 真实模型对“零是否应计入正数和”的公开问题返回了逐步累加与严格正值判断的建议。该次只证明真实请求、界面与隐私流程完成，不代表提示质量或模型准确率通过评测；历史错误建议和小模型限制仍保留在模型指南中。
 
-镜像内联合 WASI bundle 的 SHA-256 为 `ad9edfbe0cc8a4996789175f8fcb42feee618c8b4b21a8618858f5bf1fdd595d`，策略摘要为 `f7a955218ed9b662a2f878949f11014ed77bc84faefae9e6dfac6c6b9db5608a`。解释器为 CPython 3.14.9、QuickJS 2026-06-04、Wasmtime 50.0.1；完整源码身份与探针 suite 摘要保存在结果文件中。模型和 llama.cpp 的固定来源见 [AI 指南](local-coaching.md)。
+镜像内联合 WASI bundle 的 SHA-256 为 `ad9edfbe0cc8a4996789175f8fcb42feee618c8b4b21a8618858f5bf1fdd595d`，策略摘要为 `f7a955218ed9b662a2f878949f11014ed77bc84faefae9e6dfac6c6b9db5608a`。解释器为 CPython 3.14.9、QuickJS 2026-06-04、Wasmtime 50.0.1；完整源码身份与探针 suite 摘要保存在结果文件中。模型和 llama.cpp 的固定来源见 [AI 指南](deployment/ai.md)。
 
 ## 原始失败与修复
 

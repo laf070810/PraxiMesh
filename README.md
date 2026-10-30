@@ -12,98 +12,30 @@
 - **社区与协作**：主动送审的题解、讨论、博客、评论和绑定版本的题目反馈；可撤回的公开成果与可比榜单；组织角色、版本课程及第三方题库审核发布。
 - **中英体验**：中英界面，20 个知识节点与 10 道题的英文内容；缺少译文时明确回退原文。可选 AI 提示先预览再发送，不修改正式成绩。
 
-## 从这里开始
+## 部署与运行
 
-| 目标 | 入口 |
-| --- | --- |
-| 用 Docker 直接做题、评测和使用可选 AI | 下方“Docker Compose 启动”，无需宿主 Python 或预先构建 WASI |
-| 用 Python 环境开发和体验 | 下方“Python 开发环境启动”，无需 Docker |
-| 在本机运行真实评测 | [WASI 构建与判题](docs/wasi.md) |
-| 部署到自己的主机 | [发布包](docs/releases.md) → [部署、升级与恢复](docs/deployment-coordination.md) |
-| 在自己的编辑器中做题 | [本地公开测试与提交工具](docs/local-practice.md) |
-| 新增题目、课程或学习路径 | [内容规范](docs/content.md)、[工程项目](projects/README.md)、[组织题库](docs/rfcs/009-organizations-and-packages.md) |
-| 修改代码或查看设计 | [贡献指南](CONTRIBUTING.md)、[AGENTS.md](AGENTS.md)、[设计索引](docs/README.md) |
+**统一入口：[部署指南：方案选择、启动与维护](docs/deployment/README.md)。** 指南比较 Compose 单机自部署、PostgreSQL/HTTPS 发布协调器和源码开发，说明各自的适用场景、数据位置、AI 选择及升级方式。
 
-## Docker Compose 启动
-
-在 Linux x86_64 主机准备 Docker Engine 和 Docker Compose，于仓库根目录执行：
+想直接做题，在 Linux x86_64 主机准备 Docker Engine 和 Docker Compose，于仓库根目录执行：
 
 ```sh
 docker compose up --build -d
 ```
 
-默认启动 Web 和真实 WASI worker。首次自动构建固定版本的 Python/JavaScript 解释器、初始化数据库并导入题库、译文、项目及挑战；无需手工设置密钥、bundle 摘要或安装宿主 Python。首次下载和编译需要时间，后续复用构建缓存。
-
-需要同时体验本地 CPU AI 辅导，使用：
+需要同时启动本地 CPU AI：
 
 ```sh
 docker compose -f compose.yaml -f compose.ai.yaml up --build -d
 ```
 
-这会额外构建模型服务并下载约 640 MB 的固定模型。AI 先预览再发送，输出仅作建议，不改正式成绩；模型端口不对外开放。已有 HTTPS 模型服务也可通过私有配置接入。
+打开 `http://服务器IP:8000`。默认监听 `0.0.0.0:8000`；首次自动构建解释器、初始化新数据库并启动真实 worker，隔离检查完成后开放评测。使用 AI 时，后续命令也带这两个 `-f` 参数。端口、服务状态、数据保留、更新和恢复都在[部署指南](docs/deployment/README.md)查阅。
 
-打开 **`http://服务器IP:8000`**，注册后进入 Practice →「只累加正数」。Web 就绪即可浏览；worker 完成全部真实隔离自检后，才能运行样例和正式提交。
-
-```sh
-docker compose ps                # worker 显示 healthy 后可评测
-docker compose logs -f worker    # 首次隔离检查及运行日志
-curl http://127.0.0.1:8000/health/ # evaluation 应为 available
-docker compose down             # 停止，保留数据
-docker compose up -d            # 使用已有镜像再次启动
-```
-
-使用 AI 时，后续命令也带 `-f compose.yaml -f compose.ai.yaml`。默认监听 `0.0.0.0:8000`，无需端口转发；用 `PRAXIMESH_PORT=8001` 改端口，或 `PRAXIMESH_BIND=127.0.0.1` 限定同机访问。
-
-账号、会话、草稿和成绩保存在 `app-data` 命名卷，与仓库的 `db.sqlite3` 分开。原 Compose 页面体验版可直接升级并保留数据；已有库只迁移，不重导目录。`down -v` 会删除数据，勿用于日常停止。
-
-完整配置、资源、可选模型及恢复见 [Compose 指南](docs/compose.md)，实际结果见 [Compose 验收记录](docs/acceptance-compose.md)。这是包含已有功能的单机 SQLite/HTTP 入口；长期 PostgreSQL、HTTPS 和受控升级使用下方发布与部署流程。GPU 评测尚未实现。
-
-## Python 开发环境启动
-
-当前验证环境为 Linux x86_64、Python 3.11；仓库的 `.python-version` 和 `uv.lock` 固定开发环境。准备 [uv](https://docs.astral.sh/uv/)，在仓库根目录运行：
-
-```sh
-uv sync --frozen
-.venv/bin/python manage.py migrate
-.venv/bin/python manage.py content_check
-.venv/bin/python manage.py content_import --translations content/en.json
-.venv/bin/python manage.py project_import content/projects.json
-.venv/bin/python manage.py challenge_import content/challenges.json
-.venv/bin/python manage.py runserver 127.0.0.1:8000
-```
-
-这些初始化命令用于新的本地数据库。打开 <http://127.0.0.1:8000>，从 Learn 或 Practice 开始；注册后保存只显示一次的恢复码。默认 SQLite 数据库位于忽略文件 `db.sqlite3`。本地开发服务器仅供回环访问。
-
-评测关闭时，题目阅读、代码编辑和私有草稿仍可使用；提交会明确提示不可用。需要真实结果时，继续配置下节的 WASI worker。
-
-已有站点按[升级指南](docs/deployment-coordination.md)操作。`content_import` 是显式内容发布，会撤回官方包中缺失的内容 ID，不应拿示例包覆盖自有目录。示例挑战使用固定的 2026 年 UTC 时间窗口，过期不会自动延期；活动发布见[挑战与成就指南](docs/challenges.md)。
-
-## 开启真实判题与可选辅导
-
-[WASI 指南](docs/wasi.md)包含固定解释器构建、摘要配置、真实隔离探针和 Web/worker 启动步骤。`sandbox_check` 必须在执行环境真实通过；只有匹配策略且健康的 worker 才能接收任务。缺少配置、检查记录过期或 worker 离线时，提交保持关闭。
-
-WASI 支持这里声明的 Python 标准库与 JavaScript 同步 JSON 契约，不提供 Node、网络、文件写入、线程或任意第三方原生扩展。各题目单独声明输入、输出、资源预算和评分规则，详见[完整程序](docs/stdio-contract.md)、[类/API](docs/object-api-contract.md)和 [Agent](docs/agent-contract.md)契约。
-
-已完成依赖同步和 WASI 配置后，可以重放真实学习闭环：
-
-```sh
-.venv/bin/playwright install chromium
-.venv/bin/python scripts/browser_acceptance.py --judge
-```
-
-可选自部署模型、发送范围和实际质量限制见 [AI 辅导指南](docs/local-coaching.md)。学习计划、规则提示和实践证据不要求配置模型。
-
-## 自部署与验收
-
-部署目标为 Linux x86_64，使用 PostgreSQL、固定 Web/worker 镜像和 HTTPS 代理。发布目录包含 `release.json`、`source.tar.gz`、`images.tar`；先用独立确认的清单摘要校验，再通过部署协调器执行安装或升级。
-
-1. 按[发布指南](docs/releases.md)构建、校验和导入同源镜像。
-2. 按[部署协调指南](docs/deployment-coordination.md)准备私有配置、数据库角色、网络、Caddy 和服务监管，执行 `apply`；首次导入示例内容须显式选择。
-3. 按[运维手册](docs/operations.md)配置健康监测、日志、备份与恢复，并在目标主机完成验收。
-
-当前最新固定制品为 F，已验证真实 WASI 探针、容器浏览器流程、排空恢复及 E→F 保留数据的 HTTPS 升级；摘要、证据与验证边界见 [F 验收记录](docs/acceptance-f.md)。历史验收从[设计索引](docs/README.md)进入。本地生成的镜像、日志和截图保存在忽略目录 `var/`、`test-results/`，不随 Git 克隆分发。
-
-托管 CI/CD 工作流已提供，部署工作流默认禁用且只接受手工触发。服务端 CI、专用部署 runner、公有证书续期和目标站点持续容量仍需在对应环境验证，本地回环验收不能代替这些结果。
+| 其他任务 | 入口 |
+| --- | --- |
+| 用 Python 修改代码或内容 | [源码开发环境](docs/deployment/README.md#development) |
+| 在自己的编辑器中做题 | [本地公开测试与提交工具](docs/local-practice.md) |
+| 新增题目、课程或学习路径 | [内容规范](docs/content.md)、[工程项目](projects/README.md)、[组织题库](docs/rfcs/009-organizations-and-packages.md) |
+| 贡献代码或查看设计 | [贡献指南](CONTRIBUTING.md)、[AGENTS.md](AGENTS.md)、[设计索引](docs/README.md) |
 
 ## 开发与检查
 
@@ -131,7 +63,7 @@ uv sync --frozen --group browser
 .venv/bin/python scripts/browser_acceptance.py
 ```
 
-浏览器还需要相应系统依赖，CI 使用受支持的 Ubuntu。验收脚本创建并删除合成账号，结束时清理自有进程和数据库。真实沙箱、HTTPS、发布制品检查分别按 [WASI](docs/wasi.md)、[HTTPS 验收](docs/production-acceptance.md)和[发布指南](docs/releases.md)执行。
+浏览器还需要相应系统依赖，CI 使用受支持的 Ubuntu。验收脚本创建并删除合成账号，结束时清理自有进程和数据库。真实沙箱、HTTPS、发布制品检查分别按 [WASI](docs/deployment/wasi.md)、[HTTPS 验收](docs/deployment/validation.md)和[发布指南](docs/deployment/releases.md)执行。
 
 修改依赖后运行 `.venv/bin/pip-audit` 并按[贡献指南](CONTRIBUTING.md)更新锁文件。不要在正在运行的 Web/worker 环境中执行会增删依赖的 `uv sync`；服务使用固定环境，更新在独立环境准备。
 

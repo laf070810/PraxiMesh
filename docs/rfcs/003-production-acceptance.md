@@ -1,6 +1,6 @@
 # RFC-003：HTTPS 部署验证与发布证据
 
-状态：接受，隔离部署实测通过。日期：2026-10-23。关联：PRD R-09 / AC-05 / AC-07。决策见 [ADR-005](../adr/005-production-acceptance.md)，重放见[部署验收指南](../production-acceptance.md)。
+状态：接受，隔离部署实测通过。日期：2026-10-23。关联：PRD R-09 / AC-05 / AC-07。决策见 [ADR-005](../adr/005-production-acceptance.md)，重放见[部署验收指南](../deployment/validation.md)。
 
 本地开发服务器的成功不能证明生产设置、代理、TLS 或数据库角色可用。本轮建立一次性的真实部署验收：Caddy TLS → Gunicorn（生产设置）→ PostgreSQL，并接入实际 WASI worker。所有端口只绑定回环地址；不安装系统证书、不使用公开域名、不改共享 Docker 配置。
 

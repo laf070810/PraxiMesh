@@ -2,6 +2,8 @@
 
 需求基线：[PRD v0.2](../PRD.md)。技术方案可变，产品验收不随实现缩减。
 
+**运行与部署从[统一部署指南](deployment/README.md)开始**：方案选择、Compose、PostgreSQL/HTTPS、源码开发、AI、运维和构建验收均集中在 `docs/deployment/`。下方保留设计与历史验收索引。
+
 - [阶段计划与安全发布门槛](plan.md)
 - [完整 PRD 需求追踪](requirements.md) — 全目标实施中，当前 F 自部署制品及版本题目反馈已验证
 - [RFC-006：阶段 B/C 的完整产品实施](rfcs/006-complete-product.md) — 实施中
@@ -15,11 +17,9 @@
 - [RFC-014：绑定版本的题目反馈](rfcs/014-versioned-problem-feedback.md)
 - [RFC-015：Compose 一键本地体验](rfcs/015-compose-preview.md)
 - [RFC-016：可直接做题的 Compose 单机部署](rfcs/016-compose-selfhost.md)
-- [Docker Compose 单机部署与可选 AI](compose.md)
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)
-- [可选自部署模型与本地 CPU 重放](local-coaching.md)
 - [本地公开测试、访问令牌与提交工具](local-practice.md)
 - [中英界面、内容译文与版本回退](localization.md)
 - [多阶段项目发布与版本进度](../projects/README.md)
@@ -46,11 +46,6 @@
 - [学习记录和社区维护](community.md)
 - [威胁模型](security.md)
 - [内容贡献规范](content.md)
-- [运维手册](operations.md)
-- [WASI 构建与完整本地体验](wasi.md)
-- [生产设置的 HTTPS 验收重放](production-acceptance.md)
-- [发布制品构建、校验与导入](releases.md)
-- [单主机发布协调、排空与恢复](deployment-coordination.md)
 - [阶段 A 验收记录](acceptance.md)
 - [B1 学习与社区验收](acceptance-b1.md)
 - [B2 多语言练习、项目与公开成果验收](acceptance-b2.md)

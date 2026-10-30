@@ -10,4 +10,4 @@ worker 入口 `wasi_service` 在当前实例运行真实探针，通过后才启
 
 WASI bundle 升为 format 2，显式目标 `x86_64-unknown-linux-gnu`，禁用 component model；不再自动按构建机 CPU 特性生成 cache。解释器、SDK 与 Wasmtime 版本不变，重新构建并执行了全部真实测试。增加固定运行库的许可声明与来源摘要；旧 bundle/receipt 不能跨策略复用。其他 CPU/内核和目标主机仍须实测，架构名不能替代兼容性证明。
 
-选择镜像 archive 作为首个传输格式，不预设 registry；镜像导入、内容发布、schema 迁移和服务激活分开。独立导入验收覆盖全新合成 PostgreSQL、受限角色、实际浏览器 Run/WA/Accepted/进度/删除及错误摘要拒绝，不能单独证明生产迁移、在途任务排空或恢复。后续协调器按 ADR-008 处理这些状态，不原地覆盖运行代码，也不让不兼容 worker 同时抢任务。具体结果见[验收记录](../acceptance.md)，操作见[制品指南](../releases.md)。
+选择镜像 archive 作为首个传输格式，不预设 registry；镜像导入、内容发布、schema 迁移和服务激活分开。独立导入验收覆盖全新合成 PostgreSQL、受限角色、实际浏览器 Run/WA/Accepted/进度/删除及错误摘要拒绝，不能单独证明生产迁移、在途任务排空或恢复。后续协调器按 ADR-008 处理这些状态，不原地覆盖运行代码，也不让不兼容 worker 同时抢任务。具体结果见[验收记录](../acceptance.md)，操作见[制品指南](../deployment/releases.md)。

@@ -24,7 +24,7 @@
 
 所有正式题目必须同时含公开与受保护场景，测试名称不能重复。函数和完整程序用例的输入 UTF-8 JSON 最多 100,000 字节，预期结果的 ASCII 转义 JSON 最多 32,000 字节；`numeric` 必须显式声明绝对/相对容差。专业题型使用各自严格的数据、指标和资源字段，不能上传 checker 或自报分数；ML/科学数据集声明稳定 ID、revision、seed 与内容 digest。所有类型拒绝非有限数值。
 
-完整字段和边界以 [JSON Schema](../content/schema.json)、[ML 验证器](../judge/ml.py)、[科学计算验证器](../judge/scientific.py)为准。调用、反馈与资源语义见[WASI 指南](wasi.md)、[完整程序契约](stdio-contract.md)、[类/API 契约](object-api-contract.md)、[Agent 契约](agent-contract.md)和[专业评测设计](rfcs/010-specialist-evaluation.md)。七种评测器均支持 WASI；保留的 gVisor 后端只支持 Python JSON 函数。
+完整字段和边界以 [JSON Schema](../content/schema.json)、[ML 验证器](../judge/ml.py)、[科学计算验证器](../judge/scientific.py)为准。调用、反馈与资源语义见[WASI 指南](deployment/wasi.md)、[完整程序契约](stdio-contract.md)、[类/API 契约](object-api-contract.md)、[Agent 契约](agent-contract.md)和[专业评测设计](rfcs/010-specialist-evaluation.md)。七种评测器均支持 WASI；保留的 gVisor 后端只支持 Python JSON 函数。
 
 Python/JavaScript 函数模式只支持 JSON 参数和 JSON 返回值。题页显示实际后端支持的标准库边界，无网络或第三方包。JSON 不表达 tuple、集合、自定义对象。`exact` 要求数值类型一致（布尔不等于整数）；`numeric` 允许 int/float 在容差内相等，仍检查形状、键和有限性。
 

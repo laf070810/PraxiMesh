@@ -26,7 +26,7 @@
 - 应用镜像的独立烟雾基线通过：UID 65532、只读根、无网络、迁移/导入/Gunicorn/静态资源 HTTP。Web 镜像含策略与锁文件，不包含 WASI 制品或 Docker socket；该烟雾检查保持执行关闭。最新两镜像的真实部署检查见下文。
 - `content_check`、Ruff、迁移漂移、Django `check`、锁文件/生产 requirements 一致性通过。`pip-audit` 包含新增 judge 依赖，查询时未发现已知漏洞；不表示基础镜像系统包或未来漏洞已获证明。
 
-本地证据在忽略的 `test-results/`，当前为 `postgres-phase-a-final.xml`、`application-phase-a-final.xml`，另有浏览器截图、受限日志和构建日志；旧文件保留为历史基线。重放见 [WASI 指南](wasi.md)；WASI 工作流在临时 PostgreSQL 执行完整真实套件，随后执行 HTTPS、镜像导入与部署恢复验收，尚未在托管 CI 服务端运行。
+本地证据在忽略的 `test-results/`，当前为 `postgres-phase-a-final.xml`、`application-phase-a-final.xml`，另有浏览器截图、受限日志和构建日志；旧文件保留为历史基线。重放见 [WASI 指南](deployment/wasi.md)；WASI 工作流在临时 PostgreSQL 执行完整真实套件，随后执行 HTTPS、镜像导入与部署恢复验收，尚未在托管 CI 服务端运行。
 
 ## 真实 HTTPS 部署与容量（2026-10-23）
 
@@ -48,7 +48,7 @@
 
 分位数按 nearest rank；6 个任务的 p95/p99 均为最大值。满足本地回归目标“浏览 p95 < 1 秒、六份突发 < 60 秒”，但小样本不证明持续峰值或公网 SLO。单 worker 的排队是当前主要瓶颈，全局 100 个待处理任务是拒绝入队的硬上限，不是可在满意延迟内完成 100 份任务的承诺。
 
-完整机器可读结果为 `test-results/production-acceptance.json`；重放方法见[部署验收指南](production-acceptance.md)，决策见 [ADR-005](adr/005-production-acceptance.md)。WASI 工作流已接入同一脚本，尚无托管服务端运行记录。
+完整机器可读结果为 `test-results/production-acceptance.json`；重放方法见[部署验收指南](deployment/validation.md)，决策见 [ADR-005](adr/005-production-acceptance.md)。WASI 工作流已接入同一脚本，尚无托管服务端运行记录。
 
 ## 发布制品与容器核心闭环
 
@@ -58,9 +58,9 @@
 
 此前独立制品验收通过 `var/releases/2026-10-23-candidate-5/`，可信构建输出的 release manifest SHA-256 为 `95dee546759a91a58455109b172649bf81afa3c5bc903737064a05c60512ac5a`。其中的 Web/worker 包含暂停协议与 `0002` 迁移。后续协调器的实际制品与结果见下一节。构建后补写的验收文档不修改已冻结的源码档案。
 
-同次容器验收实际提交延迟受限的正确函数：零秒排空确实超时且保持关闭，新请求 503，阅读/草稿正常；原任务完成 Accepted 后排空结束但仍暂停；错误 token 被拒绝；原 token 恢复后，第二份新提交也实际 Accepted。自己的测试账号/提交被删除，临时容器、网络与数据库卷清理通过。队列协调见 [ADR-007](adr/007-admission-coordination.md)及[操作指南](deployment-coordination.md)。
+同次容器验收实际提交延迟受限的正确函数：零秒排空确实超时且保持关闭，新请求 503，阅读/草稿正常；原任务完成 Accepted 后排空结束但仍暂停；错误 token 被拒绝；原 token 恢复后，第二份新提交也实际 Accepted。自己的测试账号/提交被删除，临时容器、网络与数据库卷清理通过。队列协调见 [ADR-007](adr/007-admission-coordination.md)及[操作指南](deployment/production.md)。
 
-证据为 `test-results/release-acceptance.json`、`release-worker.log`、`release-browser.log` 和发布目录的 `release.json`；设计见 [ADR-006](adr/006-release-artifacts.md)，重放见[制品指南](releases.md)。这是打包核心的回环 HTTP 验收，生产 TLS 由独立验收验证。镜像导入本身没有激活现有服务、执行生产迁移或发布 registry。
+证据为 `test-results/release-acceptance.json`、`release-worker.log`、`release-browser.log` 和发布目录的 `release.json`；设计见 [ADR-006](adr/006-release-artifacts.md)，重放见[制品指南](deployment/releases.md)。这是打包核心的回环 HTTP 验收，生产 TLS 由独立验收验证。镜像导入本身没有激活现有服务、执行生产迁移或发布 registry。
 
 清理复查发现旧脚本强制删除容器时会留下匿名 PostgreSQL 卷，已按明确的容器事件归属删除 10 个无使用者的合成测试卷，记录在 `owned-volume-cleanup.json`。当前镜像验收改为显式标记并删除数据库卷、验证卷消失；HTTPS 脚本强制清理容器时也要求删除其匿名卷。没有执行全局 prune。
 
@@ -74,7 +74,7 @@
 - 候选开放前强制终止协调器，`recover` 重新验证并恢复旧库/旧站。开放后先通过真实 HTTPS 新增草稿和 Accepted 提交、删除另一账号，再终止协调器；恢复保留已开放候选库、新增数据和删除结果，旧快照中仍存在的账号没有复活。
 - 每次启动 worker 均重新运行真实隔离探针；候选检查实际执行正确/错误程序，匹配本 worker 的新心跳、制品与策略。临时容器、网络、数据库卷和本地进程均清理，receipt 的 `cleanup.passed=true`。
 
-完整结果为 `test-results/deployment-candidate-7/deployment-acceptance.json`，重放见[部署协调指南](deployment-coordination.md)。成功替换使用同一应用 schema；失败迁移则确实执行 DDL 后回滚。这不证明任意未来 schema 变更兼容，也未验证公有 CA、目标系统服务、异机恢复或持续容量。恢复边界见 [ADR-008](adr/008-deployment-generations.md)。
+完整结果为 `test-results/deployment-candidate-7/deployment-acceptance.json`，重放见[部署协调指南](deployment/production.md)。成功替换使用同一应用 schema；失败迁移则确实执行 DDL 后回滚。这不证明任意未来 schema 变更兼容，也未验证公有 CA、目标系统服务、异机恢复或持续容量。恢复边界见 [ADR-008](adr/008-deployment-generations.md)。
 
 此前 worker 重启补充验收制品是 `var/releases/2026-10-23-candidate-8/`，manifest SHA-256 为 `9cd00ac2ff40569aca24813063e5fcabb896b65d8a8d6201b93d530a69125982`。它修复协调器对既有重启计数的误判：等待期间新增重启仍拒绝，但不因等待开始前已有重启而拒绝当前启动探针。额外真实演练只终止所属 worker 控制器，观察自动重启计数从 0 到 1、当前启动尚未就绪，然后立即执行 `recover`；恢复保留同一已开放数据库及用户记录，再次得到真实 HTTPS Accepted，全部临时资源清理通过。Docker 随后的主动 stop/start 将计数重置为 0，记录按实测保存。
 

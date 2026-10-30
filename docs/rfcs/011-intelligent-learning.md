@@ -30,6 +30,6 @@ AI 请求和响应默认私有，纳入本人导出与删除。删除一段会�
 
 必须测试跨账号访问、CSRF、固定地址/重定向拒绝、严格 JSON、响应超限、超时、模型输出转义、秘密上下文排除、双请求预约、异常释放、配额跨日、导出和执行中删除。测试替身只能用于这些失败和权限边界，不能证明 AI 辅导已可用。
 
-真实 AI 证明使用公开合成练习问题和固定模型制品，检查实际产生提示、无客观分数写入，并记录人工审阅的准确性与局限。已在独立目录使用 Qwen 官方 `Qwen3-0.6B-GGUF` 的 Q8_0 制品及 CPU-only llama.cpp 完成真实推理和一次 Chromium 提示闭环；AI-off 浏览器流程也通过。一个独立方差解释样例出现概念错误，保留失败记录，不把少量通过样例当作可靠性保证。完整版本和运行边界见 [本地辅导指南](../local-coaching.md)；冻结镜像与升级联合验收另记。
+真实 AI 证明使用公开合成练习问题和固定模型制品，检查实际产生提示、无客观分数写入，并记录人工审阅的准确性与局限。已在独立目录使用 Qwen 官方 `Qwen3-0.6B-GGUF` 的 Q8_0 制品及 CPU-only llama.cpp 完成真实推理和一次 Chromium 提示闭环；AI-off 浏览器流程也通过。一个独立方差解释样例出现概念错误，保留失败记录，不把少量通过样例当作可靠性保证。完整版本和运行边界见 [本地辅导指南](../deployment/ai.md)；冻结镜像与升级联合验收另记。
 
 参考：[Qwen 官方模型](https://huggingface.co/Qwen/Qwen3-0.6B-GGUF)、[llama.cpp 官方 CPU 构建](https://github.com/ggml-org/llama.cpp/blob/master/docs/build.md)、[官方服务接口](https://github.com/ggml-org/llama.cpp/tree/master/tools/server)。固定源码与模型摘要保存在独立验证目录；此方案不使用 GPU，也不发送真实用户内容。

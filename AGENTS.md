@@ -43,7 +43,7 @@
 
 - 先复现具体失败，再修改和验证对应路径。优先有意义的状态、权限、边界与恢复检查；无需为纯文字调整增加重复实现的测试。相关检查通过后，仅在新改动或未解决问题需要时扩大测试范围。
 - 上例以内容检查为例，测试路径按改动模块选择。涉及 PostgreSQL 锁、角色权限或迁移时使用 `scripts/postgres_tests.py`，例如 `.venv/bin/python scripts/postgres_tests.py -q tests/test_community.py`；它创建并清理自有临时数据库。
-- 真实评测先按 [WASI 指南](docs/wasi.md)配置可信 bundle、摘要及 `JUDGE_RECEIPT`，实际运行 `sandbox_check`。`RUN_SANDBOX_TESTS=1` 才启用相关集成场景；记录跳过原因，不把 skipped 当通过。
+- 真实评测先按 [WASI 指南](docs/deployment/wasi.md)配置可信 bundle、摘要及 `JUDGE_RECEIPT`，实际运行 `sandbox_check`。`RUN_SANDBOX_TESTS=1` 才启用相关集成场景；记录跳过原因，不把 skipped 当通过。
 - 浏览器、HTTPS、发布包和升级用现有 `scripts/*acceptance.py` 入口。使用一次性数据库、合成账号和明确属于本次测试的容器/卷；默认使用回环地址，按用户明确要求验证直接 IP 访问时使用独立测试端口。完成后核对清理，不删除未知资源。
 - Compose 单机入口为 `core/selfhost.py`，复用 `core/preview.py` 的原子数据库初始化；默认包括真实 WASI worker，可选 `compose.ai.yaml` 启动本地模型。修改时重放 `python3 scripts/compose_acceptance.py`；涉及模型或界面时使用 `--ai --browsers`。核对真实探针与七种题型、worker 离线关闭提交、直接 IP/CSRF、初始化恢复、旧内容不重导及成绩/会话跨重建保留。不得用旧 receipt 或宿主缓存代替镜像内自检。此入口不替代生产发布协调器。
 - 重型 WASI/worker 验收按资源预算串行安排，避免争用造成假超时。长进程须跟踪原进程或工具句柄；观察超时不代表进程结束，不据此重复启动。
@@ -53,6 +53,7 @@
 ## 文档与 Git 提交
 
 - README 面向首次使用者，说明当前能力、快速体验、真实评测、自部署与开发入口；历史执行细节放对应验收文档。保持需求追踪、RFC/ADR、使用指南和 CHANGELOG 与实际行为一致。
+- 部署操作统一维护在 [docs/deployment/](docs/deployment/README.md)：首页负责方案和场景选择，专页负责对应操作。README 只保留最短启动入口，旧文档路径只做跳转；新增部署选项时同步更新选择表，避免在多处复制完整步骤。
 - **工作过程中及时 git commit**：每完成一个可审阅的相关增量，就记录具体问题、变化和验证结果。提交前检查差异，只包含本次任务文件；未完成或未验证部分必须如实说明。用户未要求时不推送、不改写既有共享历史。
 - 不使用 `git add .`、reset、clean 或 stash 来掩盖混合工作区。已经存在的用户暂存内容应保持原状。
 - 本项目开发工作区可能仍保留未出生的 `master` 和用户暂存的 `PRD.md`，而实现历史保存在 `codex/full-product`。遇到这种状态，先用 `git log codex/full-product` 核对，不能把所有 untracked 文件当成没有历史。沿该审阅分支追加提交，使用临时索引或隔离工作树，保持原 HEAD 和索引；不要为方便提交擅自切换或重置用户工作区。正常检出的分支按其实际状态提交。

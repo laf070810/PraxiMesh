@@ -5,7 +5,7 @@
 | 资产/威胁 | 控制与边界 | 验证 |
 | --- | --- | --- |
 | 宿主、数据库、其他用户代码 | Web 不能执行代码或访问 Docker socket；专用 worker；每用例新 WASI 实例，只读标准库，无网络/业务环境变量；gVisor 为独立策略 | 真实沙箱网络、文件、环境、跨任务隔离探针 |
-| CPU/内存/输出/磁盘耗尽 | 各评测契约固定线性内存、fuel、输出、驱动地址空间、CPU、墙钟与 FD 上限，无可写宿主目录；Python 基础函数及专门的完整程序/Agent 预算分别见 [WASI](wasi.md)、[完整程序](stdio-contract.md)和 [Agent](agent-contract.md) 契约；gVisor 保留 cgroup/ulimit 策略 | 真实死循环、内存、阻塞调用、输出、FD 与禁止写入/进程/线程探针 |
+| CPU/内存/输出/磁盘耗尽 | 各评测契约固定线性内存、fuel、输出、驱动地址空间、CPU、墙钟与 FD 上限，无可写宿主目录；Python 基础函数及专门的完整程序/Agent 预算分别见 [WASI](deployment/wasi.md)、[完整程序](stdio-contract.md)和 [Agent](agent-contract.md) 契约；gVisor 保留 cgroup/ulimit 策略 | 真实死循环、内存、阻塞调用、输出、FD 与禁止写入/进程/线程探针 |
 | 伪造评测通过 | 预期值只在控制器；沙箱返回普通 JSON 值；控制器比较全部选定测试 | 比较器、错误变体与真实正确解测试 |
 | 私有测试泄露 | 白名单页面；隐藏用例输入/预期/输出/异常文本不回传；无网络；单用例输入不可避免可见 | Web projection 和结果脱敏测试 |
 | 用户越权、XSS、CSRF | 每个草稿/提交/导出均按会话 user 过滤；模板默认转义；严格 CSP；CSRF；POST-only 修改 | 两账号越权、恶意源代码、CSRF 与方法测试 |

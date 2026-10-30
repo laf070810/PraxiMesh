@@ -32,7 +32,7 @@ python scripts/practice.py --server https://your-instance.example download sum-p
 
 ## 在本地沙箱运行公开样例
 
-先按[开发指南](../README.md)安装锁定的 judge 依赖，并取得维护者按[WASI 构建说明](wasi.md)构建和校验的 WASI bundle。下面的路径与摘要应替换为实际发布值。
+先按[开发指南](../README.md)安装锁定的 judge 依赖，并取得维护者按[WASI 构建说明](deployment/wasi.md)构建和校验的 WASI bundle。下面的路径与摘要应替换为实际发布值。
 
 ```sh
 .venv/bin/python scripts/practice.py test ./sum-positive-work \
