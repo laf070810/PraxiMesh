@@ -21,6 +21,9 @@ MAX_DIMENSION = 64
 MAX_NUMBER = 10_000
 MAX_CASES = 8
 MAX_TOLERANCE = 0.01
+BATCH_REPETITIONS = 16
+# Two maximum-size float64 JSON arrays can exceed 128 KiB before float32 conversion.
+MESSAGE_BYTES = 256 * 1024
 
 
 class GPUContractError(ValueError):
@@ -162,6 +165,10 @@ def case_request(operation, case):
     """Whitelist projection: omit expected output, visibility and hidden labels."""
     input_shape(operation, case["inputs"])
     return {"protocol": PROTOCOL, "inputs": copy.deepcopy(case["inputs"])}
+
+
+def batch_request(operation, case):
+    return {**case_request(operation, case), "repetitions": BATCH_REPETITIONS}
 
 
 def project_public_problem(problem):

@@ -11,10 +11,17 @@ import os
 import sys
 import traceback
 
-from judge.gpu_contract import ENTRYPOINT, PROTOCOL, compile_request, input_shape
+from judge.gpu_contract import (
+    BATCH_REPETITIONS,
+    ENTRYPOINT,
+    MESSAGE_BYTES,
+    PROTOCOL,
+    compile_request,
+    input_shape,
+)
 
 NVRTC_LIBRARY = "/opt/nvrtc/libnvrtc.so.13.1.115"
-MAX_MESSAGE = 128 * 1024
+MAX_MESSAGE = MESSAGE_BYTES
 MAX_PTX = 4 * 1024 * 1024
 
 
@@ -161,7 +168,9 @@ class Kernel:
         finally:
             destroy(c.byref(program))
 
-    def execute(self, inputs):
+    def execute(self, inputs, repetitions=1):
+        if type(repetitions) is not int or repetitions not in {1, BATCH_REPETITIONS}:
+            raise DriverFailure(70)
         length, grid, block = input_shape(self.operation, inputs)
         allocations = []
 
@@ -178,8 +187,6 @@ class Kernel:
         try:
             a, b = (allocate(inputs[key]) for key in ("a", "b"))
             output = allocate(count=length)
-            # Unwritten output must fail correctness, including repeated cases.
-            checked(self.fill, output, 0x7FC00000, max(1, length))
             scalar_values = (
                 [length]
                 if self.operation == "vector-add-f32-v1"
@@ -189,8 +196,12 @@ class Kernel:
             arguments = (c.c_void_p * len(parameters))(
                 *(c.cast(c.byref(value), c.c_void_p) for value in parameters)
             )
-            checked(self.launch, self.function, *grid, *block, 0, None, arguments, None)
-            checked(self.sync)
+            for _ in range(repetitions):
+                # Every invocation must write its own output, including repeated
+                # benchmark batches. No guest timer or score enters the protocol.
+                checked(self.fill, output, 0x7FC00000, max(1, length))
+                checked(self.launch, self.function, *grid, *block, 0, None, arguments, None)
+                checked(self.sync)
             values = (c.c_float * length)()
             if length:
                 checked(self.to_host, values, output, length * 4)
@@ -216,9 +227,9 @@ def main():
         kernel = Kernel(request["source"], request["operation"])
         protocol.write(json.dumps({"event": "compiled", "architecture": list(kernel.arch)}) + "\n")
         while (request := message()) is not None:
-            if set(request) != {"protocol", "inputs"}:
+            if set(request) not in ({"protocol", "inputs"}, {"protocol", "inputs", "repetitions"}):
                 raise DriverFailure(70)
-            values = kernel.execute(request["inputs"])
+            values = kernel.execute(request["inputs"], request.get("repetitions", 1))
             protocol.write(json.dumps({"values": values}, allow_nan=False) + "\n")
         return 0
     except DriverFailure as error:

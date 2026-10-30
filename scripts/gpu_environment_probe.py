@@ -85,7 +85,7 @@ def child(base, out, name):
     configuration = json.loads((base / "probe.json").read_text())
     kernel_probe = None
     image = IMAGE
-    if configuration["mode"] in {"kernels", "faults"}:
+    if configuration["mode"] in {"kernels", "faults", "sessions"}:
         from scripts import gpu_kernel_probe as kernel_probe
 
         image = kernel_probe.IMAGE
@@ -139,48 +139,46 @@ def child(base, out, name):
             raise RuntimeError(f"{label or args[0]} failed: {result.stderr[-2000:]}")
         return result
 
-    def podman(*args, timeout=30, check=True, stdin=None):
-        return command(
-            [
-                "podman",
-                "--root",
-                str(base / "data"),
-                "--runroot",
-                str(base / "run"),
-                "--tmpdir",
-                str(base / "tmp"),
-                "--storage-driver=overlay",
-                "--storage-opt=overlay.mount_program=/usr/bin/fuse-overlayfs",
-                "--cgroup-manager=cgroupfs",
-                "--events-backend=file",
-                "--runtime",
-                str(base / "runtime/runsc"),
-                "--runtime-flag=nvproxy=true",
-                "--runtime-flag=network=none",
+    def podman_arguments(*args):
+        diagnostics = (
+            ["--runtime-flag=debug=false"]
+            if configuration["mode"] == "sessions"
+            else [
                 "--runtime-flag=debug=true",
                 "--runtime-flag=debug-log=" + str(out / "runsc") + "/",
-                *args,
-            ],
+            ]
+        )
+        return [
+            "podman",
+            "--root",
+            str(base / "data"),
+            "--runroot",
+            str(base / "run"),
+            "--tmpdir",
+            str(base / "tmp"),
+            "--storage-driver=overlay",
+            "--storage-opt=overlay.mount_program=/usr/bin/fuse-overlayfs",
+            "--cgroup-manager=cgroupfs",
+            "--events-backend=file",
+            "--runtime",
+            str(base / "runtime/runsc"),
+            "--runtime-flag=nvproxy=true",
+            "--runtime-flag=network=none",
+            *diagnostics,
+            *args,
+        ]
+
+    def podman(*args, timeout=30, check=True, stdin=None):
+        return command(
+            podman_arguments(*args),
             timeout=timeout,
             check=check,
             stdin=stdin,
             label="podman " + args[0],
         )
 
-    def run(
-        label,
-        entrypoint=None,
-        args=(),
-        *,
-        stdin=None,
-        expected_exit=0,
-        timeout=60,
-        expected_timeout=False,
-    ):
-        container = name + "-" + label
-        containers.append(container)
+    def container_arguments(container, entrypoint, args, *, interactive=False, diagnostics=True):
         options = [
-            "run",
             "--pull=never",
             "--name",
             container,
@@ -202,20 +200,130 @@ def child(base, out, name):
         ]
         if entrypoint:
             options.append("--entrypoint=" + entrypoint)
-        if stdin is not None:
+        if interactive:
             options.append("--interactive")
         if kernel_probe is not None:
-            options += kernel_probe.container_options(base)
+            options += kernel_probe.container_options(base, diagnostics=diagnostics)
         # CDI already selects exactly one UUID. Do not inherit the image's
         # NVIDIA_VISIBLE_DEVICES=all and trigger legacy reinjection in runsc.
         options += [
             "--env=NVIDIA_VISIBLE_DEVICES=void",
             "--env=NVIDIA_DRIVER_CAPABILITIES=compute,utility",
         ]
+        return [*options, image, *args]
+
+    def device_idle(label):
+        for attempt in range(10):
+            active = command(
+                [
+                    "nvidia-smi",
+                    "-i",
+                    target["uuid"],
+                    "--query-compute-apps=pid",
+                    "--format=csv,noheader",
+                ],
+                timeout=10,
+                label="device idle after " + label,
+            )
+            if not active.stdout.strip():
+                return
+            if attempt == 9:
+                raise RuntimeError("Target still has a compute task; device not reusable")
+            time.sleep(0.2)
+
+    def session(label, *, mode, on_tick):
+        from judge.gpu_session import GPUSession
+
+        container = name + "-" + label
+        containers.append(container)
+        podman(
+            "create",
+            *container_arguments(
+                container,
+                "python",
+                ["-B", "-m", "judge.gpu_runtime"],
+                interactive=True,
+                diagnostics=False,
+            ),
+        )
+        details = json.loads(podman("inspect", container).stdout)[0]
+        host = details["HostConfig"]
+        require(
+            details.get("OCIRuntime") == str(base / "runtime/runsc")
+            and host["ReadonlyRootfs"]
+            and not host["Privileged"]
+            and host["NetworkMode"] == "none",
+            "Session isolation configuration changed before execution",
+        )
+
+        def oom_kills():
+            events = dict(
+                line.split()
+                for line in Path("/sys/fs/cgroup/workloads/memory.events").read_text().splitlines()
+            )
+            return int(events["oom_kill"])
+
+        initial_ooms = oom_kills()
+
+        def exit_verdict(_code):
+            details = json.loads(podman("inspect", container).stdout)[0]
+            return (
+                "memory_limit"
+                if not details["State"]["Running"] and oom_kills() > initial_ooms
+                else None
+            )
+
+        def cleanup():
+            before = json.loads(podman("inspect", container).stdout)[0]
+            if before["State"]["Running"]:
+                podman("kill", "--signal=KILL", container, timeout=15)
+            podman("wait", container, timeout=15)
+            after = json.loads(podman("inspect", container).stdout)[0]
+            require(not after["State"]["Running"], "Session workload has not stopped")
+            device_idle(label)
+            report.setdefault("session_cleanup", []).append(
+                {
+                    "name": label,
+                    "running_before_cleanup": before["State"]["Running"],
+                    "exit_code": after["State"]["ExitCode"],
+                    "device_idle": True,
+                }
+            )
+            save()
+
+        process = subprocess.Popen(
+            podman_arguments("start", "--attach", "--interactive", container),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+        )
+        return GPUSession(
+            process,
+            cleanup,
+            architecture=target["architecture"],
+            mode=mode,
+            on_tick=on_tick,
+            exit_verdict=exit_verdict,
+        )
+
+    def run(
+        label,
+        entrypoint=None,
+        args=(),
+        *,
+        stdin=None,
+        expected_exit=0,
+        timeout=60,
+        expected_timeout=False,
+    ):
+        container = name + "-" + label
+        containers.append(container)
+        options = container_arguments(container, entrypoint, args, interactive=stdin is not None)
         timed_out = False
         started = time.monotonic()
         try:
-            result = podman(*options, image, *args, timeout=timeout, check=False, stdin=stdin)
+            result = podman("run", *options, timeout=timeout, check=False, stdin=stdin)
         except subprocess.TimeoutExpired as error:
             if not expected_timeout:
                 raise
@@ -250,23 +358,7 @@ def child(base, out, name):
         if configuration["mode"] == "faults":
             # Host-side NVML observation in the trusted private controller;
             # never terminate an unknown process or reset the card.
-            for attempt in range(10):
-                active = command(
-                    [
-                        "nvidia-smi",
-                        "-i",
-                        target["uuid"],
-                        "--query-compute-apps=pid",
-                        "--format=csv,noheader",
-                    ],
-                    timeout=10,
-                    label="device idle after " + label,
-                )
-                if not active.stdout.strip():
-                    break
-                if attempt == 9:
-                    raise RuntimeError("Target still has a compute task; device not reusable")
-                time.sleep(0.2)
+            device_idle(label)
             report[label + "_device_idle"] = True
         save()
         return result.stdout.strip()
@@ -342,7 +434,11 @@ def child(base, out, name):
             "Unexpected visible GPU set",
         )
         print(json.dumps({"phase": "gpu_identity_passed", "visible_devices": visible}), flush=True)
-        if kernel_probe is not None:
+        if configuration["mode"] == "sessions":
+            from scripts.gpu_session_probe import verify_sessions
+
+            verify_sessions(session, report, save)
+        elif kernel_probe is not None:
             kernel_probe.verify_fixtures(
                 run, report, save, faults=configuration["mode"] == "faults"
             )
@@ -465,6 +561,9 @@ def parent(options):
         raise ValueError("--fault-probes requires the pinned --nvrtc-archive")
     if options.image_archive and not options.nvrtc_archive:
         raise ValueError("--image-archive requires the pinned --nvrtc-archive")
+    sessions = getattr(options, "session_probes", False)
+    if sessions and (not options.nvrtc_archive or options.fault_probes):
+        raise ValueError("--session-probes requires NVRTC and a separate run from fault probes")
     if os.getuid() == 0:
         raise ValueError("Run as the delegated non-root user, not with sudo")
     check = subprocess.run(
@@ -472,7 +571,7 @@ def parent(options):
             "nvidia-smi",
             "-i",
             options.gpu,
-            "--query-gpu=index,uuid,name,driver_version",
+            "--query-gpu=index,uuid,name,driver_version,compute_cap",
             "--format=csv,noheader",
         ],
         capture_output=True,
@@ -481,10 +580,30 @@ def parent(options):
         timeout=10,
     )
     rows = list(csv.reader(check.stdout.splitlines(), skipinitialspace=True))
-    if len(rows) != 1 or len(rows[0]) != 4:
+    if len(rows) != 1 or len(rows[0]) != 5:
         raise ValueError("Expected exactly one GPU from nvidia-smi")
-    index, device_uuid, model, driver = rows[0]
-    target = {"index": int(index), "uuid": device_uuid, "model": model, "driver": driver}
+    index, device_uuid, model, driver, architecture = rows[0]
+    require(re.fullmatch(r"[1-9][0-9]*\.[0-9]+", architecture), "Invalid device architecture")
+    target = {
+        "index": int(index),
+        "uuid": device_uuid,
+        "model": model,
+        "driver": driver,
+        "architecture": list(map(int, architecture.split("."))),
+    }
+    from judge.gpu_device_lock import DeviceLock
+
+    locks = getattr(options, "lock_directory", None) or (
+        Path("/run/user") / str(os.getuid()) / "praximesh-gpu-locks"
+    )
+    with DeviceLock(locks, target["uuid"]) as guard:
+        return owned_parent(options, target, guard)
+
+
+def owned_parent(options, target, guard):
+    sessions = getattr(options, "session_probes", False)
+    driver = target["driver"]
+    guard.assert_held()
     check = subprocess.run(
         ["nvidia-smi", "-i", target["uuid"], "--query-compute-apps=pid", "--format=csv,noheader"],
         capture_output=True,
@@ -511,7 +630,13 @@ def parent(options):
         digest = runtime_from_archive(options.runtime_archive, base / "runtime")
         outer["runsc_sha256"] = digest
         mode = (
-            "faults" if options.fault_probes else "kernels" if options.nvrtc_archive else "vendor"
+            "sessions"
+            if sessions
+            else "faults"
+            if options.fault_probes
+            else "kernels"
+            if options.nvrtc_archive
+            else "vendor"
         )
         if options.nvrtc_archive:
             from scripts.gpu_kernel_probe import prepare_artifacts
@@ -594,6 +719,7 @@ def parent(options):
             name,
         ]
         with (out / "service.log").open("w") as log:
+            guard.assert_held()
             proc = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT)
             outer["process_id"] = proc.pid
             (out / "outer.json").write_text(json.dumps(outer, indent=2) + "\n")
@@ -657,6 +783,11 @@ def main():
         "--gpu", required=True, type=gpu_selector, help="One authorized, idle GPU index or UUID"
     )
     parser.add_argument(
+        "--lock-directory",
+        type=Path,
+        help="Shared private host lock directory; defaults to /run/user/UID/praximesh-gpu-locks",
+    )
+    parser.add_argument(
         "--runtime-archive",
         type=Path,
         required=True,
@@ -671,6 +802,11 @@ def main():
         "--fault-probes",
         action="store_true",
         help="With NVRTC, run reviewed GPU faults and recovery on the dedicated card",
+    )
+    parser.add_argument(
+        "--session-probes",
+        action="store_true",
+        help="With NVRTC, verify interactive grading, timing, cancellation and owned cleanup",
     )
     parser.add_argument(
         "--image-archive",

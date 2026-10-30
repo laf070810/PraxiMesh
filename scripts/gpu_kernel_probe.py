@@ -136,17 +136,19 @@ def prepare_artifacts(base, archive, root):
     }
 
 
-def container_options(base):
-    return [
+def container_options(base, *, diagnostics=True):
+    options = [
         "--volume=" + str(base / "harness") + ":/opt/praximesh:ro",
         "--volume=" + str(base / "nvrtc") + ":/opt/nvrtc:ro",
         "--workdir=/opt/praximesh",
         "--env=PYTHONDONTWRITEBYTECODE=1",
         "--env=LD_LIBRARY_PATH=/opt/nvrtc:/usr/lib64",
+    ]
+    if diagnostics:
         # Only reviewed synthetic fixtures run here. Diagnostics remain in the
         # private probe directory, never a learner response or formal evidence.
-        "--env=PRAXIMESH_GPU_DIAGNOSTICS=1",
-    ]
+        options.append("--env=PRAXIMESH_GPU_DIAGNOSTICS=1")
+    return options
 
 
 def fixture_request(fixture):

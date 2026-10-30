@@ -25,6 +25,8 @@
 - [G2 GPU 设备故障、终止与恢复组件验证](acceptance-g2.md) — 9 组真实检查通过，正式 worker 及失联验收待完成
 - [G3 GPU 持久预约、主机锁与租约组件验证](acceptance-g3.md) — 实际 PostgreSQL 并发和最小权限；尚未接入正式 GPU worker
 - [ADR-018：GPU 所有权与恢复后释放预约](adr/018-gpu-device-ownership.md)
+- [G4 GPU 交互执行与控制器计时进度](acceptance-g4.md) — 协议检查通过，真实 GPU 验收待独占条件恢复
+- [ADR-019：CUDA 会话协议与控制器批次时间](adr/019-gpu-session-protocol.md)
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

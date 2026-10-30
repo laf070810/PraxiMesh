@@ -5,6 +5,7 @@ import pytest
 
 from judge.gpu_contract import (
     GPUContractError,
+    batch_request,
     case_request,
     compile_request,
     input_shape,
@@ -57,6 +58,9 @@ def test_public_projection_and_runtime_requests_exclude_protected_fields():
     assert "expected" not in request and "name" not in request
     request["inputs"]["a"][0] = 0
     assert source["tests"][1]["inputs"]["a"] == [9876]
+    batch = batch_request(VECTOR, source["tests"][1])
+    assert set(batch) == {"protocol", "inputs", "repetitions"}
+    assert batch["repetitions"] == 16
 
 
 def test_scalar_oracles_cover_float32_rounding_rectangular_shapes_and_empty_vectors():
@@ -116,3 +120,14 @@ def test_source_limit_is_utf8_bytes_and_rejects_invalid_transport(source):
 def test_device_source_is_only_projected_never_executed():
     source = 'extern "C" __global__ void solve() {}'
     assert compile_request(source, VECTOR) == {"protocol": 1, "source": source, "operation": VECTOR}
+
+
+@pytest.mark.parametrize("repetitions", [0, 2, 17, True, 1.0, "16"])
+def test_driver_rejects_unbounded_or_coerced_batches_before_any_cuda_access(repetitions):
+    from judge.gpu_runtime import DriverFailure, Kernel
+
+    # No constructor, CUDA library or learner source is invoked in this test.
+    kernel = Kernel.__new__(Kernel)
+    with pytest.raises(DriverFailure) as error:
+        kernel.execute({}, repetitions)
+    assert error.value.exit_code == 70

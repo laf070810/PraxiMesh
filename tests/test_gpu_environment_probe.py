@@ -1,11 +1,14 @@
 """GPU environment preparation must reject ambiguous devices and unpinned code."""
 
 import argparse
+import os
+import subprocess
 from copy import deepcopy
 from types import SimpleNamespace
 
 import pytest
 
+from judge.gpu_device_lock import DeviceLock, DeviceLockError
 from scripts.gpu_environment_probe import gpu_selector, parent, runtime_from_archive, selected_cdi
 
 UUID = "GPU-12345678-1234-1234-1234-123456789abc"
@@ -84,3 +87,30 @@ def test_fault_mode_requires_compiler_before_touching_device_or_starting_service
     monkeypatch.setattr("scripts.gpu_environment_probe.subprocess.run", forbidden)
     with pytest.raises(ValueError, match="requires the pinned"):
         parent(SimpleNamespace(fault_probes=True, nvrtc_archive=None))
+
+
+def test_duplicate_controller_is_refused_before_idle_check_or_service_start(tmp_path, monkeypatch):
+    if os.getuid() == 0:
+        pytest.skip("GPU infrastructure entry requires a non-root operator")
+    calls = []
+
+    def identify(arguments, **kwargs):
+        calls.append(arguments)
+        assert arguments[0] == "nvidia-smi"
+        assert "--query-gpu=index,uuid,name,driver_version,compute_cap" in arguments
+        return subprocess.CompletedProcess(
+            arguments, 0, f"0, {UUID}, fixture, 590.48.01, 8.6\n", ""
+        )
+
+    monkeypatch.setattr("scripts.gpu_environment_probe.subprocess.run", identify)
+    options = SimpleNamespace(
+        fault_probes=False,
+        session_probes=True,
+        nvrtc_archive=tmp_path / "unused",
+        image_archive=None,
+        gpu=UUID,
+        lock_directory=tmp_path / "locks",
+    )
+    with DeviceLock(options.lock_directory, UUID), pytest.raises(DeviceLockError, match="Another"):
+        parent(options)
+    assert len(calls) == 1

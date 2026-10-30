@@ -12,9 +12,13 @@
 
 G3 的 `gpu-slot-seconds-v1` 按 Run 90 秒、Submit 180 秒预约整卡时段，默认每日账目上限 `JUDGE_DAILY_GPU_SECONDS=1800`，与 CPU 调用单位分开。它不是实际测得的 GPU 时间；此配置目前只用于调度组件，不能据此启用 GPU 评测。正式部署还须固定共享锁目录、执行指纹和启动检查，并验证执行总时限符合预约。账号删除只删除用户数据，设备的运行身份保留到受信控制器确认恢复，不能手工清空预约来恢复提交。
 
+[G4](../acceptance-g4.md)新增交互式执行器和控制器批次计时，目前只有协议与拒绝路径的自动检查结果。首次真实重放发现目标卡存在其他账号的计算进程，在创建服务前退出；这些新路径尚未完成 GPU 验收。G1/G2 的历史通过记录不替代新代码的重放。
+
 ## 重放单卡环境检查
 
 适用于准备 GPU 执行环境和排障；它不安装常驻 worker、不生成评测 receipt，也不会开放网站提交。需要维护者明确分配一张空闲 GPU。脚本拒绝 `all`，发现已有计算任务就退出。
+
+所有模式共用每卡主机锁，默认目录为 `/run/user/UID/praximesh-gpu-locks`，也可显式传 `--lock-directory`。同一平台的全部控制器必须共用该私有目录；目录权限为 0700，锁文件保留，不随测试清理。它不能阻止其他账号运行 CUDA；即使 GPU 利用率为零，发现已有计算进程仍须协调释放，不能直接终止未知任务。
 
 本机已具备：普通用户可用的 systemd 管理器及委派的 cgroup v2 控制器、RootlessKit 3.3、Podman 5.8、slirp4netns、fuse-overlayfs、NVIDIA Container Toolkit 和受固定 runsc 支持的驱动。使用项目 Python 3.11+ 环境；不要使用 sudo。其他机器先准备这些依赖与权限，并允许拉取固定的 NVIDIA 样例镜像。
 
@@ -95,6 +99,22 @@ GODEBUG=http2client=0 GOMAXPROCS=2 skopeo \
 ```
 
 探针先复制归档到自有临时目录，验证固定清单及所有配置/镜像层的摘要、大小和平台，拒绝多余文件、重复成员及链接，再导入独立存储并核对实际镜像 ID。它继续运行全部真实隔离、正确性或故障检查，不复用 receipt。归档保留用于后续重放，导入后的临时存储仍会清理。
+
+## 交互执行与批次计时检查（待真实验收）
+
+此模式使用相同固定制品，逐条编译/执行请求，受保护答案由控制器比较。仅在独占条件恢复后运行：
+
+```sh
+.venv/bin/python scripts/gpu_environment_probe.py \
+  --gpu 0 --runtime-archive var/gpu-preflight/gvisor.tar.bz2 \
+  --nvrtc-archive var/gpu-preflight/nvrtc-13.1.115.tar.xz \
+  --image-archive var/gpu-preflight/python-image-20261030.oci.tar \
+  --session-probes
+```
+
+它覆盖参考解、错解、编译/入口错误、最大输入、公开 Run、批次采样、输出上限、取消、客户端异常退出和后续参考解恢复；仍需检查退出码、`result.json` 与 `outer.json` 的实际成功和清理记录。不能和 `--fault-probes` 合并运行。会话模式关闭 runsc 和 NVRTC 的详细诊断日志。
+
+采样条件固定为同一输入、每批 16 次、2 批预热和 5 批测量；取控制器发送请求到收到结果的批次墙钟中位数，包含通信、分配及同步成本。它不是纯 CUDA 内核时间，不代表已交付正式性能榜单。GPU worker 的每任务服务硬期限、持续占用检查、启动 receipt 和产品闭环仍待接入。
 
 ## CPU 委派问题的原因
 
