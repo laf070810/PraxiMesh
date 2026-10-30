@@ -236,7 +236,7 @@ main {
   margin: 24px auto;
   padding: 0 4%;
 }
-.choice-list {
+div.choice-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
   gap: 4px 16px;

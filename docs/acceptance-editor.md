@@ -22,4 +22,6 @@
 
 ## 验证边界
 
+首次完整 Compose 重放 `test-results/px-compose-f1ea82adee37/` 在镜像内通过 129 个隔离探针、编辑器（含真实 Ctrl+Enter）、学习/正式提交、英文项目与类/API 浏览器流程；辅导流程发现选项容器 class 被 Django 继承到每个 checkbox，网格样式将点击宽度压为零。已将网格规则限于 div 容器，并补充最小点击尺寸、实际勾选与 Space 切换检查。修正后的源码专项及 30 组布局通过，记录在 `test-results/editor-choices-final.log`。该轮未通过的整体结果和清理记录保留，不计为完整 Compose 成功。
+
 上述浏览器在一次性 SQLite 数据库、合成账号及回环服务中运行；结束时删除账号和数据库并停止自有服务。Compose 镜像内真实评测、CPU 模型、重建保留与直接 IP 浏览器检查正在单独重放，结果另行追加。没有进行 GPU 执行、公开部署、数据库 schema 变更或旧内容重新发布；完整 PRD 的外部门槛继续保留在 [需求追踪](requirements.md)。

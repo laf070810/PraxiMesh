@@ -57,8 +57,16 @@ def layouts(page, base, artifacts, *, baseline=False):
                     assert not item["overflow"], metrics[-1]
                     assert item["heading"] >= 16, metrics[-1]
                     for choice in item["choices"]:
-                        assert choice["rect"]["width"] <= 24
+                        assert 12 <= choice["rect"]["width"] <= 24
+                        assert choice["rect"]["height"] >= 12
                         assert choice["label"]["height"] >= 28
+                    if item["choices"]:
+                        choice = page.locator('input[type="checkbox"]').first
+                        choice.check()
+                        expect(choice).to_be_checked()
+                        choice.focus()
+                        choice.press("Space")
+                        expect(choice).not_to_be_checked()
                     # Controls in a filter row share a bottom edge, even with long labels.
                     rows = {}
                     for field in item["filters"]:
