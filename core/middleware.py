@@ -1,4 +1,5 @@
 import ipaddress
+import secrets
 
 from django.conf import settings
 from django.contrib.auth.forms import UsernameField
@@ -39,6 +40,7 @@ class SecurityPolicyMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        request.editor_csp_nonce = secrets.token_urlsafe(24)
         response = None
         if request.method == "POST" and request.path.startswith("/accounts/"):
             # Only an explicitly trusted proxy can supply a rewritten client IP.
@@ -55,8 +57,14 @@ class SecurityPolicyMiddleware:
             if response is None and username and not consume("account-name", username, 15, 900):
                 response = HttpResponse(gettext("操作过于频繁，请稍后重试。"), status=429)
         response = response or self.get_response(request)
+        editor_policy = (
+            "script-src 'self' 'wasm-unsafe-eval'; "
+            f"style-src 'self' 'nonce-{request.editor_csp_nonce}'; worker-src 'self'; "
+            if getattr(request, "code_editor", False)
+            else "script-src 'self'; style-src 'self'; "
+        )
         response["Content-Security-Policy"] = (
-            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
+            "default-src 'self'; " + editor_policy + "img-src 'self'; "
             "connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; "
             "form-action 'self'"
         )

@@ -96,7 +96,9 @@ def main():
             page.goto(base + "/problems/bounded-queue-api/")
             expect(page.locator("main")).to_contain_text("定义 BoundedQueue 类及声明的方法")
             expect(page.locator("main")).to_contain_text("q.put(7)")
-            page.locator("#source").fill(problem["reference"] + "\n# " + private)
+            page.locator(".cm-content[contenteditable]").fill(
+                problem["reference"] + "\n# " + private
+            )
             page.get_by_role("button", name="运行样例", exact=True).click()
             page.wait_for_url("**/submissions/*/")
             run_id = page.url.rstrip("/").rsplit("/", 1)[1]

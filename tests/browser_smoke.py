@@ -88,7 +88,7 @@ def main():
         page.goto(base + "/learn/vectors/")
         expect(page.get_by_role("heading", name="向量与点积", exact=True)).to_be_visible()
         page.get_by_role("link", name="向量的点积", exact=False).click()
-        expect(page.locator("#source")).to_be_visible()
+        expect(page.locator(".cm-content[contenteditable]")).to_be_visible()
         page.goto(base + "/accounts/register/")
         page.get_by_label("用户名", exact=False).fill(username)
         page.locator("#id_password1").fill(password)
@@ -103,7 +103,7 @@ def main():
             assert cookies["csrftoken"]["secure"]
         page.goto(base + "/problems/sum-positive/")
         source = "def solve(values):\n    return sum(x for x in values if x > 0)\n"
-        page.locator("#source").fill(source)
+        page.locator(".cm-content[contenteditable]").fill(source)
         page.get_by_role("button", name="保存草稿").click()
         expect(page.locator("#editor-status")).to_have_text("草稿已私密保存")
         page.reload()
@@ -128,13 +128,13 @@ def main():
             page.goto(base + "/me/")
             expect(page.get_by_text("已通过 0 道", exact=False)).to_be_visible()
             page.goto(base + "/problems/sum-positive/")
-            page.locator("#source").fill("def solve(values): return -1")
+            page.locator(".cm-content[contenteditable]").fill("def solve(values): return -1")
             page.get_by_role("button", name="提交评测", exact=False).click()
             expect(page.get_by_role("heading", name="答案有误", exact=True)).to_be_visible(
                 timeout=180000
             )
             page.goto(base + "/problems/sum-positive/")
-            page.locator("#source").fill(source)
+            page.locator(".cm-content[contenteditable]").fill(source)
             page.get_by_role("button", name="提交评测", exact=False).click()
             expect(page.get_by_role("heading", name="通过", exact=True)).to_be_visible(
                 timeout=180000

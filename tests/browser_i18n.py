@@ -88,7 +88,7 @@ def main():
                 "def solve(values): return sum(x for x in values if x > 0)\n# 私有代码 "
                 + uuid.uuid4().hex
             )
-            page.locator("#source").fill(source)
+            page.locator(".cm-content[contenteditable]").fill(source)
             expect(page.locator("#editor-status")).to_have_text("Unsaved changes")
             page.get_by_role("button", name="Save draft", exact=True).click()
             expect(page.locator("#editor-status")).to_have_text("Draft saved privately")

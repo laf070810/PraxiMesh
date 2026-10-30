@@ -272,6 +272,7 @@ def main():
         compose("cp", "worker:/opt/praximesh/wasi", str(bundle))
         bundle_digest = hashlib.sha256((bundle / "manifest.json").read_bytes()).hexdigest()
         scripts = [
+            "browser_editor",
             "browser_smoke",
             "browser_projects_i18n",
             "browser_object_api",

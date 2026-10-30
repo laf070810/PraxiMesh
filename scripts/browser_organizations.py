@@ -313,7 +313,7 @@ def run_journey(environment, owner_run, artifacts=None):
             receipt["phase"] = "private_learner_evidence"
             member.goto(base + "/problems/sum-positive/")
             source = "def solve(values):\n    return sum(x for x in values if x > 0)\n# " + marker
-            member.locator("#source").fill(source)
+            member.locator(".cm-content[contenteditable]").fill(source)
             member.get_by_role("button", name="保存草稿", exact=True).click()
             expect(member.locator("#editor-status")).to_have_text("草稿已私密保存")
             if judge:

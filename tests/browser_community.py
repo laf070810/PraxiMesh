@@ -147,7 +147,7 @@ def run_workflow(browser, base, accounts, result, artifacts, progress, errors):
     private_source = "def solve(values): return 0\n# PRIVATE-COMMUNITY-SOURCE-" + suffix
     phase("private_draft_and_explicit_review_request")
     author_page.goto(base + "/problems/sum-positive/")
-    author_page.locator("#source").fill(private_source)
+    author_page.locator(".cm-content[contenteditable]").fill(private_source)
     author_page.get_by_role("button", name="保存草稿", exact=True).click()
     expect(author_page.locator("#editor-status")).to_have_text("草稿已私密保存")
     author_page.get_by_role("link", name="写题解", exact=True).click()

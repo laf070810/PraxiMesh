@@ -127,7 +127,9 @@ def main():
                 problem = problems[slug]
                 page.goto(base + f"/problems/{slug}/")
                 expect(page.locator("main")).to_contain_text("CPU 练习额度")
-                page.locator("#source").fill(problem["reference"] + "\n# " + private_marker)
+                page.locator(".cm-content[contenteditable]").fill(
+                    problem["reference"] + "\n# " + private_marker
+                )
                 page.get_by_role("button", name="运行样例", exact=True).click()
                 page.wait_for_url("**/submissions/*/")
                 run_id = page.url.rstrip("/").rsplit("/", 1)[1]

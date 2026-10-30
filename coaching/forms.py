@@ -8,7 +8,8 @@ from localization.presentation import localized_node
 
 class GoalForm(forms.Form):
     targets = forms.MultipleChoiceField(
-        label=_("我的私有概念目标（最多八个）"), widget=forms.CheckboxSelectMultiple
+        label=_("我的私有概念目标（最多八个）"),
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "choice-list"}),
     )
 
     def __init__(self, *args, **kwargs):

@@ -1,7 +1,113 @@
 # English interface for PraxiMesh.
 # Copyright PraxiMesh contributors.
 msgid ""
-msgstr "Project-Id-Version: PraxiMesh\nLanguage: en\nPO-Revision-Date: 2026-10-23 00:00+0000\nLast-Translator: PraxiMesh contributors\nLanguage-Team: English\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nPlural-Forms: nplurals=2; plural=(n != 1);\n"
+msgstr ""
+"Project-Id-Version: PraxiMesh\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-30 15:42+0000\n"
+"PO-Revision-Date: 2026-10-23 00:00+0000\n"
+"Last-Translator: PraxiMesh contributors\n"
+"Language-Team: English\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "正在本地检查…"
+msgstr "Checking locally…"
+
+msgid "正在本地格式化…"
+msgstr "Formatting locally…"
+
+msgid "本地检查工具暂不可用；代码已保留，可以继续编辑、保存和提交。"
+msgstr "Local checks are unavailable. Your code is preserved; you can still edit, save and submit."
+
+msgid "格式化期间代码已修改，请重新格式化。"
+msgstr "Your code changed during formatting. Format again to use the latest edits."
+
+msgid "请先修复语法错误，再格式化。"
+msgstr "Fix syntax errors before formatting."
+
+msgid "已格式化，可撤销。"
+msgstr "Formatted. You can undo this change."
+
+msgid "代码格式无需调整。"
+msgstr "Code is already formatted."
+
+msgid "代码不能超过 20000 字符。"
+msgstr "Code must not exceed 20,000 characters."
+
+#, javascript-format
+msgid "第 %s 行，第 %s 列"
+msgstr "Line %s, column %s"
+
+msgid "源代码"
+msgstr "Source code"
+
+msgid "查找"
+msgstr "Find"
+
+msgid "替换"
+msgstr "Replace"
+
+msgid "下一个"
+msgstr "Next"
+
+msgid "上一个"
+msgstr "Previous"
+
+msgid "全部"
+msgstr "All"
+
+msgid "区分大小写"
+msgstr "Match case"
+
+msgid "正则表达式"
+msgstr "Regular expression"
+
+msgid "全词匹配"
+msgstr "Whole word"
+
+msgid "全部替换"
+msgstr "Replace all"
+
+msgid "关闭"
+msgstr "Close"
+
+msgid "没有检查提示"
+msgstr "No diagnostics"
+
+msgid "检查提示"
+msgstr "Diagnostics"
+
+msgid "没有补全候选"
+msgstr "No completions"
+
+msgid "代码补全"
+msgstr "Code completion"
+
+msgid "折叠代码"
+msgstr "Fold code"
+
+msgid "展开代码"
+msgstr "Unfold code"
+
+msgid "跳转到行"
+msgstr "Go to line"
+
+msgid "跳转"
+msgstr "Go"
+
+msgid "已删除选中内容"
+msgstr "Selection deleted"
+
+#, javascript-format
+msgid "发现 %s 条检查提示；不影响保存或提交。"
+msgstr "Found %s diagnostics. You can still save or submit."
+
+msgid "本地检查未发现问题；运行结果仍以评测为准。"
+msgstr "No issues found locally. Evaluation still determines the result."
 
 msgid "尚未保存"
 msgstr "Unsaved changes"
@@ -35,4 +141,3 @@ msgstr "Cannot read the status right now. Refresh or log in again."
 
 msgid "连接暂时中断，正在重试。你也可以稍后在提交历史查看结果。"
 msgstr "Connection interrupted; retrying. You can also view the result later in submission history."
-

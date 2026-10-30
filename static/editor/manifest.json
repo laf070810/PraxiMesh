@@ -1,0 +1,27 @@
+{
+  "inputs": {
+    "package.json": "b4aef841935326a65434fe9f80fb0ae9d0d0c9cf0df6c00dee7c618cd8ee1cae",
+    "package-lock.json": "41461aa88e4be1837ce84bc20c33190bc61ee50c3b985eac248bda9905806643",
+    "frontend/editor.js": "d898f6445af72456b3760f9a8dfbd23ce8cb61ca968ae2555a29c6331b595beb",
+    "frontend/editor-worker.js": "214049045236f26c6a2c1b67b08744ebda3905eeca1c751d56f6b8ac4308bf0e",
+    "scripts/build_editor.mjs": "b665c4e7d140fd1794503868de00437737a7e1193e5211a2790096a372de1359"
+  },
+  "outputs": {
+    "editor.js": {
+      "sha256": "efbb116fe8d8eb3ab014050a54e12f59880bbb3345898dae419cf1b8f9ab925a",
+      "bytes": 554179
+    },
+    "worker.js": {
+      "sha256": "b36aa04ece2986997b9cc4b3b297e6a10acfc7ef363603295ee944d613520cbd",
+      "bytes": 624198
+    },
+    "ruff.wasm": {
+      "sha256": "11340ec97f5f422781428dcea1032a7e4d557930522d7e1f9927357e84ae68df",
+      "bytes": 10038888
+    },
+    "THIRD_PARTY_LICENSES.txt": {
+      "sha256": "5fd5a6f221815103313233e86bf238028a1c76b9cb481c5fc97abf894b72ee1a",
+      "bytes": 43836
+    }
+  }
+}

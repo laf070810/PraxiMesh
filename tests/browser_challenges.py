@@ -74,7 +74,7 @@ def run_journey(environment, artifacts):
             if real_judge:
                 receipt["phase"] = "real_run_and_formal_evidence"
                 page.goto(base + "/problems/population-stats/")
-                page.locator("#source").fill(references["population-stats"])
+                page.locator(".cm-content[contenteditable]").fill(references["population-stats"])
                 page.get_by_role("button", name="运行样例", exact=True).click()
                 expect(page.get_by_role("heading", name="通过", exact=True)).to_be_visible(
                     timeout=180000
@@ -84,7 +84,7 @@ def run_journey(environment, artifacts):
                 formal = []
                 for problem in ("population-stats", "sum-positive"):
                     page.goto(base + "/problems/" + problem + "/")
-                    page.locator("#source").fill(references[problem])
+                    page.locator(".cm-content[contenteditable]").fill(references[problem])
                     page.get_by_role("button", name="提交评测", exact=False).click()
                     expect(page.get_by_role("heading", name="通过", exact=True)).to_be_visible(
                         timeout=180000

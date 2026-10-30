@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PraxiMesh\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-23 21:55+0000\n"
+"POT-Creation-Date: 2026-10-30 15:42+0000\n"
 "PO-Revision-Date: 2026-10-23 00:00+0000\n"
 "Last-Translator: PraxiMesh contributors\n"
 "Language-Team: English\n"
@@ -396,7 +396,7 @@ msgid "题目已更新，请刷新页面。旧版本草稿仍保留。"
 msgstr "The problem changed. Refresh the page; your old draft is retained."
 
 msgid "代码不能超过 20000 字符。"
-msgstr "Code cannot exceed 20000 characters."
+msgstr "Code must not exceed 20,000 characters."
 
 msgid "保存过于频繁，请稍后重试。"
 msgstr "Too many save requests. Please try again later."
@@ -2623,16 +2623,40 @@ msgstr "CPU practice allowance for %(day)s UTC: %(remaining)s / %(limit)s units 
 msgid "按最大沙箱调用次数预约；开始调用后保守计入完整预约，不代表实测 CPU 或费用。"
 msgstr "Reservations use the maximum sandbox call count. Once calls begin, the full reservation is conservatively counted; it is not measured CPU usage or a fee."
 
-msgid "读取标准输入并输出 JSON · Tab 可离开编辑区 · 草稿仅自己可见"
-msgstr "Read standard input and write JSON · Tab leaves the editor · Drafts are private"
+msgid "检查代码"
+msgstr "Check code"
+
+msgid "格式化"
+msgstr "Format"
+
+msgid "查找 / 替换"
+msgstr "Find / replace"
+
+#| msgid "读取标准输入并输出 JSON · Tab 可离开编辑区 · 草稿仅自己可见"
+msgid "读取标准输入并输出 JSON · 草稿仅自己可见"
+msgstr "Read standard input and print JSON · Drafts are private"
 
 #, python-format
-msgid "定义 %(class_name)s 类及声明的方法 · Tab 可离开编辑区 · 草稿仅自己可见"
-msgstr "Define the %(class_name)s class and its declared methods · Tab leaves the editor · Drafts are private"
+#| msgid "定义 %(class_name)s 类及声明的方法 · Tab 可离开编辑区 · 草稿仅自己可见"
+msgid "定义 %(class_name)s 类及声明的方法 · 草稿仅自己可见"
+msgstr "Define the %(class_name)s class and its declared methods · Drafts are private"
 
 #, python-format
-msgid "定义 %(value1)s 函数 · Tab 可离开编辑区 · 草稿仅自己可见"
-msgstr "Define %(value1)s · Tab leaves the editor · Drafts are private"
+#| msgid "定义 %(value1)s 函数 · Tab 可离开编辑区 · 草稿仅自己可见"
+msgid "定义 %(value1)s 函数 · 草稿仅自己可见"
+msgstr "Define the %(value1)s function · Drafts are private"
+
+msgid "Tab 可离开编辑区。"
+msgstr "Press Tab to leave the editor."
+
+msgid "快捷键与编辑帮助"
+msgstr "Shortcuts and editor help"
+
+msgid "Ctrl/Cmd+S 保存草稿；Ctrl/Cmd+Enter 运行样例；Shift+Alt+F 格式化；Ctrl+Space 补全；Ctrl/Cmd+F 查找替换；Ctrl/Cmd+/ 切换注释；Ctrl/Cmd+Z 撤销；Alt+↑/↓ 移动行。"
+msgstr "Ctrl/Cmd+S: save draft; Ctrl/Cmd+Enter: run examples; Shift+Alt+F: format; Ctrl+Space: complete; Ctrl/Cmd+F: find/replace; Ctrl/Cmd+/: toggle comment; Ctrl/Cmd+Z: undo; Alt+↑/↓: move line."
+
+msgid "Tab 缩进，Shift+Tab 反向缩进；先按 Esc，再按 Tab 可离开编辑区。检查和格式化只在本浏览器中进行，不执行代码。"
+msgstr "Tab indents; Shift+Tab outdents. Press Esc, then Tab to leave the editor. Checks and formatting run only in this browser and never execute your code."
 
 msgid "保存草稿"
 msgstr "Save draft"

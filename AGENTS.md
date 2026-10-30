@@ -26,6 +26,7 @@
 - 数据库结构变化追加迁移，保留已交付迁移文件。新增表/应用时核对 `scripts/deploy_database.py` 的角色权限、`scripts/release.py` 的源码范围和 `Dockerfile` 的复制范围；Web/worker 不获得全表权限来规避授权错误。
 - 发布包不可原地改写。新控制器必须能校验需要升级的旧制品；新增开发文档不得无意变成旧清单的必填项。schema 升级、失败恢复和内容发布分别说明验证范围。
 - 界面字符串使用 Django 翻译，维护 `.po` 和编译后的 `.mo`；内容译文绑定准确的源版本。缺少译文明确回退，不能借用另一版本文本。
+- 编辑器源码在 `frontend/`，按 [编辑器指南](docs/editor.md)更新 npm 锁文件、预构建静态资源和许可证；不能只改源码而遗留旧 bundle。保留 textarea 回退、私有草稿、异步修订保护及 CSP nonce，分析工具不得执行源码或外发代码。界面改动用 `scripts/browser_acceptance.py --interface` 验证中英、多种宽度、键盘操作与失败回退。
 
 ## 环境与验证
 

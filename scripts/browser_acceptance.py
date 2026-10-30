@@ -87,6 +87,9 @@ def main():
     parser.add_argument(
         "--judge", action="store_true", help="Require real sandbox gates and worker"
     )
+    parser.add_argument(
+        "--interface", action="store_true", help="Only run editor and responsive layout checks"
+    )
     options = parser.parse_args()
     root = Path(__file__).resolve().parent.parent
     artifacts = root / "test-results"
@@ -177,6 +180,9 @@ def main():
                     time.sleep(0.2)
                 else:
                     raise RuntimeError("Application or real judge did not become ready.")
+                run("tests/browser_editor.py", timeout=300)
+                if options.interface:
+                    return
                 run("tests/browser_smoke.py", timeout=300)
                 credentials = bootstrap_moderator(run, env)
                 try:

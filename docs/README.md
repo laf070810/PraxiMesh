@@ -35,6 +35,10 @@
 - [挑战、成就与题库筛选指南](challenges.md)
 - [本地公开测试、访问令牌与提交工具](local-practice.md)
 - [中英界面、内容译文与版本回退](localization.md)
+- [浏览器编辑器、快捷键与前端构建](editor.md)
+- [RFC-020：渐进增强的练习编辑器与页面对齐](rfcs/020-browser-editor.md)
+- [ADR-021：站内渐进编辑器与本地静态分析](adr/021-browser-editor.md)
+- [编辑器与页面对齐验收](acceptance-editor.md)
 - [多阶段项目发布与版本进度](../projects/README.md)
 - [RFC-001：阶段 A 的架构、内容和可信评测](rfcs/001-phase-a.md) — 接受，2026-10-22
 - [ADR-001：应用和数据边界](adr/001-application.md) — 接受

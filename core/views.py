@@ -225,6 +225,7 @@ def problem_detail(request, slug):
     from localization.presentation import runtime_description
 
     problem = current_problem(slug)
+    request.code_editor = True
     data = public_problem(problem.current)
     source = data["starter"]
     if request.user.is_authenticated:

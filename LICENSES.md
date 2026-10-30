@@ -7,6 +7,8 @@ PRD §13 将代码许可证、题目/教程文字、社区投稿和外部测试/
 - 社区投稿：贡献者必须有相应权利，并接受已确定的投稿条款；目前条款尚未生效。
 - 第三方依赖：按各自许可证使用，镜像发布需保留相应声明，不能以平台许可证覆盖。
 
+浏览器编辑器依赖 CodeMirror、Lezer、Ruff WASM、Prettier 及其运行依赖。完整依赖声明随构建保存在 [`static/editor/THIRD_PARTY_LICENSES.txt`](static/editor/THIRD_PARTY_LICENSES.txt)，包括上游附带的第三方声明。npm 锁文件固定来源与完整性，构建入口见 [编辑器指南](docs/editor.md)。
+
 当前 WASI bundle 保留 CPython LICENSE、QuickJS 的 MIT LICENSE，以及固定 WASI SDK 24 对应的 wasi-libc、musl、cloudlibc、LLVM compiler-rt 声明。原文和不可变来源/摘要见 `vendor/wasi/`、`vendor/quickjs/`。安装到镜像的 Python 包保留各自 distribution 许可元数据。这些记录不替代维护者对最终公开制品授权和再分发义务的复核。
 
 可选 Compose 模型镜像保留固定 llama.cpp 来源的 MIT 许可 `/opt/LICENSE.llama.cpp` 与固定 Qwen3-0.6B-GGUF 版本的 Apache-2.0 许可 `/opt/LICENSE.qwen`。源码、权重及许可下载均校验固定摘要，见 `scripts/build_compose_tutor.py`；不改变平台本身的待确认授权状态。
