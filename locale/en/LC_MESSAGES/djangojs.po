@@ -141,3 +141,9 @@ msgstr "Cannot read the status right now. Refresh or log in again."
 
 msgid "连接暂时中断，正在重试。你也可以稍后在提交历史查看结果。"
 msgstr "Connection interrupted; retrying. You can also view the result later in submission history."
+
+msgid "代码结构可能有语法错误；完整 CUDA 检查以隔离编译结果为准。"
+msgstr "Possible syntax structure error; full CUDA checks require isolated compilation."
+
+msgid "未发现代码结构错误；CUDA 类型、头文件和设备能力仍需隔离编译检查。"
+msgstr "No structure errors found; CUDA types, headers and device support still require isolated compilation."

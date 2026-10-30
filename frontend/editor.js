@@ -4,6 +4,7 @@ import { EditorView, keymap } from "@codemirror/view";
 import { indentWithTab, isolateHistory } from "@codemirror/commands";
 import { python } from "@codemirror/lang-python";
 import { javascript, javascriptLanguage } from "@codemirror/lang-javascript";
+import { cuda } from "./cuda-language.js";
 import { completeFromList } from "@codemirror/autocomplete";
 import {
   indentUnit,
@@ -25,7 +26,7 @@ const host = document.querySelector("#code-editor");
 
 function enhance() {
   const language = host.dataset.language;
-  if (!["python", "javascript"].includes(language)) return;
+  if (!["python", "javascript", "cuda"].includes(language)) return;
   const analysis = document.querySelector("#editor-analysis");
   const tools = document.querySelector("#editor-tools");
   const position = document.querySelector("#editor-position");
@@ -33,7 +34,8 @@ function enhance() {
     serial = 0,
     worker,
     debounce,
-    formatting = false;
+    formatting = false,
+    staleFormat = false;
   const pending = new Map();
   const messages = {
     checking: gettext("正在本地检查…"),
@@ -67,33 +69,42 @@ function enhance() {
       doc: source.value,
       extensions: [
         EditorView.cspNonce.of(host.dataset.nonce),
+        EditorView.domEventObservers({
+          keydown(event, editor) {
+            // Observe even when a completion/search handler consumes Escape.
+            // Both closing its panel and leaving with Tab should remain possible.
+            if (event.key === "Escape") editor.setTabFocusMode(2000);
+          },
+        }),
         basicSetup,
         language === "python"
           ? python()
-          : [
-              javascript(),
-              javascriptLanguage.data.of({
-                autocomplete: completeFromList([
-                  "Math",
-                  "JSON",
-                  "Array",
-                  "Object",
-                  "Number",
-                  "String",
-                  "Boolean",
-                  "Map",
-                  "Set",
-                  "Infinity",
-                  "NaN",
-                  "undefined",
-                  "parseInt",
-                  "parseFloat",
-                  "isFinite",
-                  "isNaN",
-                ]),
-              }),
-            ],
-        indentUnit.of(language === "python" ? "    " : "  "),
+          : language === "cuda"
+            ? cuda()
+            : [
+                javascript(),
+                javascriptLanguage.data.of({
+                  autocomplete: completeFromList([
+                    "Math",
+                    "JSON",
+                    "Array",
+                    "Object",
+                    "Number",
+                    "String",
+                    "Boolean",
+                    "Map",
+                    "Set",
+                    "Infinity",
+                    "NaN",
+                    "undefined",
+                    "parseInt",
+                    "parseFloat",
+                    "isFinite",
+                    "isNaN",
+                  ]),
+                }),
+              ],
+        indentUnit.of(language === "javascript" ? "  " : "    "),
         lintGutter(),
         EditorView.contentAttributes.of({
           "aria-label": gettext("源代码"),
@@ -163,6 +174,7 @@ function enhance() {
         ),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
+            staleFormat = false;
             revision += 1;
             source.value = update.state.doc.toString();
             source.dispatchEvent(new Event("input", { bubbles: true }));
@@ -261,7 +273,10 @@ function enhance() {
     pending.delete(data.id);
     if (item.operation === "format") formatting = false;
     if (data.revision !== revision) {
-      if (item.operation === "format") analysis.textContent = messages.stale;
+      if (item.operation === "format") {
+        staleFormat = true;
+        analysis.textContent = messages.stale;
+      }
       return;
     }
     if (data.unavailable) {
@@ -274,7 +289,12 @@ function enhance() {
         from,
         to: Math.max(from, offset(entry.end ?? entry.start)),
         severity: entry.severity,
-        message: entry.message,
+        message:
+          entry.code === "cuda-syntax"
+            ? gettext(
+                "代码结构可能有语法错误；完整 CUDA 检查以隔离编译结果为准。",
+              )
+            : entry.message,
       };
     });
     view.dispatch(setDiagnostics(view.state, diagnostics));
@@ -301,11 +321,16 @@ function enhance() {
       });
       analysis.textContent = messages.formatted;
     } else {
-      analysis.textContent = diagnostics.length
-        ? interpolate(gettext("发现 %s 条检查提示；不影响保存或提交。"), [
-            diagnostics.length,
-          ])
-        : gettext("本地检查未发现问题；运行结果仍以评测为准。");
+      if (!staleFormat || item.show)
+        analysis.textContent = diagnostics.length
+          ? interpolate(gettext("发现 %s 条检查提示；不影响保存或提交。"), [
+              diagnostics.length,
+            ])
+          : language === "cuda"
+            ? gettext(
+                "未发现代码结构错误；CUDA 类型、头文件和设备能力仍需隔离编译检查。",
+              )
+            : gettext("本地检查未发现问题；运行结果仍以评测为准。");
       if (item.show) openLintPanel(view);
     }
   }
@@ -316,6 +341,7 @@ function enhance() {
       [...pending.values()].some((item) => item.revision === revision)
     )
       return;
+    if (operation === "format" || show) staleFormat = false;
     try {
       if (!worker) {
         worker = new Worker(host.dataset.worker, { type: "module" });
@@ -333,8 +359,9 @@ function enhance() {
         timeout: setTimeout(unavailable, 20000),
       });
       if (operation === "format") formatting = true;
-      analysis.textContent =
-        operation === "format" ? messages.formatting : messages.checking;
+      if (!staleFormat)
+        analysis.textContent =
+          operation === "format" ? messages.formatting : messages.checking;
       worker.postMessage({
         id,
         revision,
@@ -342,6 +369,7 @@ function enhance() {
         language,
         source: source.value,
         wasmURL: host.dataset.wasm,
+        clangWasmURL: host.dataset.clangWasm,
       });
     } catch {
       unavailable();

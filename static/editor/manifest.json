@@ -1,27 +1,34 @@
 {
   "inputs": {
-    "package.json": "b4aef841935326a65434fe9f80fb0ae9d0d0c9cf0df6c00dee7c618cd8ee1cae",
-    "package-lock.json": "41461aa88e4be1837ce84bc20c33190bc61ee50c3b985eac248bda9905806643",
-    "frontend/editor.js": "d898f6445af72456b3760f9a8dfbd23ce8cb61ca968ae2555a29c6331b595beb",
-    "frontend/editor-worker.js": "214049045236f26c6a2c1b67b08744ebda3905eeca1c751d56f6b8ac4308bf0e",
-    "scripts/build_editor.mjs": "b665c4e7d140fd1794503868de00437737a7e1193e5211a2790096a372de1359"
+    "package.json": "ff1ce71ec7af8c4d34255a5fd6133dcbd85a15dcd1b93cb0101938b3c76737bf",
+    "package-lock.json": "cb101fe806870638fc95a26c8dd2d262f74f08e2c20b394d180cbca03047fd5c",
+    "frontend/editor.js": "4b99672a0b137753501eda7247b877b20e17afa7268e6c021bc2b8d2559cb529",
+    "frontend/editor-worker.js": "78b9b302ff445d2caa6fd6c9ca492c43ec6f3e2de4ae50233f74295a502e7277",
+    "frontend/cuda-language.js": "dadf340a2ca14e63549ad5e84b0352e20fa04dac38118c6538e5055bd7a00b7d",
+    "frontend/clang-format-NOTICES.txt": "fb1eba5c7c0e32d4dff7558d79ca07b9bd9cfcbc74ab20ea6a63ef6fb386e477",
+    "scripts/build_editor.mjs": "288dacbfaa72b1b41146eec0849b015ebc96629bf09907e9e0e5348818d28901",
+    "scripts/editor_cuda.mjs": "ce3e780e3e8f04825d12b5a436b85a0b0fdd81217c74b200f2b7c114d639980d"
   },
   "outputs": {
     "editor.js": {
-      "sha256": "efbb116fe8d8eb3ab014050a54e12f59880bbb3345898dae419cf1b8f9ab925a",
-      "bytes": 554179
+      "sha256": "67bbb597990c0a0cca51c78ef3c2abb62b8a9e1de05f97aad5c7395356108e05",
+      "bytes": 768617
     },
     "worker.js": {
-      "sha256": "b36aa04ece2986997b9cc4b3b297e6a10acfc7ef363603295ee944d613520cbd",
-      "bytes": 624198
+      "sha256": "05d5cce71f57d3c9e917e722e01c2af88737f76e029f20e305d44230f7f4f06b",
+      "bytes": 814763
     },
     "ruff.wasm": {
       "sha256": "11340ec97f5f422781428dcea1032a7e4d557930522d7e1f9927357e84ae68df",
       "bytes": 10038888
     },
+    "clang-format.wasm": {
+      "sha256": "49d98626475dd2e22b9a3245b4bc0d7b1310db7f6c30176a89cc58d1e89b75bc",
+      "bytes": 2573116
+    },
     "THIRD_PARTY_LICENSES.txt": {
-      "sha256": "5fd5a6f221815103313233e86bf238028a1c76b9cb481c5fc97abf894b72ee1a",
-      "bytes": 43836
+      "sha256": "5f2892bea64b19fed2dc93cfede29b897ffdc5e0161303c1afc02cd19ca4a514",
+      "bytes": 74202
     }
   }
 }

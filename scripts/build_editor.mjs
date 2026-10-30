@@ -9,6 +9,7 @@ import {
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { cudaGrammar } from "./editor_cuda.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const output = path.join(root, "static/editor");
@@ -27,6 +28,7 @@ const result = await build({
   minify: true,
   legalComments: "none",
   metafile: true,
+  plugins: [await cudaGrammar(root)],
 });
 if (
   Object.keys(result.metafile.inputs).filter((name) =>
@@ -38,6 +40,10 @@ if (
 await copyFile(
   path.join(root, "node_modules/@astral-sh/ruff-wasm-web/ruff_wasm_bg.wasm"),
   path.join(output, "ruff.wasm"),
+);
+await copyFile(
+  path.join(root, "node_modules/@wasm-fmt/clang-format/clang-format.wasm"),
+  path.join(output, "clang-format.wasm"),
 );
 
 // Preserve licenses for every bundled package, including Rust notices in Ruff's license.
@@ -67,6 +73,12 @@ for (const directory of packages) {
     `\n\n===== ${info.name} ${info.version} =====\n\n` +
     (await readFile(path.join(root, directory, license), "utf8"));
 }
+notices +=
+  "\n\n" +
+  (await readFile(
+    path.join(root, "frontend/clang-format-NOTICES.txt"),
+    "utf8",
+  ));
 await writeFile(path.join(output, "THIRD_PARTY_LICENSES.txt"), notices);
 const digest = (data) => createHash("sha256").update(data).digest("hex");
 const manifest = { inputs: {}, outputs: {} };
@@ -75,7 +87,10 @@ for (const name of [
   "package-lock.json",
   "frontend/editor.js",
   "frontend/editor-worker.js",
+  "frontend/cuda-language.js",
+  "frontend/clang-format-NOTICES.txt",
   "scripts/build_editor.mjs",
+  "scripts/editor_cuda.mjs",
 ]) {
   manifest.inputs[name] = digest(await readFile(path.join(root, name)));
 }
@@ -83,6 +98,7 @@ for (const name of [
   "editor.js",
   "worker.js",
   "ruff.wasm",
+  "clang-format.wasm",
   "THIRD_PARTY_LICENSES.txt",
 ]) {
   const data = await readFile(path.join(output, name));

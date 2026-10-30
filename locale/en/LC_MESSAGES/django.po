@@ -3167,3 +3167,23 @@ msgstr "Evaluation environment:"
 
 #~ msgid "讨论、提问与题解"
 #~ msgstr "Discussions, questions and solutions"
+
+msgid "CUDA 设备内核"
+msgstr "CUDA device kernel"
+
+msgid "CUDA 设备内置函数"
+msgstr "CUDA device built-ins"
+
+msgid "每次正式提交最多 CPU 调用单位"
+msgstr "Maximum CPU invocation units per submission"
+
+msgid "每次正式提交最多 GPU 秒数"
+msgstr "Maximum GPU device-slot seconds per submission"
+
+#, python-format
+msgid "正式提交预约 %(units)s 秒 GPU 整卡时段"
+msgstr "Submission reserves %(units)s GPU device-slot seconds"
+
+#, python-format
+msgid "正式提交预约 %(units)s CPU 调用单位"
+msgstr "Submission reserves %(units)s CPU invocation units"

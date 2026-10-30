@@ -26,9 +26,11 @@ export PRAXIMESH_API_TOKEN
 python scripts/practice.py --server https://your-instance.example download sum-positive ./sum-positive-work
 ```
 
-目标目录必须不存在，父目录必须存在。工具创建私有目录、`exercise.json` 和对应语言的解答文件。JSON 含公开题意、公开测试、固定版本身份及来源服务器；不含参考实现和受保护用例。编辑 `solution.py`（JavaScript 题为 `solution.js`），不要改变版本元数据。
+目标目录必须不存在，父目录必须存在。工具创建私有目录、`exercise.json` 和对应语言的解答文件。JSON 含公开题意、公开测试、固定版本身份及来源服务器；不含参考实现和受保护用例。编辑 `solution.py`（JavaScript 为 `solution.js`，CUDA 为 `solution.cu`），不要改变版本元数据。
 
 类/API 题（例如 `bounded-queue-api`）也使用 `solution.py`，实现题目声明的类和方法。公开包含构造与方法调用序列；同一场景保留状态，场景之间重置。无需编写 `solve` 函数或宿主测试脚本。语义与异常规则见[类/API 契约](object-api-contract.md)。
+
+CUDA 下载与提交适用于维护者提供的固定版本题目；默认题库尚未发布 CUDA 题。公开包只包含指定操作、内核入口、浮点容差和公开输入/答案，工具校验形状与预期结果，拒绝混入参考解或受保护字段。GPU 环境状态见[集中 GPU 指南](deployment/gpu.md)。
 
 ## 在本地沙箱运行公开样例
 
@@ -41,6 +43,8 @@ python scripts/practice.py --server https://your-instance.example download sum-p
 ```
 
 工具检查 bundle、解释器依赖与沙箱政策，随后在 WASI 内运行学员程序，不执行宿主 Python/Node 或下载的构建脚本。结果带 `formal_result: false`、bundle 和政策摘要。成功退出码为 0，公开测试未通过为 1，配置或传输错误为 2。此功能要求受支持的非 root Linux x86_64 环境；不可用时仍可编辑并提交服务器。
+
+`test` 仅支持 CPU/WASI 题，CUDA 会明确报错并保留本地文件。当前没有本地 GPU 执行入口；可用下面的 `submit --mode run` 请求具有已验收 GPU 环境的服务器执行公开样例。服务器不可用时返回 503，不会改用宿主编译器或普通容器。
 
 ## 正式提交与查询
 

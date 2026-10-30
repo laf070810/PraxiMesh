@@ -25,6 +25,7 @@ TOKEN = re.compile(r"pm_[0-9a-f]{32}\.[A-Za-z0-9_-]{43}")
 LANGUAGES = {
     "python": "solution.py",
     "javascript": "solution.js",
+    "cuda": "solution.cu",
 }
 CONTRACTS = {
     "python-function-v1": "python",
@@ -34,6 +35,7 @@ CONTRACTS = {
     "python-ml-linear-v1": "python",
     "python-weighted-fit-v1": "python",
     "python-agent-tools-v1": "python",
+    "cuda-kernel-v1": "cuda",
 }
 ROOT = Path(__file__).resolve().parent.parent
 SPECIALISTS = {"python-agent-tools-v1", "python-ml-linear-v1", "python-weighted-fit-v1"}
@@ -86,6 +88,46 @@ def api_payload(package):
         raise ValueError("Public cases must not contain a visibility override")
     payload["tests"] = [{**case, "public": True} for case in package["public_tests"]]
     validate_problem(payload, public_only=True)
+    return payload
+
+
+def gpu_payload(package):
+    """Validate public data only. This imports no GPU runtime or driver."""
+    sys.path.insert(0, str(ROOT))
+    from judge.gpu_contract import validate_problem
+
+    problem = package["problem"]
+    execution = {"evaluator", "language", "operation", "entrypoint", "comparison"}
+    public_fields = {
+        "id",
+        "revision",
+        "title",
+        "summary",
+        "statement",
+        "constraints",
+        "outcomes",
+        "concepts",
+        "difficulty",
+        "starter",
+        "hints",
+        "changelog",
+        "tags",
+        "examples",
+    }
+    if set(problem) - (execution | public_fields):
+        raise ValueError("Unexpected GPU package field")
+    cases = package["public_tests"]
+    if not isinstance(cases, list) or any(
+        not isinstance(case, dict) or "public" in case for case in cases
+    ):
+        raise ValueError("Invalid GPU public cases")
+    payload = {key: problem[key] for key in execution}
+    payload["tests"] = [{**case, "public": True} for case in cases]
+    validate_problem(payload, public_only=True)
+    if "examples" in problem:
+        validate_problem({**payload, "tests": problem["examples"]}, public_only=True)
+        if problem["examples"] != payload["tests"]:
+            raise ValueError("Inconsistent GPU examples")
     return payload
 
 
@@ -257,6 +299,9 @@ def validate_package(package):
             or "tests" in problem
         ):
             raise ValueError
+        if problem["evaluator"] == "cuda-kernel-v1":
+            gpu_payload(package)
+            return package
         stdio = problem["evaluator"] == "python-stdio-v1"
         if problem["evaluator"] != "python-object-api-v1" and "interface" in problem:
             raise ValueError
@@ -384,6 +429,11 @@ def load_exercise(directory):
 
 def local_test(directory, bundle, digest):
     _, package, source = load_exercise(directory)
+    if package["problem"]["evaluator"] == "cuda-kernel-v1":
+        raise PracticeError(
+            "CUDA public tests cannot run in WASI. Use submit --mode run against a server "
+            "with verified GPU evaluation; local CUDA execution is not available."
+        )
     sys.path.insert(0, str(ROOT))
     from judge.evaluator import EVALUATORS, evaluate
     from judge.sandbox import SandboxUnavailable

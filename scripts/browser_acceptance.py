@@ -192,7 +192,7 @@ def main():
                 else:
                     raise RuntimeError("Application or real judge did not become ready.")
                 if options.gpu_results:
-                    run("tests/browser_gpu_results.py", timeout=180)
+                    run("tests/browser_gpu_results.py", timeout=300)
                     return
                 run("tests/browser_editor.py", timeout=300)
                 if options.interface:

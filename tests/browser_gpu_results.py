@@ -32,6 +32,7 @@ def main():
     import django
 
     django.setup()
+    from browser_cuda_editor import check_cuda_editor
     from django.conf import settings
     from django.contrib.auth import get_user_model
     from django.urls import reverse
@@ -64,6 +65,8 @@ def main():
         "passed": False,
         "checks": [],
         "closed_practice_checks": [],
+        "cuda_editor_checks": [],
+        "discovery_checks": [],
         "sources": {
             name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
             for name in (
@@ -86,6 +89,14 @@ def main():
                 "localization/presentation.py",
                 "tests/gpu_evidence_fixtures.py",
                 "tests/browser_gpu_results.py",
+                "tests/browser_cuda_editor.py",
+                "frontend/editor.js",
+                "frontend/editor-worker.js",
+                "frontend/cuda-language.js",
+                "static/editor/manifest.json",
+                "locale/en/LC_MESSAGES/djangojs.mo",
+                "core/discovery.py",
+                "templates/practice.html",
                 "scripts/browser_acceptance.py",
             )
         },
@@ -114,6 +125,14 @@ def main():
                     page = context.new_page()
                     errors = []
                     page.on("pageerror", lambda error, captured=errors: captured.append(str(error)))
+                    page.on(
+                        "console",
+                        lambda message, captured=errors: (
+                            captured.append(message.text)
+                            if "Content Security Policy" in message.text
+                            else None
+                        ),
+                    )
                     login(page, user.username)
                     for width in (390, 768, 1440):
                         page.set_viewport_size({"width": width, "height": 900})
@@ -188,6 +207,35 @@ def main():
                         record["closed_practice_checks"].append(
                             {"language": language, "width": width, "passed": True}
                         )
+                        page.goto(address + "/practice/?language=cuda&max_gpu_seconds=180")
+                        assert page.locator(".problem-row").count() == 1
+                        assert "CUDA / NVRTC / gVisor" in page.locator(".problem-row").inner_text()
+                        assert page.evaluate(
+                            "document.documentElement.scrollWidth <= innerWidth + 1"
+                        )
+                        fields = page.locator(".filters label").evaluate_all("""elements => elements.map(e => ({
+                            top: Math.round(e.getBoundingClientRect().top),
+                            bottom: e.querySelector('input,select').getBoundingClientRect().bottom
+                        }))""")
+                        for top in {field["top"] for field in fields}:
+                            bottoms = [field["bottom"] for field in fields if field["top"] == top]
+                            assert max(bottoms) - min(bottoms) <= 2
+                        if width == 390:
+                            page.screenshot(
+                                path=str(out / (language + "-390-discovery.png")), full_page=True
+                            )
+                        record["discovery_checks"].append(
+                            {"language": language, "width": width, "passed": True}
+                        )
+                    try:
+                        record["cuda_editor_checks"].append(
+                            check_cuda_editor(page, address, version.problem_id, out, language)
+                        )
+                    except Exception:
+                        page.screenshot(
+                            path=str(out / (language + "-cuda-failure.png")), full_page=True
+                        )
+                        raise
                     assert not errors, errors
                     context.close()
                 context = browser.new_context()

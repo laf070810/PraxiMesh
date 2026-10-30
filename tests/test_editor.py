@@ -34,3 +34,4 @@ def test_committed_editor_assets_match_sources_and_release_size_budget():
         assert len(contents) == expected["bytes"]
         assert len(contents) < 10 * 1024 * 1024
     assert (assets / "ruff.wasm").read_bytes().startswith(b"\x00asm")
+    assert (assets / "clang-format.wasm").read_bytes().startswith(b"\x00asm")

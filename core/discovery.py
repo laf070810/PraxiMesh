@@ -13,20 +13,38 @@ EVALUATORS = {
     "python-ml-linear-v1": _("ML 训练"),
     "python-weighted-fit-v1": _("科学计算与拟合"),
     "python-agent-tools-v1": _("受控工具 Agent"),
+    "cuda-kernel-v1": _("CUDA 设备内核"),
 }
 RUNTIMES = {
     "python-wasi": "Python 3.14.9 / WASI",
     "javascript-wasi": "JavaScript / QuickJS / WASI",
     "python-gvisor": "Python 3.11.15 / gVisor",
+    "cuda-gvisor": "CUDA / NVRTC / gVisor",
 }
 LIBRARIES = {
     "python-stdlib": _("Python 基础标准库"),
     "javascript-builtins": _("JavaScript 内置对象"),
+    "cuda-device": _("CUDA 设备内置函数"),
 }
 
 
-def metadata(version):
+def metadata(version, *, gpu_supported=None):
     evaluator = version.data["evaluator"]
+    if evaluator == "cuda-kernel-v1":
+        if gpu_supported is None:
+            from core.queue import gpu_available
+
+            gpu_supported = gpu_available()
+        return {
+            "evaluator_label": EVALUATORS[evaluator],
+            "runtime": "cuda-gvisor",
+            "runtime_label": RUNTIMES["cuda-gvisor"],
+            "library": "cuda-device",
+            "library_label": LIBRARIES["cuda-device"],
+            "supported": gpu_supported,
+            "resource_kind": "gpu",
+            "formal_units": reservation_units(version, "submit"),
+        }
     python = version.data["language"] == "python"
     supported = settings.JUDGE_BACKEND == "wasi" or (
         settings.JUDGE_BACKEND == "gvisor" and evaluator == "python-function-v1"
@@ -42,6 +60,7 @@ def metadata(version):
         "library": library,
         "library_label": LIBRARIES[library],
         "supported": supported,
+        "resource_kind": "cpu",
         "formal_units": reservation_units(version, "submit"),
     }
 
@@ -60,9 +79,14 @@ def filter_resources(cards, parameters):
         if supported not in {"1", "0"}:
             return []
         cards = [card for card in cards if card["supported"] == (supported == "1")]
-    maximum = parameters.get("max_units", "")
-    if maximum:
-        if not maximum.isascii() or not maximum.isdecimal() or len(maximum) > 6:
-            return []
-        cards = [card for card in cards if card["formal_units"] <= int(maximum)]
+    for parameter, kind in (("max_units", "cpu"), ("max_gpu_seconds", "gpu")):
+        maximum = parameters.get(parameter, "")
+        if maximum:
+            if not maximum.isascii() or not maximum.isdecimal() or len(maximum) > 6:
+                return []
+            cards = [
+                card
+                for card in cards
+                if card["resource_kind"] == kind and card["formal_units"] <= int(maximum)
+            ]
     return cards

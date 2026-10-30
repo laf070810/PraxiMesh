@@ -58,15 +58,20 @@ def states(user):
 
 def problem_cards(user):
     attempted, accepted = states(user)
+    problems = [
+        p for p in Problem.objects.filter(published=True).select_related("current") if p.current
+    ]
+    gpu_supported = False
+    if any(p.current.data["evaluator"] == "cuda-kernel-v1" for p in problems):
+        gpu_supported = gpu_available()
     return [
         {
             **public_problem(p.current),
-            **metadata(p.current),
+            **metadata(p.current, gpu_supported=gpu_supported),
             "version_id": p.current_id,
             "state": "completed" if p.current_id in accepted else attempted.get(p.id, "new"),
         }
-        for p in Problem.objects.filter(published=True).select_related("current")
-        if p.current
+        for p in problems
     ]
 
 
@@ -164,6 +169,7 @@ def practice(request):
         "evaluator_choices": choices(cards, "evaluator", EVALUATORS),
         "runtime_choices": choices(cards, "runtime", RUNTIMES),
         "library_choices": choices(cards, "library", LIBRARIES),
+        "has_gpu": any(card["resource_kind"] == "gpu" for card in cards),
     }
     cards = filter_resources(cards, request.GET)
     query = request.GET.get("q", "")[:100].strip().casefold()

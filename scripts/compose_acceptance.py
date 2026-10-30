@@ -347,7 +347,11 @@ def main():
             for item in info["Mounts"]
         )
         base = address()
-        assert json.loads(get(base, "/health/")) == {"status": "ok", "evaluation": "available"}
+        assert json.loads(get(base, "/health/")) == {
+            "status": "ok",
+            "evaluation": "available",
+            "gpu_evaluation": "unavailable",
+        }
         compose(
             "exec",
             "-T",
@@ -400,6 +404,18 @@ def main():
         ]
         for path in paths:
             assert get(base, path), path
+        # Validate the actual image's local editor payload, including lazy CUDA
+        # formatting assets, without publishing synthetic GPU content.
+        editor = json.loads((ROOT / "static/editor/manifest.json").read_bytes())
+        assert json.loads(get(base, "/static/editor/manifest.json")) == editor
+        for name, expected in editor["outputs"].items():
+            with client.open(base + "/static/editor/" + name, timeout=10) as response:
+                payload = response.read()
+                if name.endswith(".wasm"):
+                    assert response.headers.get_content_type() == "application/wasm"
+                assert len(payload) == expected["bytes"]
+                assert hashlib.sha256(payload).hexdigest() == expected["sha256"]
+        report["editor_assets"] = editor["outputs"]
         if options.browsers:
             browser_journeys("http://127.0.0.1:" + base.rsplit(":", 1)[1])
         first = json.loads(
