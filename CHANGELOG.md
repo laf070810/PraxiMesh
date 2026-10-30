@@ -4,6 +4,7 @@
 
 - 维护者修复 rootless 用户控制器委派后，Docker 四项资源能力均为 true；独立可信容器实测 0.5 核限额与节流通过，容器已清理。
 - 记录维护者授权 GPU 0 独占验收；校验官方 gVisor release-20261026.0 完整归档，精确驱动支持列表匹配 590.48.01。后续按 RFC-018 验证独立临时 GPU 环境，尚未开放 GPU 提交。
+- 独立 Docker/Podman 接入实际复现 runsc 的 rootless systemd/cgroup 权限问题，CUDA 程序未启动；原始失败、修正过程和清理结果保留在 RFC-018。临时资源已清理，现有三项服务健康、直接 IP 的 CPU 评测仍可用。
 
 ## GitHub CI、runner 与 GPU 接入指南 — 2026-10-30
 

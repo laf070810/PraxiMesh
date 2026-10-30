@@ -6,7 +6,7 @@
 
 2026-10-30 维护者补齐 CPU 委派并重启用户 Docker 后，当前 context `/run/user/2031/docker.sock` 的 `MemoryLimit`、`SwapLimit`、`PidsLimit`、`CpuCfsQuota` 均为 `true`，资源控制警告为空。可信临时容器设置 `--cpus=0.5`，实际运行 5 秒消耗约 2.501 秒 CPU，`cpu.max=50000 100000`，发生 50 次节流；测试容器已清理。CPU 配额缺口已解决，结果见 `test-results/cpu-controller-restored/result.json`。
 
-维护者明确指定第 0 张 RTX 3090 供独占验收；检查时无计算进程，后续按其 UUID 选择设备。官方完整 gVisor `release-20261026.0` 已校验到本地忽略目录，驱动列表包含本机 `590.48.01`。运行中站点的 Docker 仍未注册 runsc；准备使用独立临时 daemon 验证实际 GPU 隔离，见 [RFC-018](../rfcs/018-gpu-environment-probe.md)。版本匹配不代表 GPU 执行或题型已验收。
+维护者明确指定第 0 张 RTX 3090 供独占验收；检查时无计算进程，后续按其 UUID 选择设备。官方完整 gVisor `release-20261026.0` 已校验到本地忽略目录，驱动列表包含本机 `590.48.01`。运行中站点的 Docker 未注册 runsc；独立临时 Docker 和 Podman 的 GPU 接入分别遇到系统级 systemd 认证及根 cgroup 写入限制，均在 CUDA 程序启动前停止，见 [RFC-018 的实际结果](../rfcs/018-gpu-environment-probe.md#实际结果与下一步)。临时资源已清理，原站点正常。剩余工作是 rootless 运行时适配与 GPU 题型实现，不再是 CPU 委派配置缺失。
 
 此前 CPU 配额缺失的原因是用户服务的控制器委派：
 
