@@ -58,6 +58,7 @@ def execution_digest(root=None):
         "core/gpu_resources.py",
         "core/gpu_control.py",
         "core/gpu_execution.py",
+        "core/gpu_startup.py",
         "core/resources.py",
         "core/queue.py",
         "core/models.py",

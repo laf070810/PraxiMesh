@@ -134,9 +134,21 @@ def controlled(monkeypatch):
                 lambda _self, command, **_kwargs: events.append(("start", command)),
             )
 
-            def run(*, on_begin=None):
+            def run(*, on_begin=None, maintenance=False, purpose=None):
+                service = OwnedJobService(
+                    guard,
+                    uuid.uuid4(),
+                    uuid.uuid4(),
+                    purpose=purpose or ("maintenance" if maintenance else "task"),
+                )
+                if maintenance:
+                    return adapter.recover(
+                        service,
+                        deadline=time.monotonic() + 90,
+                        on_tick=lambda: events.append(("poll", None)),
+                    )
                 return adapter.evaluate(
-                    OwnedJobService(guard, uuid.uuid4(), uuid.uuid4()),
+                    service,
                     deadline=time.monotonic() + 90,
                     problem=problem(),
                     source="synthetic-source-never-executed",
@@ -164,6 +176,48 @@ def test_private_source_follows_verified_preparation_and_final_result_follows_st
     assert events.index(("eof", None)) < events.index(("stop", None))
     assert events[-1] == ("observe", False)
     assert not list(adapter.directory.iterdir())
+
+
+def test_startup_maintenance_sends_no_learner_input_and_waits_for_cleanup(controlled):
+    adapter, messages, events, run = controlled
+    messages[-1] = {"event": "recovered", "recovered": True}
+    assert run(maintenance=True) == adapter.environment
+    requests = [value for name, value in events if name == "send"]
+    assert requests == [
+        {"event": "prepare", "target": TARGET},
+        {"event": "recover"},
+        {"event": "finish"},
+    ]
+    assert not any(name == "begin" for name, _value in events)
+    assert events.index(("eof", None)) < events.index(("stop", None))
+    assert events[-1] == ("observe", False)
+    assert not list(adapter.directory.iterdir())
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        {"event": "completed", "result": result(), "recovered": True},
+        {"event": "recovered", "result": result(), "recovered": True},
+        {"event": "recovered", "recovered": False},
+        {"event": "recovered", "recovered": 1},
+    ],
+)
+def test_startup_maintenance_rejects_scores_or_unconfirmed_recovery(controlled, response):
+    _adapter, messages, events, run = controlled
+    messages[-1] = response
+    with pytest.raises(SandboxUnavailable, match="startup recovery"):
+        run(maintenance=True)
+    assert ("stop", None) in events
+    assert ("send", {"event": "finish"}) not in events
+
+
+@pytest.mark.parametrize("maintenance,purpose", [(True, "task"), (False, "maintenance")])
+def test_task_and_maintenance_services_cannot_be_interchanged(controlled, maintenance, purpose):
+    _adapter, _messages, events, run = controlled
+    with pytest.raises(ValueError, match="service instance"):
+        run(maintenance=maintenance, purpose=purpose)
+    assert not events
 
 
 @pytest.mark.parametrize("stage", [0, 1])

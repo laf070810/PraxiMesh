@@ -269,3 +269,15 @@ def quarantine(guard, job=None):
     device.checked_at = None
     device.save(update_fields=["state", "checked_at"])
     return True
+
+
+@transaction.atomic
+def verify_recovery_owner(guard, *, job_id, reservation_token):
+    """Fence startup work without announcing health or changing the old slot."""
+    device = _device(guard)
+    if (
+        device.state != GPUDevice.State.QUARANTINED
+        or device.checked_at is not None
+        or (device.job_id, device.reservation_token) != (job_id, reservation_token)
+    ):
+        raise DeviceOwnershipError("GPU ownership or reservation changed during startup recovery")

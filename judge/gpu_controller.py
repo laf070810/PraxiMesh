@@ -54,24 +54,26 @@ def serve(channel, base, archives, deadline):
         identity = runtime.prepare_gpu(prepare["target"], archives[2])
         channel.send({"event": "prepared", "identity": identity, "target": prepare["target"]})
         request = channel.receive()
-        if type(request) is not dict or set(request) != {"event", "problem", "source", "mode"}:
-            raise SandboxUnavailable("Unexpected GPU execution request")
-        if request != task_request(request["problem"], request["source"], request["mode"]):
-            raise SandboxUnavailable("Invalid GPU execution request")
-        execution_deadline = deadline - RECOVERY_MARGIN - CLEANUP_MARGIN
-        if time.monotonic() >= execution_deadline:
-            raise SandboxUnavailable("Insufficient reservation for GPU execution and recovery")
-
-        def execution_tick():
-            runtime.tick()
+        maintenance = request == {"event": "recover"}
+        if not maintenance:
+            if type(request) is not dict or set(request) != {"event", "problem", "source", "mode"}:
+                raise SandboxUnavailable("Unexpected GPU execution request")
+            if request != task_request(request["problem"], request["source"], request["mode"]):
+                raise SandboxUnavailable("Invalid GPU execution request")
+            execution_deadline = deadline - RECOVERY_MARGIN - CLEANUP_MARGIN
             if time.monotonic() >= execution_deadline:
-                raise GPUExecutionError("time_limit")
+                raise SandboxUnavailable("Insufficient reservation for GPU execution and recovery")
 
-        with runtime.kernel_session("task", mode=request["mode"]) as session:
-            session.on_tick = execution_tick
-            result = evaluate_kernel(
-                request["problem"], request["source"], request["mode"], session
-            )
+            def execution_tick():
+                runtime.tick()
+                if time.monotonic() >= execution_deadline:
+                    raise GPUExecutionError("time_limit")
+
+            with runtime.kernel_session("task", mode=request["mode"]) as session:
+                session.on_tick = execution_tick
+                result = evaluate_kernel(
+                    request["problem"], request["source"], request["mode"], session
+                )
         # Release the input references before the independent recovery; nothing
         # is persisted and neither expected values nor fixtures reach the guest.
         del request
@@ -80,7 +82,11 @@ def serve(channel, base, archives, deadline):
         runtime.deadline = deadline
         runtime.close()
         closed = True
-        channel.send({"event": "completed", "result": result, "recovered": True})
+        channel.send(
+            {"event": "recovered", "recovered": True}
+            if maintenance
+            else {"event": "completed", "result": result, "recovered": True}
+        )
         if channel.receive() != {"event": "finish"}:
             raise SandboxUnavailable("Unexpected GPU completion acknowledgement")
     finally:

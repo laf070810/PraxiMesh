@@ -180,7 +180,10 @@ def recover_workspace(workspace, *, deadline, on_tick):
     The task service must already be stopped. This function does not observe GPU
     state, call the database, run a learner task, or authorize further work.
     """
-    if type(workspace) is not JobWorkspace or workspace.service.purpose != "task":
+    if type(workspace) is not JobWorkspace or workspace.service.purpose not in {
+        "task",
+        "maintenance",
+    }:
         raise ValueError("An owned task workspace is required")
     if type(deadline) not in {int, float} or not math.isfinite(deadline):
         raise SandboxUnavailable("A finite private recovery deadline is required")

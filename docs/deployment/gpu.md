@@ -24,6 +24,8 @@ G3 的 `gpu-slot-seconds-v1` 按 Run 90 秒、Submit 180 秒预约整卡时段�
 
 [G9](../acceptance-g9.md)已实现运行适配器、私有 CUDA 控制器与数据库结算连接。协议及实际 PostgreSQL 边界通过，真实命名空间的检查仅覆盖准备前拒绝；完整 GPU 运行、独立正确解恢复、时间预算、正式 worker 和启动 receipt 尚未验收。
 
+[G10](../acceptance-g10.md)连接启动接管与异常恢复：先停止数据库旧预约对应的服务，以及每卡固定身份的遗留维护服务，再清理私有目录、运行固定正确解。恢复成功仍保持隔离停用和旧预约，完整就绪检查及启动凭证尚未交付。所有控制器副本与后续升级必须共用原来的私有工作根和锁目录；换目录不能处理旧进程或存储，也不能据此恢复提交。
+
 ## 不占 GPU 的控制链检查
 
 适用于显卡暂被占用时开发、检查 worker 控制链，或在目标 Linux 主机核对用户服务管理器及 CPU/内存/PID 委派。需要项目 Python 环境、可用的普通用户 systemd 管理器和 cgroup v2；不需要显卡、驱动或 CUDA 制品。不要用 sudo，也不在普通 Web/CPU worker 容器内执行。
@@ -80,9 +82,19 @@ G3 的 `gpu-slot-seconds-v1` 按 Run 90 秒、Submit 180 秒预约整卡时段�
   --image-archive var/gpu-preflight/python-image-20261030.oci.tar
 ```
 
-脚本在固定 CPU guest 确实运行后，分别触发控制器立即退出、整服务终止和独立硬期限；确认原进程树停止，再用持久预约启动新的回收服务。还验证活动任务不能回收，以及回收服务在删除前中断后的接管。它只创建并处理本次独有服务、锁和目录，不访问 GPU、不修改共享容器存储。
+脚本在固定 CPU guest 确实运行后，分别触发任务控制器立即退出、整服务终止、独立硬期限，以及维护控制器立即退出；确认原进程树停止，再用持久身份启动新的回收服务。还验证活动任务不能回收，以及回收服务在删除前中断后的接管。它只创建并处理本次独有服务、锁和目录，不访问 GPU、不修改共享容器存储。
 
-结果在 `test-results/px-gpu-recovery-*/result.json`，应有三项成功 `checks`；每项 `all_task_processes_stopped`、`recovery.workspace_removed`、`service_cleanup.cgroup_empty` 为 `true`，总 `passed` 和 `temporary_directory_removed` 为 `true`。回收过程核对原 UID/GID 映射及目录身份；错误、映射变化或残留挂载会保留现场。不要手工删除未知目录、调整 subuid/subgid 来绕过核对，或据此释放设备预约。下一步真实 CUDA 恢复与正式准入仍需独占卡。
+结果在 `test-results/px-gpu-recovery-*/result.json`，应有四项成功 `checks`；每项 `all_task_processes_stopped`、`recovery.workspace_removed`、`service_cleanup.cgroup_empty` 为 `true`，总 `passed` 和 `temporary_directory_removed` 为 `true`。回收过程核对原 UID/GID 映射及目录身份；错误、映射变化或残留挂载会保留现场。不要手工删除未知目录、调整 subuid/subgid 来绕过核对，或据此释放设备预约。下一步真实 CUDA 恢复与正式准入仍需独占卡。
+
+启动状态与接管边界可使用一次性 PostgreSQL 检查：
+
+```sh
+.venv/bin/python scripts/postgres_tests.py -q \
+  tests/test_gpu_startup.py tests/test_gpu_execution.py \
+  tests/test_gpu_control.py tests/test_gpu_resources.py
+```
+
+这组检查会自动清理自有数据库容器和卷；GPU 执行使用明确的测试替身，不能作为真实设备恢复证据。尚无正式 GPU worker 启动命令，不要直接调用数据库的恢复转换来绕过就绪检查。
 
 ## 重放单卡环境检查
 

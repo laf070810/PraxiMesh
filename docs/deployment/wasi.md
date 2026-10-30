@@ -24,6 +24,8 @@ curl --fail --location --max-time 60 --output /tmp/praximesh-quickjs.tar.xz http
 
 当前使用 format 3 联合 bundle：CPython 3.14.9、QuickJS 2026-06-04 与 Wasmtime 50.0.1。第一步生成 format 2 Python 构建输入，第二步校验其文件及 QuickJS/SDK 固定摘要，在当前引擎策略下重新生成两个 cache。format 2 不能直接供 B2 worker 使用。显式 target 为 `x86_64-unknown-linux-gnu`，不推断构建机 CPU 特性；关闭未使用的 component model。`THIRD_PARTY_NOTICES.txt` 保存 wasi-libc、musl、cloudlibc、LLVM compiler-rt 的声明，`LICENSE.quickjs` 保存 QuickJS 的 MIT 许可。固定来源、WASI 兼容补丁见 `vendor/wasi/` 和 `vendor/quickjs/`。旧 bundle 与 receipt 不能手改 manifest 升级。
 
+当前构建会用同版可信 CPython 缓存标准库字节码。早期本地 bundle 缺少这些缓存，曾在 Agent 正确解的单轮 CPU 限额内超时；应按本页流程构建到新的目录并重跑完整探针，保留题目原预算，不能手改旧 bundle 或复用旧 receipt。失败与重建版本的比较见 [G10](../acceptance-g10.md#策略身份与范围)。
+
 将脚本输出的 `JUDGE_WASI_BUNDLE`、`JUDGE_WASI_SHA256` 配置到执行节点。示例只展示读取**刚在本机可信构建产生**的 manifest；不能用同样方法信任陌生 native cache。
 
 ```sh

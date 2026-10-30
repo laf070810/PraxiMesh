@@ -56,11 +56,26 @@ class GPUExecutionAdapter:
     ):
         if type(service) is not OwnedJobService or service.purpose != "task":
             raise ValueError("An owned task service instance is required")
+        request = task_request(problem, source, mode)
+        message = self._exchange(
+            service, request, deadline=deadline, on_tick=on_tick, on_begin=on_begin
+        )
+        return copy.deepcopy(message["result"]), copy.deepcopy(self.environment)
+
+    def recover(self, service, *, deadline, on_tick):
+        """Run only the fixed correct kernel in a distinct maintenance service."""
+        if type(service) is not OwnedJobService or service.purpose != "maintenance":
+            raise ValueError("An owned maintenance service instance is required")
+        self._exchange(
+            service, {"event": "recover"}, deadline=deadline, on_tick=on_tick, on_begin=lambda: None
+        )
+        return copy.deepcopy(self.environment)
+
+    def _exchange(self, service, request, *, deadline, on_tick, on_begin):
         guard = service.guard
         if type(guard) is not DeviceLock or guard.device_uuid != self.target["uuid"]:
             raise ValueError("The selected device's held host lock is required")
         guard.assert_held()
-        request = task_request(problem, source, mode)
         if (
             environment_identity(self.target, self.identity) != self.environment
             or canonical_digest(self.environment) != self.fingerprint
@@ -113,14 +128,20 @@ class GPUExecutionAdapter:
                 tick()
                 channel.send(request)
                 message = channel.receive()
-                if (
-                    type(message) is not dict
-                    or set(message) != {"event", "result", "recovered"}
-                    or message["event"] != "completed"
-                    or message["recovered"] is not True
-                ):
-                    raise SandboxUnavailable("GPU controller did not complete device recovery")
-                validate_result(message["result"], problem, mode)
+                if request["event"] == "recover":
+                    if canonical_digest(message) != canonical_digest(
+                        {"event": "recovered", "recovered": True}
+                    ):
+                        raise SandboxUnavailable("GPU controller did not complete startup recovery")
+                else:
+                    if (
+                        type(message) is not dict
+                        or set(message) != {"event", "result", "recovered"}
+                        or message["event"] != "completed"
+                        or message["recovered"] is not True
+                    ):
+                        raise SandboxUnavailable("GPU controller did not complete device recovery")
+                    validate_result(message["result"], request["problem"], request["mode"])
                 channel.send({"event": "finish"})
                 channel.expect_eof()
             finally:
@@ -137,4 +158,4 @@ class GPUExecutionAdapter:
         # that the host device has no other process. Check once more before DB IO.
         guard.assert_held()
         monitor.observe()
-        return copy.deepcopy(message["result"]), copy.deepcopy(self.environment)
+        return message

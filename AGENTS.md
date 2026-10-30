@@ -54,6 +54,7 @@
 - 共用离线制品与运行环境在 `judge/gpu_artifacts.py`、`judge/gpu_environment.py`，控制命令由 `judge/gpu_command.py` 有界执行。修改后按集中指南重放固定 CPU 的实际 runsc 验收；CUDA 仍须显式准备单卡和编译器。输出超限时先关闭并终止附着客户端，再独立核对、终止和等待自有容器；不能把关闭管道视为 GPU 清理完成。保留私有存储、空 hook 目录、固定镜像校验和子进程独立 home，不继承操作者配置来修复启动失败。
 - 异常存储回收在 `judge/gpu_recovery.py`，固定入口为 `judge/gpu_recovery_entry.py`。先持锁确认原服务停止及 cgroup 为空，再用独立回收服务核对预约、目录 inode 和 UID/GID 映射；不能打开旧容器数据库、根据旧 PID 发信号或执行遗留目录中的程序。保留失败现场和身份记录，按集中指南重放实际 CPU 异常恢复；文件删除成功不证明 GPU 恢复，也不能直接释放设备预约。
 - GPU 执行连接在 `judge/gpu_adapter.py`、`judge/gpu_controller.py` 和 `core/gpu_execution.py`。运行时身份核对及开始执行登记之前不发送源码；结果须等待独立正确解恢复、存储和整服务清理及设备空闲。错误清理保留同一服务实例的调用身份，不重建对象绕过核对。协议/PG 替身测试和准备前的实际拒绝检查不证明 CUDA、恢复或性能成功；正式启动 receipt 和产品准入仍须真实验收。
+- GPU 启动恢复在 `core/gpu_startup.py`：接管先隔离停用，保留原预约，先停止全部已知旧服务再处理目录；无任务时仍按每卡固定身份找回中断的维护服务。所有副本与升级共用原私有工作根及锁目录。维护消息不含学员输入，恢复完成仍不能直接标记 ready 或签发凭证；修改后重放实际 PostgreSQL 与四项 CPU 异常恢复检查。`core/gpu_resources.py` 也在 CPU 策略摘要中，更新后须使用当前策略重新执行真实 WASI 探针，不能沿用旧 receipt。
 - 浏览器、HTTPS、发布包和升级用现有 `scripts/*acceptance.py` 入口。使用一次性数据库、合成账号和明确属于本次测试的容器/卷；默认使用回环地址，按用户明确要求验证直接 IP 访问时使用独立测试端口。完成后核对清理，不删除未知资源。
 - Compose 单机入口为 `core/selfhost.py`，复用 `core/preview.py` 的原子数据库初始化；默认包括真实 WASI worker，可选 `compose.ai.yaml` 启动本地模型。修改时重放 `python3 scripts/compose_acceptance.py`；涉及模型或界面时使用 `--ai --browsers`。核对真实探针与七种题型、worker 离线关闭提交、直接 IP/CSRF、初始化恢复、旧内容不重导及成绩/会话跨重建保留。不得用旧 receipt 或宿主缓存代替镜像内自检。此入口不替代生产发布协调器。
 - 重型 WASI/worker 验收按资源预算串行安排，避免争用造成假超时。长进程须跟踪原进程或工具句柄；观察超时不代表进程结束，不据此重复启动。

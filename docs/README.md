@@ -37,6 +37,8 @@
 - [ADR-024：异常退出后的私有存储回收](adr/024-gpu-crash-storage-recovery.md)
 - [G9 执行适配器与结算连接](acceptance-g9.md) — 协议及实际 PostgreSQL 边界通过，硬件执行与恢复待验收
 - [ADR-025：GPU 执行适配器与结算边界](adr/025-gpu-execution-adapter.md)
+- [G10 启动接管与维护恢复](acceptance-g10.md) — 预约保留、实际 PostgreSQL 与四项 CPU 存储回收通过，正式就绪检查待完成
+- [ADR-026：GPU 启动接管与维护恢复](adr/026-gpu-startup-recovery.md)
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

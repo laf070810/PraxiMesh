@@ -59,7 +59,12 @@ def abandoned_recovery(workspace, record):
 
 
 def scenario(name, directory, guard, archives, record, save):
-    service = OwnedJobService(guard, uuid.uuid4(), uuid.uuid4())
+    service = OwnedJobService(
+        guard,
+        uuid.uuid4(),
+        uuid.uuid4(),
+        purpose="maintenance" if name == "maintenance-exit" else "task",
+    )
     record.update(name=name, passed=False, unit=service.unit)
     with JobWorkspace(directory, service) as workspace, PrivateListener() as listener:
         record["workspace"] = str(workspace.path)
@@ -112,7 +117,7 @@ def scenario(name, directory, guard, archives, record, save):
                 record["live_recovery_rejected"] = True
             else:
                 raise RuntimeError("A live task was accepted for storage recovery")
-            if name == "controller-exit":
+            if name in {"controller-exit", "maintenance-exit"}:
                 channel.send({"event": "exit"})
             else:
                 channel.send({"event": "wait"})
@@ -127,7 +132,9 @@ def scenario(name, directory, guard, archives, record, save):
                 abandoned_recovery(workspace, record)
             # Reopen through a replacement controller, with only the persisted
             # reservation and lock; no original in-memory container registry.
-            replacement = OwnedJobService(guard, service.job_id, service.reservation_token)
+            replacement = OwnedJobService(
+                guard, service.job_id, service.reservation_token, purpose=service.purpose
+            )
             with JobWorkspace(directory, replacement, create=False) as reopened:
                 record["recovery"] = recover_workspace(
                     reopened, deadline=time.monotonic() + 60, on_tick=guard.assert_held
@@ -196,7 +203,7 @@ def main():
     print(json.dumps({"report": str(out / "result.json")}), flush=True)
     try:
         with DeviceLock(out / "locks", "GPU-" + str(uuid.uuid4())) as guard:
-            for name in ("controller-exit", "service-stop", "deadline"):
+            for name in ("controller-exit", "service-stop", "deadline", "maintenance-exit"):
                 record = {}
                 report["checks"].append(record)
                 scenario(name, directory, guard, archives, record, save)

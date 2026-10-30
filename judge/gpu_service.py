@@ -77,15 +77,15 @@ class OwnedJobService:
         if type(guard) is not DeviceLock:
             raise ValueError("An owned GPU device lock is required")
         guard.assert_held()
-        if purpose not in {"task", "recovery"}:
+        if purpose not in {"task", "recovery", "maintenance"}:
             raise ValueError("Unknown owned service purpose")
         self.guard = guard
         self.purpose = purpose
         self.job_id = uuid.UUID(str(job_id))
         self.reservation_token = uuid.UUID(str(reservation_token))
         identity = f"v1:{os.getuid()}:{guard.device_uuid}:{self.job_id}:{self.reservation_token}"
-        if purpose == "recovery":
-            identity += ":recovery"
+        if purpose != "task":
+            identity += ":" + purpose
         digest = hashlib.sha256(identity.encode()).hexdigest()
         self.unit = (
             "praximesh-gpu-"

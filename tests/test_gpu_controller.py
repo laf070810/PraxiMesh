@@ -155,3 +155,23 @@ def test_independent_recovery_does_not_accept_a_wrong_output():
     with pytest.raises(SandboxUnavailable, match="correctness recovery failed"):
         gpu_controller.recover_device(Runtime())
     assert events == ["stopped"]
+
+
+def test_maintenance_request_runs_no_learner_session_and_returns_no_score(controller):
+    controller.incoming[1] = {"event": "recover"}
+    controller.run()
+    assert not any(name in {"session", "evaluated"} for name, _message in controller.events)
+    assert ("recovery-checked", None) in controller.events
+    message = next(
+        message
+        for name, message in controller.events
+        if name == "send" and message["event"] == "recovered"
+    )
+    assert message == {"event": "recovered", "recovered": True}
+
+
+def test_recovery_request_with_source_is_rejected(controller):
+    controller.incoming[1] = {"event": "recover", "source": "not accepted"}
+    with pytest.raises(SandboxUnavailable, match="execution request"):
+        controller.run()
+    assert ("recovery-checked", None) not in controller.events
