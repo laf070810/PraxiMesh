@@ -8,7 +8,7 @@ jobs:
     environment: judge-acceptance
     runs-on: [self-hosted, linux, x64, praximesh-judge]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Real gVisor checks (trusted reviewed code only)
         env:
           JUDGE_BACKEND: gvisor
