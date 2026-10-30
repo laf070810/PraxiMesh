@@ -6,7 +6,31 @@
 
 2026-10-30 维护者补齐 CPU 委派并重启用户 Docker 后，当前 context `/run/user/2031/docker.sock` 的 `MemoryLimit`、`SwapLimit`、`PidsLimit`、`CpuCfsQuota` 均为 `true`，资源控制警告为空。可信临时容器设置 `--cpus=0.5`，实际运行 5 秒消耗约 2.501 秒 CPU，`cpu.max=50000 100000`，发生 50 次节流；测试容器已清理。CPU 配额缺口已解决，结果见 `test-results/cpu-controller-restored/result.json`。
 
-维护者明确指定第 0 张 RTX 3090 供独占验收；检查时无计算进程，后续按其 UUID 选择设备。官方完整 gVisor `release-20261026.0` 已校验到本地忽略目录，驱动列表包含本机 `590.48.01`。运行中站点的 Docker 未注册 runsc；独立临时 Docker 和 Podman 的 GPU 接入分别遇到系统级 systemd 认证及根 cgroup 写入限制，均在 CUDA 程序启动前停止，见 [RFC-018 的实际结果](../rfcs/018-gpu-environment-probe.md#实际结果与下一步)。临时资源已清理，原站点正常。剩余工作是 rootless 运行时适配与 GPU 题型实现，不再是 CPU 委派配置缺失。
+维护者明确指定第 0 张 RTX 3090 供独占验收，按 UUID 选择设备。固定 gVisor `release-20261026.0` 与驱动 `590.48.01` 的实际组合已跑通：在独立用户 cgroup 命名空间、Podman、runsc 与 CDI 中，只识别目标卡，并完成 50,000 元素 CUDA 向量加法。最终 CPU 探针用时 9.002 秒、消耗 4.393 秒 CPU，发生 75 次节流，0.5 核限额生效。临时资源已清理，原站点正常。
+
+初次接入失败和修正见 [RFC-018](../rfcs/018-gpu-environment-probe.md#实际结果与下一步)。CPU 委派与基础 CUDA 执行已解决；GPU 题型、正式 worker、设备预约、显存与故障处理、性能比较仍未交付。
+
+## 重放单卡环境检查
+
+适用于准备 GPU 执行环境和排障；它不安装常驻 worker、不生成评测 receipt，也不会开放网站提交。需要维护者明确分配一张空闲 GPU。脚本拒绝 `all`，发现已有计算任务就退出。
+
+本机已具备：普通用户可用的 systemd 管理器及委派的 cgroup v2 控制器、RootlessKit 3.3、Podman 5.8、slirp4netns、fuse-overlayfs、NVIDIA Container Toolkit 和受固定 runsc 支持的驱动。使用项目 Python 3.11+ 环境；不要使用 sudo。其他机器先准备这些依赖与权限，并允许拉取固定的 NVIDIA 样例镜像。
+
+本机归档已在 `var/gpu-preflight/gvisor.tar.bz2`，可直接执行最后一条命令。新环境先下载固定完整归档，脚本会核对内置 SHA-512 并保留 sidecar 二进制：
+
+```sh
+mkdir -p var/gpu-preflight
+curl --fail --location --retry 3 \
+  --output var/gpu-preflight/gvisor.tar.bz2 \
+  https://storage.googleapis.com/gvisor/releases/release/20261026.0/x86_64/gvisor.tar.bz2
+
+.venv/bin/python scripts/gpu_environment_probe.py \
+  --gpu 0 --runtime-archive var/gpu-preflight/gvisor.tar.bz2
+```
+
+`--gpu` 也接受完整 GPU UUID；只能指定已授权设备。整个试验有 360 秒服务时限、2 核/2 GiB/512 PID 总预算；串行工作负载的父 cgroup 限制为 0.5 核、512 MiB、零 swap、256 PID。这些 PID 包括 gofer、sentry 和驱动辅助程序开销。
+
+脚本依次验证单卡可见性、厂商 CUDA 正确性和实际 CPU 节流，结束后删除专属容器、存储和临时服务。命令退出码须为 0；输出目录 `test-results/px-gpu-cgns-*/` 中，`result.json` 应有 `passed: true` 且无清理错误，`outer.json` 的两个 `temporary_*_removed` 应为 true。`service.log` 和 `runsc/` 保留失败细节。不能把这些基础检查外推为学员程序隔离、显存超限和故障恢复全部通过。
 
 此前 CPU 配额缺失的原因是用户服务的控制器委派：
 

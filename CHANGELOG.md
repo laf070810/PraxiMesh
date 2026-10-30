@@ -3,8 +3,9 @@
 ## CPU 配额复验与 GPU 0 准备 — 2026-10-30
 
 - 维护者修复 rootless 用户控制器委派后，Docker 四项资源能力均为 true；独立可信容器实测 0.5 核限额与节流通过，容器已清理。
-- 记录维护者授权 GPU 0 独占验收；校验官方 gVisor release-20261026.0 完整归档，精确驱动支持列表匹配 590.48.01。后续按 RFC-018 验证独立临时 GPU 环境，尚未开放 GPU 提交。
-- 独立 Docker/Podman 接入实际复现 runsc 的 rootless systemd/cgroup 权限问题，CUDA 程序未启动；原始失败、修正过程和清理结果保留在 RFC-018。临时资源已清理，现有三项服务健康、直接 IP 的 CPU 评测仍可用。
+- 记录维护者授权 GPU 0 独占验收；校验官方 gVisor release-20261026.0 完整归档，精确驱动支持列表匹配 590.48.01；按 RFC-018 完成独立临时环境检查，尚未开放 GPU 提交。
+- 初次独立 Docker/Podman 接入复现 runsc 的 rootless systemd/cgroup 权限问题；随后使用临时用户服务和 cgroup 命名空间解决，原始失败与修正过程保留在 RFC-018。
+- 新增可重放的单卡 GPU 环境脚本：固定完整 gVisor 归档、按 UUID 筛选 CDI、可信父 cgroup 限额；GPU 0 的真实 CUDA 向量加法、0.5 核 CPU 节流及清理通过，12 项设备/制品拒绝检查通过。未修改现有 daemon 或站点，尚未实现正式 GPU 题型。
 
 ## GitHub CI、runner 与 GPU 接入指南 — 2026-10-30
 

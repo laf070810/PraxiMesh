@@ -18,7 +18,8 @@
 - [RFC-015：Compose 一键本地体验](rfcs/015-compose-preview.md)
 - [RFC-016：可直接做题的 Compose 单机部署](rfcs/016-compose-selfhost.md)
 - [RFC-017：托管 CI 与部署 runner 接入](rfcs/017-hosted-deployment-runner.md)
-- [RFC-018：GPU 0 的独立隔离环境验证](rfcs/018-gpu-environment-probe.md) — CPU 通过，GPU 容器接入未通过
+- [RFC-018：GPU 0 的独立隔离环境验证](rfcs/018-gpu-environment-probe.md) — 单卡 CUDA 样例、CPU 节流与清理通过，正式题型待实现
+- [ADR-017：用户 cgroup 命名空间内的 GPU 环境检查](adr/017-gpu-environment-probe.md)
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

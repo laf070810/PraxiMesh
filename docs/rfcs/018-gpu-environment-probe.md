@@ -1,6 +1,6 @@
 # RFC-018：GPU 0 的独立隔离环境验证
 
-状态：CPU 与版本预检通过，两条 GPU 容器接入均未通过，尚未开放 GPU 评测。日期：2026-10-30。关联 PRD R-16、AC-04、AC-08；前置 [RFC-010](010-specialist-evaluation.md)。
+状态：独立 rootless 环境的单卡识别、真实 CUDA 样例、CPU 节流及清理通过，尚未开放 GPU 评测。日期：2026-10-30。关联 PRD R-16、AC-04、AC-08；前置 [RFC-010](010-specialist-evaluation.md)，决定见 [ADR-017](../adr/017-gpu-environment-probe.md)。
 
 ## 本次范围
 
@@ -26,6 +26,10 @@
 
 Podman 备选中的 cgroup 父目录使用本次专属普通子目录，不能直接以 systemd slice 名称作为 cgroupfs 父路径。runsc 不接受 Podman 默认注入的 OCI SELinux process label，因此仅对本次临时容器设置 `label=disable`；主机 SELinux 状态不变，runsc 隔离、只读文件系统、网络关闭、去除 capabilities 与全部资源限额继续保留。该兼容调整仍须实际验证，不作为生产方案自动启用。
 
+进一步验证用户 cgroup 命名空间方案：用本次专属、自动回收的临时用户服务获得独立子树，设置整体 CPU/内存/PID/运行时限，再由现有 RootlessKit 的 `--pidns --cgroupns --evacuate-cgroup2` 将运行时限制在该子树的视图内。先独立验证命名空间和真实 controller 文件，再决定是否进入 GPU 检查。此方案不修改既有用户或系统服务、不更改 runsc 二进制，也不忽略 cgroup 错误。
+
+该路径的实际排查已越过 cgroup 权限和 CDI hook 初始化。128 个宿主线程/进程的初始预算不足以同时容纳 gofer、sentry 和 NVIDIA 辅助程序，内核 `pids.events` 记录拒绝；继续试验采用固定的 256 PID 预算，并限制辅助 Go 程序并发为 2。同时发现容器子 cgroup 的 `cpu.max` 未保持预期值，不能只凭 CLI 参数判定限额生效：可信控制端先在专属 `workloads` 父 cgroup 设置 0.5 CPU、512 MiB 内存、0 swap 和 256 PID，再验证容器继承的有效限制及实际 CPU 节流。该预算用于基础设施试验，尚非正式 GPU 评测策略。
+
 官方依据：[gVisor GPU](https://gvisor.dev/docs/user_guide/gpu/)、[rootless 模式](https://gvisor.dev/docs/user_guide/rootless/)、[NVIDIA CDI](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/cdi-support.html)。
 
 ## 实际结果与下一步
@@ -36,10 +40,16 @@ Podman 备选中的 cgroup 父目录使用本次专属普通子目录，不能�
 | GPU 0 身份、空闲及驱动列表 | 通过只读预检；UUID 已记录，驱动 590.48.01 在固定 runsc 支持列表中 |
 | 独立 Docker + runsc + CDI | daemon 能力检查及固定 CUDA 样例镜像获取成功；runsc 创建系统级 systemd scope 时要求交互认证，guest 未启动 |
 | 独立 Podman + runsc + CDI | 保留并排查下载 EOF、cgroupfs 父路径和 OCI SELinux 标签问题；最终 runsc 写 `/sys/fs/cgroup/cgroup.subtree_control` 时权限不足，guest 未启动 |
-| 清理及原站点复核 | 五次试验的临时目录、专属 cgroup 和可归属进程均无残留；共享 Podman 命名空间辅助进程未擅自删除。原 Web/worker/tutor 健康，回环和直接 IP 健康入口均返回 200，CPU 评测可用；GPU 0 无计算进程 |
+| 用户 cgroup namespace + 独立 Podman + runsc + CDI | 通过；容器内仅识别授权 GPU 0，真实执行 50,000 元素 CUDA 向量加法，厂商正确性检查输出 `Test PASSED` |
+| 该 GPU 路径的实际 CPU 限额 | 最终脚本重放通过；9.002 秒耗费 4.393 秒 CPU，比例 0.488，75 次节流；父 cgroup 的 0.5 核、512 MiB、零 swap、256 PID 限额在执行前后保持一致 |
+| 清理及原站点复核 | 初次五轮和后续命名空间试验的专属目录、服务及 cgroup 已清理；共享 Podman 命名空间辅助进程未擅自删除。既有 Web/worker/tutor 健康，回环和直接 IP 健康入口均返回 200，CPU 评测可用；GPU 0 无残留计算进程 |
 
-固定 CUDA 样例镜像为 `nvcr.io/nvidia/k8s/cuda-sample@sha256:6337237230602d2c063263922dc1db6c8ecc8d23c1f8438e172fe912f10f3973`。镜像被获取不等于 CUDA 程序已执行；本轮没有取得真实 GPU 计算成功的证据。
+固定 CUDA 样例镜像为 `nvcr.io/nvidia/k8s/cuda-sample@sha256:6337237230602d2c063263922dc1db6c8ecc8d23c1f8438e172fe912f10f3973`。前两条接入路径只取得镜像；命名空间路径随后实际完成 CUDA 计算。此结果只验证厂商基础设施样例，不包含学员代码、正式成绩或性能比较。
 
-下一步属于运行时适配和产品实现：在已委派的用户 cgroup 范围内实施真实资源限制，处理 runsc 的 rootless cgroup 路径/管理器兼容性，再重放设备范围、正确性、超时和清理检查。CPU 配置已修复，不应继续要求维护者扩大系统级 D-Bus 或根 cgroup 权限，也不能设置忽略 cgroup 错误来绕过。
+命名空间方案还处理了三个实测兼容问题：为 `/run/lock` 准备私有挂载；覆盖样例镜像继承的 `NVIDIA_VISIBLE_DEVICES=all`，由 CDI 单独按 UUID 选卡；为 Go 辅助程序设置 `GOMAXPROCS=2`，并为完整运行时开销提供固定 PID 预算。探针曾误将 Podman 返回的运行时完整路径与短名称比较，已修正为校验本次固定 runsc 的完整路径并重放。全部原始失败保留。
+
+下一步是将这一基础能力接入 GPU 题型、可信结果比较、设备预约与任务租约，再补齐显存预算、资源超限、取消、worker 失联、故障恢复和性能可比性验收。CPU 委派及基础 GPU 执行路径不再是当前阻塞；没有修改系统级 D-Bus、根 cgroup 权限或现有 daemon。
 
 原始结果保留在忽略目录：`test-results/px-gpu-c21a854521d8/`、`px-podman-gpu-ca97c25f3a7c/`、`px-podman-gpu-bb6747327a26/`、`px-podman-gpu-f00ea72345e6/`、`px-podman-gpu-77b4558be2bd/`；最终状态与清理复核为 `test-results/gpu-runtime-preflight/final-state.json`。初次健康查询受到客户端代理影响返回 502，关闭该请求的代理后两种直连均成功；没有因此修改站点。
+
+后续结果位于 `test-results/px-cgns-57a8b50a3d0e/` 和 `test-results/px-gpu-cgns-*/`。首次完整通过为 `px-gpu-cgns-bc82eca5d489`；整理后的 [检查脚本](../../scripts/gpu_environment_probe.py) 最终实测重放为 `px-gpu-cgns-616bf74c3bca`，脚本 SHA-256、固定 runsc 身份与清理记录见该目录的 `outer.json`，CUDA 与 CPU 结果见 `result.json`。最终全部专属资源清理、既有站点健康和 GPU 0 空闲复核见 `test-results/gpu-runtime-preflight/final-state-after-success.json`。12 项定向单元检查验证设备筛选和未知制品拒绝，不替代这次实测。操作只在 [GPU 部署指南](../deployment/gpu.md#重放单卡环境检查)维护。

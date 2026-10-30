@@ -1,6 +1,6 @@
 # 全部 PRD 要求的实施与证据
 
-更新：2026-10-30。目标：按 PRD 实施阶段 A/B/C 与 D/E/F 补充。维护者已明确当前先交付可本地验证的自部署版本；公开运营、许可证选择及真实 GPU 验收留待后续。**C 的专业评测、组织与辅导，D 的完整筛选、私有成就与挑战，E 的类/API，以及 F 的版本题目反馈均已通过本地验收。外部部署与授权事项仍未完成。** 当前固定制品及 E→F HTTPS 升级见 [F 验收](acceptance-f.md)，类/API见 [E 验收](acceptance-e.md)，筛选与挑战见 [D 验收](acceptance-d.md)，既有阶段 A 验收见 [acceptance.md](acceptance.md)，架构见 [RFC-006](rfcs/006-complete-product.md)和 [ADR-011](adr/011-specialists-organizations-coaching.md)。
+更新：2026-10-30。目标：按 PRD 实施阶段 A/B/C 与 D/E/F 补充。维护者已明确当前先交付可本地验证的自部署版本；公开运营和许可证选择稍后确定，GPU 正式题型及完整验收仍未完成。**C 的专业评测、组织与辅导，D 的完整筛选、私有成就与挑战，E 的类/API，以及 F 的版本题目反馈均已通过本地验收。外部部署与授权事项仍未完成。** 当前固定制品及 E→F HTTPS 升级见 [F 验收](acceptance-f.md)，类/API见 [E 验收](acceptance-e.md)，筛选与挑战见 [D 验收](acceptance-d.md)，既有阶段 A 验收见 [acceptance.md](acceptance.md)，架构见 [RFC-006](rfcs/006-complete-product.md)和 [ADR-011](adr/011-specialists-organizations-coaching.md)。
 
 ## 功能要求
 
@@ -31,7 +31,7 @@
 - PRD §8：可维护依赖、自动化成功/失败/安全/恢复测试、可复现部署；密钥/权限/网络/CPU/内存/存储/额度约束；安全报告流程；键盘/移动阅读/清晰空态和错误；实测性能和成本政策。
 - AC-01–07：旧闭环在每批扩展后持续成立；AC-08 需用真正不同的评测方式证明复用现有知识、题库、账户与进度。
 - PRD §12：重大方案先留 RFC、决定更新 ADR；实现与证据同步；整体完成必须覆盖本表全部行及跨模块门槛。
-- PRD §13：维护者已选择先交付自部署版本，公开运营和许可证稍后决定；已指定本机 GPU 0 供独占验收，GPU 执行环境尚待实测，长期站点目标尚未确认。本地 CPU 模型已通过实际验收。GitHub 代码仓库现已公开，不等于产品已公开运营或代码/内容许可证已获批准。
+- PRD §13：维护者已选择先交付自部署版本，公开运营和许可证稍后决定；已指定本机 GPU 0 供独占验收，基础环境的真实 CUDA 样例已通过，正式题型尚未交付；长期站点目标尚未确认。本地 CPU 模型已通过实际验收。GitHub 代码仓库现已公开，不等于产品已公开运营或代码/内容许可证已获批准。
 
 ## 完整目标仍未通过的门槛
 
@@ -41,14 +41,14 @@
 
 | 未完成项 | 当前证据与限制 | 后续完成所需条件 |
 | --- | --- | --- |
-| GPU 题型（§2.2 C、§4.2/4.4、R-16） | 尚无 GPU 评测器、示例题或性能榜单。维护者已指定 GPU 0；CPU 委派及 0.5 核实际限额检查已通过。固定 runsc 支持本机驱动；两条临时 rootless 接入在 systemd/根 cgroup 权限处失败，未进入 CUDA 执行，资源已清理，见 [GPU 准备](deployment/gpu.md)及 [RFC-018](rfcs/018-gpu-environment-probe.md)。 | 完成已委派用户 cgroup 范围内的运行时适配，推进 GPU 契约、设备预约和结果逻辑，再完成真实正确/错误程序、资源回收、稳定基准及硬件可比性验收。不能用扩大系统权限或忽略限额来绕过。 |
+| GPU 题型（§2.2 C、§4.2/4.4、R-16） | GPU 0 已通过独立 rootless 环境的单卡识别、真实 CUDA 向量加法、0.5 核实际节流及清理；提供可重放脚本。初次 systemd/cgroup 接入失败已通过用户命名空间方案解决，见 [GPU 指南](deployment/gpu.md)及 [RFC-018](rfcs/018-gpu-environment-probe.md)。尚无 GPU 评测器、题目或性能榜单。 | 实现正式 GPU 契约、设备预约、租约与可信结果比较，完成参考解/错解、显存与资源超限、取消/失联/故障恢复、性能基准及硬件可比性验收。厂商样例成功不能代替正式评测验收。 |
 | 托管 CI/CD（§8.2、R-09） | `origin` 已指向 GitHub，默认分支 `main`；应用与 WASI CI 已实际获得托管 runner 并运行，尚未确认最终全通过。部署工作流新增默认 `status`；runner 管理 API 未认证返回 401，不能据此确认是否已注册。 | 核对 CI 最终成功/失败记录；按 [CI 指南](deployment/ci.md)设置受信运维仓库/有效访问限制、分支/environment、专用部署节点，再验收状态、发布和恢复。部署 runner 不依赖 GPU。 |
 | 目标站点运维（§8.2/8.4、AC-07） | 本地固定镜像、回环 HTTPS、备份恢复、升级与容量样本已验证；没有指定长期部署目标。 | 在目标主机验收服务监管、容量、公有证书与续期、日志/备份保留和故障恢复。公开运营仍按维护者决定后续处理。 |
 | 开源与公开发布政策（§1、§8.3、§13） | `LICENSES.md` 仍为待确认状态；`SECURITY.md` 尚无正式私密报告渠道和负责人。维护者明确先交付自部署、公开运营及许可证后定。 | 维护者确认代码/内容/投稿授权，以及需要公开运营时的品牌、资源、治理、隐私和安全响应安排。开发者不能代为批准这些事项。 |
 
 2026-10-24 的硬件/运行时查询仅为只读，没有执行 GPU 工作负载或修改共享主机。原始复核见 `test-results/f-completion-external.json` 和 `f-completion-audit.json`。当前不能将完整 PRD 目标标为完成；已确认的自部署功能与制品继续可供本地使用。
 
-2026-10-24 开发指南交付后的只读查询记录在 `test-results/post-onboarding-blockers-1.json`；其中无远端的历史条件已被 2026-10-30 的 GitHub 接入解除。CPU 委派缺口随后由维护者修复，实际限额结果见 `test-results/cpu-controller-restored/result.json`。候选 runsc 的精确驱动版本列表检查见 `test-results/gpu-runtime-preflight/result.json`，尚不代表 GPU 实际运行验收。nvproxy 会将受支持的 GPU 调用转交宿主 NVIDIA 驱动，驱动本身仍在信任边界内，详见 [gVisor GPU 官方指南](https://gvisor.dev/docs/user_guide/gpu/)。
+2026-10-24 开发指南交付后的只读查询记录在 `test-results/post-onboarding-blockers-1.json`；其中无远端的历史条件已被 2026-10-30 的 GitHub 接入解除。CPU 委派缺口随后由维护者修复，实际限额结果见 `test-results/cpu-controller-restored/result.json`。候选 runsc 的精确驱动版本列表检查见 `test-results/gpu-runtime-preflight/result.json`；后续单卡 CUDA 样例与实际节流已通过，范围及失败修正见 [RFC-018](rfcs/018-gpu-environment-probe.md)。nvproxy 会将受支持的 GPU 调用转交宿主 NVIDIA 驱动，驱动本身仍在信任边界内，详见 [gVisor GPU 官方指南](https://gvisor.dev/docs/user_guide/gpu/)。
 
 ## 分批结果
 
