@@ -35,6 +35,8 @@
 - [ADR-023：共用离线 GPU 运行模块与容器回收](adr/023-gpu-offline-runtime.md)
 - [G8 异常退出后的私有存储回收](acceptance-g8.md) — 实际 CPU 容器的退出、整服务终止、期限和回收接管通过
 - [ADR-024：异常退出后的私有存储回收](adr/024-gpu-crash-storage-recovery.md)
+- [G9 执行适配器与结算连接](acceptance-g9.md) — 协议及实际 PostgreSQL 边界通过，硬件执行与恢复待验收
+- [ADR-025：GPU 执行适配器与结算边界](adr/025-gpu-execution-adapter.md)
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

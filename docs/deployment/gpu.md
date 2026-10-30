@@ -22,6 +22,8 @@ G3 的 `gpu-slot-seconds-v1` 按 Run 90 秒、Submit 180 秒预约整卡时段�
 
 [G8](../acceptance-g8.md)增加控制器异常退出后的私有存储回收，真实 CPU 容器的退出、终止及期限场景通过。该组件只恢复文件系统，设备预约仍须等待实际 GPU 恢复；正式 worker 尚未接入。
 
+[G9](../acceptance-g9.md)已实现运行适配器、私有 CUDA 控制器与数据库结算连接。协议及实际 PostgreSQL 边界通过，真实命名空间的检查仅覆盖准备前拒绝；完整 GPU 运行、独立正确解恢复、时间预算、正式 worker 和启动 receipt 尚未验收。
+
 ## 不占 GPU 的控制链检查
 
 适用于显卡暂被占用时开发、检查 worker 控制链，或在目标 Linux 主机核对用户服务管理器及 CPU/内存/PID 委派。需要项目 Python 环境、可用的普通用户 systemd 管理器和 cgroup v2；不需要显卡、驱动或 CUDA 制品。不要用 sudo，也不在普通 Web/CPU worker 容器内执行。
@@ -43,6 +45,14 @@ G3 的 `gpu-slot-seconds-v1` 按 Run 90 秒、Submit 180 秒预约整卡时段�
 这一步也不需要显卡、驱动或 CUDA 制品。它使用完全断网的独立命名空间和固定 CPU 进程，验证大消息传输、断连、额外消息拒绝、独立期限及同 UID 的错误 cgroup 拒绝；检查环境变量白名单、实际父组限额与工作目录清理。结果在 `test-results/px-gpu-namespace-*/result.json`，应有五项成功 `checks`，每项 `cleanup.cgroup_empty`、`workspace_removed` 为 `true`，总 `passed` 和 `temporary_directory_removed` 为 `true`。
 
 该脚本只运行控制进程，没有运行 Podman guest、CUDA 或 GPU 恢复探针。启动失败时保留失败结果，先核对 RootlessKit 与 `ip` 是否位于系统路径；不要通过继承整套 worker 环境变量修复，也不要把残留目录或设备预约直接删除。
+
+修改运行适配器或控制器入口后，还可在同样的非 GPU 环境验证实际加载和错误顺序拒绝：
+
+```sh
+.venv/bin/python scripts/gpu_controller_acceptance.py
+```
+
+它不接收设备或学员源码参数，不需要 CUDA 制品；只在私有服务中启动可信入口，核对对端后发送顺序错误的请求，确认在准备运行时之前失败并退出。结果位于 `test-results/px-gpu-controller-*/result.json`；`passed`、`rejected_before_runtime_preparation`、`cleanup.cgroup_empty`、`workspace_removed`、`temporary_directory_removed` 均应为 `true`。该入口不验证 CUDA 执行或 GPU 恢复。
 
 ## 不占 GPU 的离线容器检查
 
