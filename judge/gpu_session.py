@@ -23,6 +23,10 @@ class GPUExecutionError(Exception):
         self.verdict = verdict
 
 
+class GPUDriverExited(SandboxUnavailable):
+    """The attached driver exited without a classified learner failure."""
+
+
 def decode_frame(raw):
     def unique(pairs):
         value = {}
@@ -89,7 +93,7 @@ class GPUSession:
             verdict = "memory_limit"
         if verdict:
             raise GPUExecutionError(verdict)
-        raise SandboxUnavailable("GPU driver exited before completing its protocol")
+        raise GPUDriverExited("GPU driver exited before completing its protocol")
 
     def _read(self, key):
         data = os.read(key.fd, 8192)

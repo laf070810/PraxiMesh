@@ -55,6 +55,7 @@ def execution_digest(root=None):
         "judge/gpu_isolation.py",
         "judge/gpu_isolation_guest.py",
         "judge/gpu_host_pids.py",
+        "judge/gpu_kernel_checks.py",
         "judge/gpu_probes.py",
         "judge/gpu_device_lock.py",
         "judge/results.py",

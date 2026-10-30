@@ -231,3 +231,62 @@ def test_failed_resource_check_cannot_return_a_ready_report(controller, monkeypa
         name == "send" and message["event"] == "resources-checked"
         for name, message in controller.events
     )
+
+
+def test_kernel_check_requires_recovery_and_store_close_before_completion(controller, monkeypatch):
+    from tests.test_gpu_kernel_checks import REQUEST, check_report
+
+    def kernel(runtime, request):
+        assert request == REQUEST
+        assert runtime.deadline < time.monotonic() + 60
+        controller.events.append(("kernel-checked", None))
+        return check_report(request)
+
+    monkeypatch.setattr(gpu_controller, "check_kernel", kernel)
+    controller.incoming[1] = dict(REQUEST)
+    controller.run()
+    events = controller.events
+    sent = next(
+        i
+        for i, (name, value) in enumerate(events)
+        if name == "send" and value["event"] == "kernel-checked"
+    )
+    assert (
+        events.index(("kernel-checked", None))
+        < events.index(("recovery-checked", None))
+        < events.index(("store-closed", None))
+        < sent
+    )
+    assert not any(name in {"session", "evaluated"} for name, _value in events)
+
+
+@pytest.mark.parametrize("failure", ["check", "recovery", "store"])
+def test_kernel_failure_never_returns_successful_report(controller, monkeypatch, failure):
+    from tests.test_gpu_kernel_checks import REQUEST, check_report
+
+    def failed(*_args):
+        raise SandboxUnavailable("fixed startup failure")
+
+    monkeypatch.setattr(gpu_controller, "check_kernel", lambda *_args: check_report())
+    if failure == "check":
+        monkeypatch.setattr(gpu_controller, "check_kernel", failed)
+    elif failure == "recovery":
+        monkeypatch.setattr(gpu_controller, "recover_device", failed)
+    else:
+        monkeypatch.setattr(gpu_controller.PrivateRuntime, "close", failed)
+    controller.incoming[1] = dict(REQUEST)
+    with pytest.raises(SandboxUnavailable, match="startup failure"):
+        controller.run()
+    assert not any(
+        name == "send" and value["event"] == "kernel-checked" for name, value in controller.events
+    )
+
+
+def test_kernel_request_with_source_is_rejected_and_store_closed(controller):
+    from tests.test_gpu_kernel_checks import REQUEST
+
+    controller.incoming[1] = {**REQUEST, "source": "not allowed"}
+    with pytest.raises(SandboxUnavailable, match="Unexpected CUDA"):
+        controller.run()
+    assert ("store-closed", None) in controller.events
+    assert ("recovery-checked", None) not in controller.events

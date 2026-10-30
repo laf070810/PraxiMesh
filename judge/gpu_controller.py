@@ -13,6 +13,7 @@ from judge.gpu_execution_contract import (
     validate_target,
 )
 from judge.gpu_isolation import check_resources, request_values
+from judge.gpu_kernel_checks import check_kernel
 from judge.gpu_policy import execution_digest
 from judge.gpu_probes import VECTOR_REFERENCE
 from judge.gpu_session import GPUExecutionError
@@ -57,7 +58,12 @@ def serve(channel, base, archives, deadline):
         request = channel.receive()
         maintenance = request == {"event": "recover"}
         resource_check = type(request) is dict and request.get("event") == "check-resources"
-        if resource_check:
+        kernel_check = type(request) is dict and request.get("event") == "check-kernel"
+        if kernel_check:
+            runtime.deadline = deadline - RECOVERY_MARGIN - CLEANUP_MARGIN
+            kernel_report = check_kernel(runtime, request)
+            runtime.deadline = deadline
+        elif resource_check:
             if set(request) != {"event", "canary", "port"}:
                 raise SandboxUnavailable("Unexpected GPU resource check request")
             values = request_values({name: request[name] for name in ("canary", "port")})
@@ -91,7 +97,9 @@ def serve(channel, base, archives, deadline):
         runtime.deadline = deadline
         runtime.close()
         closed = True
-        if resource_check:
+        if kernel_check:
+            channel.send({"event": "kernel-checked", "report": kernel_report, "recovered": True})
+        elif resource_check:
             channel.send({"event": "resources-checked", "report": resources, "recovered": True})
         elif maintenance:
             channel.send({"event": "recovered", "recovered": True})

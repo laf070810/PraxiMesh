@@ -21,6 +21,7 @@ from judge.gpu_execution_contract import (
     validate_target,
 )
 from judge.gpu_isolation import validate_report
+from judge.gpu_kernel_checks import check_request, validate_check_report
 from judge.gpu_monitor import DeviceMonitor, identify
 from judge.gpu_namespace import JobWorkspace
 from judge.gpu_recovery import recover_workspace
@@ -91,6 +92,16 @@ class GPUExecutionAdapter:
             )
         return copy.deepcopy(message["report"]), copy.deepcopy(self.environment)
 
+    def check_kernel(self, service, name, *, deadline, on_tick):
+        """One fixed CUDA startup case, with independent recovery and cleanup."""
+        if type(service) is not OwnedJobService or service.purpose != "maintenance":
+            raise ValueError("An owned maintenance service instance is required")
+        request = check_request(name, uuid.uuid4().hex)
+        message = self._exchange(
+            service, request, deadline=deadline, on_tick=on_tick, on_begin=lambda: None
+        )
+        return copy.deepcopy(message["report"]), copy.deepcopy(self.environment)
+
     def _exchange(self, service, request, *, deadline, on_tick, on_begin):
         guard = service.guard
         if type(guard) is not DeviceLock or guard.device_uuid != self.target["uuid"]:
@@ -148,7 +159,16 @@ class GPUExecutionAdapter:
                 tick()
                 channel.send(request)
                 message = channel.receive()
-                if request["event"] == "check-resources":
+                if request["event"] == "check-kernel":
+                    if (
+                        type(message) is not dict
+                        or set(message) != {"event", "report", "recovered"}
+                        or message["event"] != "kernel-checked"
+                        or message["recovered"] is not True
+                    ):
+                        raise SandboxUnavailable("CUDA check did not finish recovery")
+                    validate_check_report(message["report"], request)
+                elif request["event"] == "check-resources":
                     if (
                         type(message) is not dict
                         or set(message) != {"event", "report", "recovered"}

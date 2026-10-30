@@ -136,13 +136,23 @@ def controlled(monkeypatch):
                 lambda _self, command, **_kwargs: events.append(("start", command)),
             )
 
-            def run(*, on_begin=None, maintenance=False, purpose=None, resource_check=False):
+            def run(
+                *, on_begin=None, maintenance=False, purpose=None, resource_check=False, kernel=None
+            ):
                 service = OwnedJobService(
                     guard,
                     uuid.uuid4(),
                     uuid.uuid4(),
-                    purpose=purpose or ("maintenance" if maintenance or resource_check else "task"),
+                    purpose=purpose
+                    or ("maintenance" if maintenance or resource_check or kernel else "task"),
                 )
+                if kernel is not None:
+                    return adapter.check_kernel(
+                        service,
+                        kernel,
+                        deadline=time.monotonic() + 180,
+                        on_tick=lambda: events.append(("poll", None)),
+                    )
                 if resource_check:
                     return adapter.check_resources(
                         service,
@@ -166,6 +176,74 @@ def controlled(monkeypatch):
                 )
 
             yield adapter, messages, events, run
+
+
+def test_kernel_check_binds_fresh_request_then_waits_for_service_stop(controlled):
+    from tests.test_gpu_kernel_checks import check_report
+
+    adapter, messages, events, run = controlled
+
+    def response():
+        request = next(
+            value for name, value in events if name == "send" and value["event"] == "check-kernel"
+        )
+        assert set(request) == {"event", "name", "challenge"}
+        return {"event": "kernel-checked", "report": check_report(request), "recovered": True}
+
+    messages[-1] = response
+    report, environment = run(kernel="public-run")
+    assert report["name"] == "public-run" and environment == adapter.environment
+    assert not any(name == "begin" for name, _value in events)
+    assert events.index(("eof", None)) < events.index(("stop", None))
+    assert events[-1] == ("observe", False)
+    assert list(adapter.directory.iterdir()) == []
+
+
+@pytest.mark.parametrize("defect", ["event", "recovery", "challenge", "extra", "verdict"])
+def test_kernel_check_rejects_incomplete_or_mismatched_response(controlled, defect):
+    from tests.test_gpu_kernel_checks import check_report
+
+    _adapter, messages, events, run = controlled
+
+    def response():
+        request = next(
+            value for name, value in events if name == "send" and value["event"] == "check-kernel"
+        )
+        value = {"event": "kernel-checked", "report": check_report(request), "recovered": True}
+        if defect == "event":
+            value["event"] = "completed"
+        elif defect == "recovery":
+            value["recovered"] = 1
+        elif defect == "challenge":
+            value["report"]["challenge"] = "0" * 32
+        elif defect == "extra":
+            value["report"]["ready"] = True
+        else:
+            value["report"]["result"].update(
+                verdict="wrong_answer", label=LABELS["wrong_answer"], passed=0
+            )
+        return value
+
+    messages[-1] = response
+    with pytest.raises(SandboxUnavailable):
+        run(kernel="public-run")
+    assert ("stop", None) in events
+    assert ("send", {"event": "finish"}) not in events
+
+
+@pytest.mark.parametrize("purpose", ["task", "recovery"])
+def test_kernel_checks_need_a_maintenance_service(controlled, purpose):
+    _adapter, _messages, events, run = controlled
+    with pytest.raises(ValueError, match="maintenance"):
+        run(kernel="public-run", purpose=purpose)
+    assert events == []
+
+
+def test_unknown_kernel_check_is_rejected_before_device_query(controlled):
+    _adapter, _messages, events, run = controlled
+    with pytest.raises(ValueError, match="fixed CUDA"):
+        run(kernel="arbitrary-command")
+    assert events == []
 
 
 def test_private_source_follows_verified_preparation_and_final_result_follows_stop(controlled):

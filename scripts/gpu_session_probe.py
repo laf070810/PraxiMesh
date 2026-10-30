@@ -6,32 +6,10 @@ import time
 from pathlib import Path
 
 from judge.gpu import evaluate_kernel
-from judge.gpu_contract import reference_values
+from judge.gpu_kernel_checks import problem_for
 from judge.gpu_policy import PROFILE, execution_digest, profile_digest
 from judge.gpu_probes import VECTOR_REFERENCE, correctness_fixtures, fault_fixtures
 from judge.sandbox import SandboxUnavailable
-
-
-def problem_for(fixture):
-    inputs = fixture["inputs"] or [{"a": [1], "b": [2]}]
-    if len(inputs) == 1:
-        inputs = inputs * 2
-    return {
-        "evaluator": "cuda-kernel-v1",
-        "language": "cuda",
-        "entrypoint": "solve",
-        "operation": fixture["operation"],
-        "comparison": {"kind": "float", "absolute": 1e-5, "relative": 1e-5},
-        "tests": [
-            {
-                "name": "public" if index == 0 else f"protected-case-{index}",
-                "public": index == 0,
-                "inputs": values,
-                "expected": reference_values(fixture["operation"], values),
-            }
-            for index, values in enumerate(inputs)
-        ],
-    }
 
 
 def verify_sessions(factory, report, save):
