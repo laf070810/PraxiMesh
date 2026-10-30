@@ -1,6 +1,6 @@
 # GPU 评测：现状与接入准备
 
-[部署方案选择](README.md) · **GPU 评测尚未实现；本页是准备与实施顺序，不是已经可用的启动命令。** 当前 Compose 和发布协调器提供七种 CPU/WASI 评测。添加 `--gpus`、安装 NVIDIA runtime 或注册 Actions runner 都不会自动增加 GPU 题型。
+[部署方案选择](README.md) · **GPU 正式评测尚未交付；本页提供环境和内核组件检查，不是 GPU worker 的部署入口。** 当前 Compose 和发布协调器提供七种 CPU/WASI 评测。添加 `--gpus`、安装 NVIDIA runtime 或注册 Actions runner 都不会自动增加 GPU 题型。
 
 ## 本机当前状态
 
@@ -8,7 +8,7 @@
 
 维护者明确指定第 0 张 RTX 3090 供独占验收，按 UUID 选择设备。固定 gVisor `release-20261026.0` 与驱动 `590.48.01` 的实际组合已跑通：在独立用户 cgroup 命名空间、Podman、runsc 与 CDI 中，只识别目标卡，并完成 50,000 元素 CUDA 向量加法。最终 CPU 探针用时 9.002 秒、消耗 4.393 秒 CPU，发生 75 次节流，0.5 核限额生效。临时资源已清理，原站点正常。
 
-初次接入失败和修正见 [RFC-018](../rfcs/018-gpu-environment-probe.md#实际结果与下一步)。CPU 委派与基础 CUDA 执行已解决；GPU 题型、正式 worker、设备预约、显存与故障处理、性能比较仍未交付。
+初次接入失败和修正见 [RFC-018](../rfcs/018-gpu-environment-probe.md#实际结果与下一步)。之后实现了有界 CUDA 内核契约和受信驱动，真实向量/矩阵参考解、三种错解、编译错误及缺失入口共 7 组检查通过，见 [G1 组件验证](../acceptance-g1.md)。GPU 正式题型、worker、设备预约、显存与故障处理、性能比较仍未交付。
 
 ## 重放单卡环境检查
 
@@ -30,7 +30,29 @@ curl --fail --location --retry 3 \
 
 `--gpu` 也接受完整 GPU UUID；只能指定已授权设备。整个试验有 360 秒服务时限、2 核/2 GiB/512 PID 总预算；串行工作负载的父 cgroup 限制为 0.5 核、512 MiB、零 swap、256 PID。这些 PID 包括 gofer、sentry 和驱动辅助程序开销。
 
-脚本依次验证单卡可见性、厂商 CUDA 正确性和实际 CPU 节流，结束后删除专属容器、存储和临时服务。命令退出码须为 0；输出目录 `test-results/px-gpu-cgns-*/` 中，`result.json` 应有 `passed: true` 且无清理错误，`outer.json` 的两个 `temporary_*_removed` 应为 true。`service.log` 和 `runsc/` 保留失败细节。不能把这些基础检查外推为学员程序隔离、显存超限和故障恢复全部通过。
+脚本依次验证单卡可见性、厂商 CUDA 正确性和实际 CPU 节流，结束后删除专属容器、存储和临时服务。命令退出码须为 0；输出目录 `test-results/px-gpu-cgns-*/` 中，`result.json` 应有 `passed: true` 且无清理错误，`outer.json` 的两个 `temporary_*_removed` 应为 true。`service.log` 和 `runsc/` 保留失败细节。固定公开镜像使用临时空认证文件拉取，不继承或改写用户的 registry 凭证。
+
+如果停在镜像拉取阶段，先检查仓库及代理连通性；下载超时不表示 GPU 不可用。本次曾出现继承代理的下载超时，直连重放成功。仅当目标网络允许直连时，可为单次命令去掉代理环境后重试，不必改动正在运行的 Docker 服务。
+
+## 重放内核正确性检查
+
+在上述依赖和单卡授权基础上，增加固定 NVRTC 13.1.115 归档；不需要在宿主执行 CUDA 编译器。本机已保存 `var/gpu-preflight/nvrtc-13.1.115.tar.xz`，可以直接执行第二条命令。新环境先下载：
+
+```sh
+curl --fail --location --retry 3 \
+  --output var/gpu-preflight/nvrtc-13.1.115.tar.xz \
+  https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvrtc/linux-x86_64/cuda_nvrtc-linux-x86_64-13.1.115-archive.tar.xz
+
+.venv/bin/python scripts/gpu_environment_probe.py \
+  --gpu 0 --runtime-archive var/gpu-preflight/gvisor.tar.bz2 \
+  --nvrtc-archive var/gpu-preflight/nvrtc-13.1.115.tar.xz
+```
+
+脚本在解包前验证固定 SHA-256，再校验动态库；只将最小受信驱动和编译库只读挂载进固定 Python 镜像。向量加法、矩阵乘法的参考解和针对性错解均在 gVisor 内编译和执行，预期值留在控制器。`result.json` 还应包含 7 个通过的 `kernel_probes`；此模式同样检查单卡、实际 CPU 限额和清理。
+
+两种模式串行执行，不接受任意学员源码、不生成正式 receipt，也不开放网站提交。正常内核成功不能代替非法访存、显存耗尽、超时、设备恢复和可信性能验收。实现与未完成门槛见 [RFC-019](../rfcs/019-gpu-kernel-evaluation.md)和 [G1 记录](../acceptance-g1.md)。
+
+## CPU 委派问题的原因
 
 此前 CPU 配额缺失的原因是用户服务的控制器委派：
 

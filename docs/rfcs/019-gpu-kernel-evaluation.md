@@ -33,3 +33,5 @@ worker 在各阶段续租并检查取消。租约失效只终止自己的任务�
 5. 提供明确的容器化 GPU worker 部署入口，更新集中部署指南、README、AGENTS、需求追踪及 ADR。所有门槛通过前继续关闭 GPU 提交。
 
 本 RFC 不将阶段性组件测试标为完整交付。正式策略及结果结构必须在上述故障和性能检查后固定。NVRTC 与 Driver API 以固定版本的 [NVIDIA 文档](https://docs.nvidia.com/cuda/archive/13.1.1/nvrtc/index.html)和实际二进制为依据。
+
+2026-10-30：第一步的有界契约、受信 NVRTC/Driver API 驱动及控制器比较已实现；GPU 0 的两类参考解、三类错解、编译错误和缺失入口共 7 组真实检查通过。检查入口和失败修复见 [G1 记录](../acceptance-g1.md)。尚未注册正式评测器或完成资源、恢复、性能与产品接入。

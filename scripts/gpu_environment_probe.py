@@ -1,6 +1,6 @@
 """Probe one explicitly selected GPU in a disposable rootless gVisor environment.
 
-This runs vendor infrastructure fixtures only, never learner code, and produces
+This runs reviewed infrastructure fixtures only, never learner code, and produces
 no judge receipt. See docs/deployment/gpu.md for prerequisites and scope.
 """
 
@@ -22,6 +22,8 @@ from copy import deepcopy
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 IMAGE = "nvcr.io/nvidia/k8s/cuda-sample@sha256:6337237230602d2c063263922dc1db6c8ecc8d23c1f8438e172fe912f10f3973"
 RELEASE = "release-20261026.0"
 ARCHIVE_SHA512 = "26e4a327565f5da0f73261a6387e2c20f4695a232e330095a3111b70efd604fdf09d734e8cc8f714dbb5c5607ce8c87ea80b26df549d83a146f2efd5a1af448a"
@@ -80,11 +82,19 @@ def selected_cdi(spec, target):
 
 def child(base, out, name):
     target = json.loads((base / "target.json").read_text())
+    configuration = json.loads((base / "probe.json").read_text())
+    kernel_probe = None
+    image = IMAGE
+    if configuration["mode"] == "kernels":
+        from scripts import gpu_kernel_probe as kernel_probe
+
+        image = kernel_probe.IMAGE
     report = {
         "started_at": datetime.datetime.now(datetime.UTC).isoformat(),
         "base": str(base),
         "unit": name,
         "target": target,
+        "mode": configuration["mode"],
         "steps": [],
         "passed": False,
     }
@@ -98,8 +108,10 @@ def child(base, out, name):
     def save():
         (out / "result.json").write_text(json.dumps(report, indent=2) + "\n")
 
-    def command(args, timeout=30, check=True, label=None):
-        result = subprocess.run(args, capture_output=True, text=True, env=env, timeout=timeout)
+    def command(args, timeout=30, check=True, label=None, stdin=None):
+        result = subprocess.run(
+            args, capture_output=True, text=True, env=env, timeout=timeout, input=stdin
+        )
         report["steps"].append(
             {
                 "label": label or args[0],
@@ -113,7 +125,7 @@ def child(base, out, name):
             raise RuntimeError(f"{label or args[0]} failed: {result.stderr[-2000:]}")
         return result
 
-    def podman(*args, timeout=30, check=True):
+    def podman(*args, timeout=30, check=True, stdin=None):
         return command(
             [
                 "podman",
@@ -137,10 +149,11 @@ def child(base, out, name):
             ],
             timeout=timeout,
             check=check,
+            stdin=stdin,
             label="podman " + args[0],
         )
 
-    def run(label, entrypoint=None, args=()):
+    def run(label, entrypoint=None, args=(), *, stdin=None, expected_exit=0):
         container = name + "-" + label
         containers.append(container)
         options = [
@@ -166,13 +179,21 @@ def child(base, out, name):
         ]
         if entrypoint:
             options.append("--entrypoint=" + entrypoint)
+        if stdin is not None:
+            options.append("--interactive")
+        if kernel_probe is not None:
+            options += kernel_probe.container_options(base)
         # CDI already selects exactly one UUID. Do not inherit the image's
         # NVIDIA_VISIBLE_DEVICES=all and trigger legacy reinjection in runsc.
         options += [
             "--env=NVIDIA_VISIBLE_DEVICES=void",
             "--env=NVIDIA_DRIVER_CAPABILITIES=compute,utility",
         ]
-        result = podman(*options, IMAGE, *args, timeout=60)
+        result = podman(*options, image, *args, timeout=60, check=False, stdin=stdin)
+        require(
+            result.returncode == expected_exit,
+            f"{label}: expected exit {expected_exit}, got {result.returncode}",
+        )
         details = json.loads(podman("inspect", container).stdout)[0]
         require(details.get("OCIRuntime") == str(base / "runtime/runsc"), "Unexpected OCI runtime")
         host = details["HostConfig"]
@@ -224,8 +245,19 @@ def child(base, out, name):
             json.dumps({"phase": "private_namespace_ready", "result": str(out / "result.json")}),
             flush=True,
         )
-        podman("pull", "--retry=3", "--retry-delay=2s", IMAGE, timeout=240)
-        report["sample_image"] = IMAGE
+        # Fixed public images must not inherit stale/private registry credentials.
+        authfile = base / "registry-auth.json"
+        authfile.write_text('{"auths": {}}\n')
+        authfile.chmod(0o600)
+        podman(
+            "pull",
+            "--authfile=" + str(authfile),
+            "--retry=3",
+            "--retry-delay=2s",
+            image,
+            timeout=240,
+        )
+        report["sample_image"] = image
         print(json.dumps({"phase": "sample_image_ready"}), flush=True)
         visible = run(
             "identity",
@@ -238,10 +270,13 @@ def child(base, out, name):
             "Unexpected visible GPU set",
         )
         print(json.dumps({"phase": "gpu_identity_passed", "visible_devices": visible}), flush=True)
-        output = run("vectoradd")
-        report["vectoradd_output"] = output
-        require("Test PASSED" in output, "Vendor CUDA correctness check failed")
-        print(json.dumps({"phase": "vectoradd_passed", "output": output}), flush=True)
+        if kernel_probe is not None:
+            kernel_probe.verify_fixtures(run, report, save)
+        else:
+            output = run("vectoradd")
+            report["vectoradd_output"] = output
+            require("Test PASSED" in output, "Vendor CUDA correctness check failed")
+            print(json.dumps({"phase": "vectoradd_passed", "output": output}), flush=True)
 
         def cpu_stats():
             return {
@@ -397,6 +432,13 @@ def parent(options):
     try:
         digest = runtime_from_archive(options.runtime_archive, base / "runtime")
         outer["runsc_sha256"] = digest
+        mode = "kernels" if options.nvrtc_archive else "vendor"
+        if options.nvrtc_archive:
+            from scripts.gpu_kernel_probe import prepare_artifacts
+
+            outer.update(prepare_artifacts(base, options.nvrtc_archive, ROOT))
+        outer["mode"] = mode
+        (base / "probe.json").write_text(json.dumps({"mode": mode}))
         supported = subprocess.run(
             [str(base / "runtime/runsc"), "nvproxy", "list-supported-drivers"],
             capture_output=True,
@@ -531,6 +573,11 @@ def main():
         type=Path,
         required=True,
         help=f"Unmodified official {RELEASE} gvisor.tar.bz2",
+    )
+    parser.add_argument(
+        "--nvrtc-archive",
+        type=Path,
+        help="Optional pinned NVIDIA NVRTC 13.1.115 archive for CUDA kernel fixtures",
     )
     options = parser.parse_args()
     try:

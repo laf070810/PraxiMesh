@@ -21,6 +21,7 @@
 - [RFC-018：GPU 0 的独立隔离环境验证](rfcs/018-gpu-environment-probe.md) — 单卡 CUDA 样例、CPU 节流与清理通过，正式题型待实现
 - [ADR-017：用户 cgroup 命名空间内的 GPU 环境检查](adr/017-gpu-environment-probe.md)
 - [RFC-019：CUDA 内核评测、设备预约与可比性能](rfcs/019-gpu-kernel-evaluation.md) — 实施中，尚未开放提交
+- [G1 CUDA 内核契约与真实正确性组件验证](acceptance-g1.md) — 7 组真实检查通过，正式队列与资源故障验收待完成
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)
