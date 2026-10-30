@@ -53,13 +53,13 @@ jobs:
         run: .venv/bin/pip-audit --progress-spinner off
       - name: Retain the verified deployable release
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: immutable-release
           path: var/releases/candidate/
           compression-level: 0
           retention-days: 7
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: real-wasi-acceptance

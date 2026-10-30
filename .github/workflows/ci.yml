@@ -13,7 +13,7 @@ jobs:
       - run: docker build -t praximesh:phase-a-check .
       - run: python3 scripts/container_smoke.py
       - run: python3 scripts/compose_acceptance.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: compose-selfhost
@@ -55,7 +55,7 @@ jobs:
           diff -u requirements.lock /tmp/requirements.lock
           uv export --frozen --no-dev --group judge --no-emit-project --format requirements-txt --no-header --quiet -o /tmp/requirements-judge.lock
           diff -u requirements-judge.lock /tmp/requirements-judge.lock
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: application-${{ matrix.database }}
@@ -72,7 +72,7 @@ jobs:
       - run: uv run --group browser playwright install --with-deps chromium
       - name: Local browser journey, evaluation disabled
         run: uv run --group browser python scripts/browser_acceptance.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: browser
