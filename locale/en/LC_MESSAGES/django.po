@@ -14,6 +14,35 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+#, python-format
+msgid "%(passed)s / %(total)s 个正确性用例通过。"
+msgstr "%(passed)s / %(total)s correctness cases passed."
+
+#, python-format
+msgid "编译与初始化：%(milliseconds)s ms。"
+msgstr "Compilation and initialization: %(milliseconds)s ms."
+
+#, python-format
+msgid "控制器批次往返时间中位数：%(milliseconds)s ms。"
+msgstr "Controller round-trip batch median: %(milliseconds)s ms."
+
+#, python-format
+msgid "每批 %(repetitions)s 次执行；%(warmup)s 批预热，%(samples)s 批采样。"
+msgstr "%(repetitions)s executions per batch; %(warmup)s warmup batches and %(samples)s measured batches."
+
+msgid "该时间包含通信和同步成本；只比较同一题目版本、设备与评测环境。"
+msgstr "This time includes communication and synchronization. Compare only the same problem version, device, and evaluation environment."
+
+msgid "全部正确性用例通过后，重复批次仍可能失败；最终状态以评测结论为准。"
+msgstr "Repeated batches can fail after all correctness cases pass. The final verdict determines the outcome."
+
+#, python-format
+msgid "本次预约 %(units)s 秒 GPU 整卡时段，归属 %(day)s UTC 日。"
+msgstr "This task reserves %(units)s GPU device-slot seconds for the UTC day %(day)s."
+
+msgid "预约秒数是整卡时段上限，不是实测 GPU 时间或费用。"
+msgstr "Reserved seconds bound the exclusive device slot; they are not measured GPU time or a fee."
+
 msgid "未开始"
 msgstr "Not started"
 

@@ -49,6 +49,8 @@
 - [ADR-030：完整 GPU 启动、私有凭证与就绪事务](adr/030-gpu-complete-startup-and-receipts.md)
 - [G15 宿主 GPU worker 生命周期](acceptance-g15.md) — 领取、取消恢复、凭证续检与退出已连接，完整 CUDA 与容器部署待验收
 - [ADR-031：GPU worker 生命周期与当前凭证](adr/031-gpu-worker-lifecycle.md)
+- [G16 GPU 持久成绩与结果展示](acceptance-g16.md) — 历史证据、私有进度和中英反馈已连接，真实 CUDA 与提交准入待验收
+- [ADR-032：GPU 持久成绩与版本化学习证据](adr/032-gpu-persisted-evidence.md)
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

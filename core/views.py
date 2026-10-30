@@ -22,7 +22,12 @@ from core.limits import consume
 from core.models import AccountProfile, Draft, Enrollment, KnowledgeNode, Problem, Submission
 from core.queue import AdmissionError, available, enqueue
 from core.resources import GPU_BUDGET_POLICY, reservation_data, reservation_units, usage
-from core.result_evidence import SPECIALISTS, evidence_jobs, is_formal_evidence, safe_result
+from core.result_evidence import (
+    SEQUENTIAL_EVALUATORS,
+    evidence_jobs,
+    is_formal_evidence,
+    safe_result,
+)
 from judge.backends import result_environment_label
 from learning.models import Bookmark, TutorialReading
 from learning.services import export_user_data as export_learning
@@ -331,18 +336,22 @@ def submission_detail(request, job_id):
     job = get_object_or_404(
         Submission.objects.select_related("version"), id=job_id, user=request.user
     )
+    result = safe_result(job)
     return render(
         request,
         "submission.html",
         {
             "job": job,
+            "result": result,
             "problem": public_problem(job.version),
             "verdict_label": LABELS.get(job.verdict, ""),
             "pending": job.status != "finished",
-            "evaluation_image": result_environment_label(job.environment),
-            "public_cases": localized_public_cases(job.version, safe_result(job)),
+            "evaluation_image": result_environment_label(
+                job.environment, job.evaluation_fingerprint
+            ),
+            "public_cases": localized_public_cases(job.version, result),
             "reservation": reservation_data(job),
-            "shareable": job.version.data.get("evaluator") not in SPECIALISTS
+            "shareable": job.version.data.get("evaluator") in SEQUENTIAL_EVALUATORS
             and is_formal_evidence(job),
         },
     )
@@ -512,7 +521,9 @@ def export_account(request):
                 "verdict": j.verdict,
                 "result": safe_result(j),
                 "resource_reservation": reservation_data(j),
-                "evaluation_image": result_environment_label(j.environment),
+                "evaluation_image": result_environment_label(
+                    j.environment, j.evaluation_fingerprint
+                ),
                 "evaluation_fingerprint": j.evaluation_fingerprint,
                 "created_at": j.created_at.isoformat(),
             }

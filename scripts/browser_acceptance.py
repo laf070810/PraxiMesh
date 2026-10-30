@@ -90,7 +90,14 @@ def main():
     parser.add_argument(
         "--interface", action="store_true", help="Only run editor and responsive layout checks"
     )
+    parser.add_argument(
+        "--gpu-results",
+        action="store_true",
+        help="Only render synthetic GPU results in the owned temporary DB; no GPU execution",
+    )
     options = parser.parse_args()
+    if options.gpu_results and (options.judge or options.interface):
+        parser.error("--gpu-results is a separate rendering check without a judge")
     root = Path(__file__).resolve().parent.parent
     artifacts = root / "test-results"
     artifacts.mkdir(exist_ok=True)
@@ -114,6 +121,9 @@ def main():
         env.pop("BROWSER_CA_FILE", None)
         env.pop("BROWSER_MODERATOR_USERNAME", None)
         env.pop("BROWSER_MODERATOR_PASSWORD", None)
+        env.pop("BROWSER_GPU_RESULTS", None)
+        if options.gpu_results:
+            env["BROWSER_GPU_RESULTS"] = "1"
 
         def run(*args, **kwargs):
             environment = kwargs.pop("env", env)
@@ -180,6 +190,9 @@ def main():
                     time.sleep(0.2)
                 else:
                     raise RuntimeError("Application or real judge did not become ready.")
+                if options.gpu_results:
+                    run("tests/browser_gpu_results.py", timeout=180)
+                    return
                 run("tests/browser_editor.py", timeout=300)
                 if options.interface:
                     return

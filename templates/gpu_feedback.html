@@ -1,0 +1,12 @@
+{% load i18n %}
+{% if result.total %}
+<p>{% blocktranslate with passed=result.passed total=result.total %}{{ passed }} / {{ total }} 个正确性用例通过。{% endblocktranslate %}</p>
+{% if result.compile_initialization_ms %}<p>{% blocktranslate with milliseconds=result.compile_initialization_ms|floatformat:3 %}编译与初始化：{{ milliseconds }} ms。{% endblocktranslate %}</p>{% endif %}
+{% if result.performance %}
+<p>{% blocktranslate with milliseconds=result.performance.median_batch_ms|floatformat:3 %}控制器批次往返时间中位数：{{ milliseconds }} ms。{% endblocktranslate %}</p>
+<p>{% blocktranslate with repetitions=result.performance.batch_repetitions warmup=result.performance.warmup_batches samples=result.performance.sample_batches %}每批 {{ repetitions }} 次执行；{{ warmup }} 批预热，{{ samples }} 批采样。{% endblocktranslate %}</p>
+<p class="muted">{% translate "该时间包含通信和同步成本；只比较同一题目版本、设备与评测环境。" %}</p>
+{% elif result.passed == result.total and job.verdict != "accepted" %}
+<p class="muted">{% translate "全部正确性用例通过后，重复批次仍可能失败；最终状态以评测结论为准。" %}</p>
+{% endif %}
+{% endif %}

@@ -261,6 +261,10 @@ def public_execution(version):
     """Explicit public execution data; references and hidden cases never enter it."""
     source = version.data
     evaluator = source["evaluator"]
+    if evaluator == "cuda-kernel-v1":
+        from judge.gpu_contract import project_public_problem
+
+        return project_public_problem(source)
     if evaluator == "python-object-api-v1":
         from judge.object_api import project_public_problem
 
@@ -317,7 +321,10 @@ def public_problem(version):
             for case in execution["tests"]
         ]
         return data
-    if version.data["evaluator"] in SPECIALIST_EVALUATORS:
+    if (
+        version.data["evaluator"] in SPECIALIST_EVALUATORS
+        or version.data["evaluator"] == "cuda-kernel-v1"
+    ):
         data.update({key: value for key, value in execution.items() if key != "tests"})
         data["examples"] = execution["tests"]
         return data

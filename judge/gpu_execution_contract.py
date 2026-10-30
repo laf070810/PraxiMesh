@@ -99,11 +99,13 @@ def task_request(problem, source, mode):
     }
 
 
-def validate_result(result, problem, mode):
+def validate_result(result, problem, mode, *, profile=None):
     """Even trusted IPC returns only bounded learner-visible result fields."""
+    profile = PROFILE if profile is None else profile
     required = {"verdict", "label", "passed", "total", "public_cases"}
     allowed = required | {"compile_initialization_ms", "performance"}
-    total = sum(mode == "submit" or case["public"] for case in problem["tests"])
+    selected = [case for case in problem["tests"] if mode == "submit" or case["public"]]
+    total = len(selected)
     if (
         type(result) is not dict
         or not required <= set(result) <= allowed
@@ -130,6 +132,18 @@ def validate_result(result, problem, mode):
             or case["label"] != LABELS[case["verdict"]]
         ):
             raise SandboxUnavailable("Invalid GPU public feedback")
+    visible_positions = [index for index, case in enumerate(selected) if case["public"]]
+    maximum_reached = (
+        visible_positions[len(result["public_cases"])]
+        if len(result["public_cases"]) < len(visible_positions)
+        else total
+    )
+    public_passed = sum(case["verdict"] == "accepted" for case in result["public_cases"])
+    public_failed = len(result["public_cases"]) - public_passed
+    if not public_passed <= result["passed"] <= maximum_reached - public_failed or (
+        result["verdict"] == "wrong_answer" and len(result["public_cases"]) != len(public)
+    ):
+        raise SandboxUnavailable("Contradictory GPU public case counts")
     if result["verdict"] == "accepted" and (
         result["passed"] != total
         or len(result["public_cases"]) != len(public)
@@ -140,18 +154,20 @@ def validate_result(result, problem, mode):
         result["compile_initialization_ms"]
     ):
         raise SandboxUnavailable("Invalid GPU compile timing")
+    if result["verdict"] == "accepted" and result.get("compile_initialization_ms", 0) <= 0:
+        raise SandboxUnavailable("Accepted GPU result requires completed compilation")
     performance = result.get("performance")
     if mode != "submit" or result["verdict"] != "accepted":
-        if performance is not None:
+        if "performance" in result:
             raise SandboxUnavailable("GPU performance requires a fully correct Submit")
         return
     expected = {
-        "profile": PROFILE["id"],
-        "profile_digest": profile_digest(),
-        "measurement": PROFILE["measurement"],
-        "warmup_batches": PROFILE["warmup_batches"],
-        "sample_batches": PROFILE["sample_batches"],
-        "batch_repetitions": PROFILE["batch_repetitions"],
+        "profile": profile["id"],
+        "profile_digest": profile_digest(profile),
+        "measurement": profile["measurement"],
+        "warmup_batches": profile["warmup_batches"],
+        "sample_batches": profile["sample_batches"],
+        "batch_repetitions": profile["batch_repetitions"],
     }
     if (
         type(performance) is not dict
@@ -161,12 +177,12 @@ def validate_result(result, problem, mode):
             for name, value in expected.items()
         )
         or type(performance["samples_ms"]) is not list
-        or len(performance["samples_ms"]) != PROFILE["sample_batches"]
-        or not all(finite_time(value) for value in performance["samples_ms"])
+        or len(performance["samples_ms"]) != profile["sample_batches"]
+        or not all(finite_time(value) and value > 0 for value in performance["samples_ms"])
         or not finite_time(performance["median_batch_ms"])
         or performance["median_batch_ms"] != statistics.median(performance["samples_ms"])
     ):
-        raise SandboxUnavailable("Invalid GPU controller performance samples")
+        raise SandboxUnavailable("GPU performance requires complete positive controller samples")
 
 
 def finite_time(value):

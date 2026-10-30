@@ -8,7 +8,7 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 
 此前在 GPU 0（RTX 3090）完成了 [G1 的七组正确性检查](../acceptance-g1.md)及 [G2 的九组故障/恢复检查](../acceptance-g2.md)。发现其他账号占用后，维护者要求继续不占 GPU 的开发；新的完整执行路径尚未硬件验收，旧记录不能代替新代码重放。
 
-目前宿主 worker 已连接设备锁、持久预约、私有执行环境、异常回收、二十四阶段启动检查、凭证续检与信号退出。非 GPU 验证范围见 [G15](../acceptance-g15.md)。**完整 CUDA 验收、容器化部署、题型与性能榜单仍待完成，网站的 GPU 提交保持关闭。** 分批历史统一查阅[需求追踪](../requirements.md)和[验收索引](../README.md)。
+目前宿主 worker 已连接设备锁、持久预约、私有执行环境、异常回收、二十四阶段启动检查、凭证续检与信号退出，见 [G15](../acceptance-g15.md)。持久成绩、私有学习证据及中英结果展示已接通，非 GPU 验证见 [G16](../acceptance-g16.md)。**完整 CUDA 验收、容器化部署、题型发布、提交准入与性能榜单仍待完成，网站的 GPU 提交保持关闭。** 分批历史统一查阅[需求追踪](../requirements.md)和[验收索引](../README.md)。
 
 所有控制器副本和升级必须共用原来的私有工作根与设备锁目录，不能换路径避开旧进程、存储或预约。调度组件使用 `gpu-slot-seconds-v1`：Run 90 秒、Submit 180 秒的整卡时段，默认每日 `JUDGE_DAILY_GPU_SECONDS=1800`，与 CPU 调用单位分开。这些是预约上限，不是测得的 GPU 时间；不能据此启用评测或手工清空预约。
 
@@ -20,6 +20,21 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 整控制器退出、通道失联和独立硬期限 | [控制器故障检查](#不占-gpu-的控制器故障检查) |
 | 已获授权的空闲单卡与 CUDA 环境 | [单卡环境检查](#重放单卡环境检查)，再按需执行内核和故障检查 |
 | 完整启动、长期领取、取消与退出流程 | [宿主 worker](#gpu-worker)，需要独占卡；非 GPU 状态检查使用下方 PostgreSQL 测试 |
+| 历史 GPU 成绩、私有进度、中英反馈与布局 | [成绩展示检查](#gpu-results)，不使用 GPU |
+
+<a id="gpu-results"></a>
+
+## 不占 GPU 的成绩展示检查
+
+在独立开发环境准备浏览器依赖及 Chromium 后执行：
+
+```sh
+.venv/bin/python scripts/browser_acceptance.py --gpu-results
+```
+
+它通过现有验收入口创建一次性 SQLite、合成账号和回环 Web 服务，关闭评测，只写入明确的合成成绩；不连接 GPU worker，也不创建设备行或运行凭证。真实 Chromium 检查中英、390/768/1440 像素，以及正确 Submit、重复批次失败、公开 Run 和损坏记录共二十四组，并验证其他账号不能查看私有源码与成绩。结果在 `test-results/px-gpu-results-*/result.json`；须有 `passed: true`、`other_account_denied: true`、`gpu_executed: false`，记录的临时数据库在入口退出后应不存在。
+
+修改结果或预约展示时，同时按开发指南运行 `scripts/browser_acceptance.py --interface`，核对现有编辑器和列表布局。成绩一致性与私有课程/挑战可用 `tests/test_gpu_evidence.py` 在 SQLite 和[临时 PostgreSQL](#不占-gpu-的异常恢复检查)上验证。这些合成计时不是 GPU 性能证据；正式结果仍须来自经过完整启动检查的真实执行路径。
 
 <a id="gpu-worker"></a>
 

@@ -573,7 +573,13 @@ def test_target_identity_cannot_be_implicit_or_ambiguous(key, value):
 @pytest.mark.parametrize("defect", [None, "missing", "median", "guest-time", "extra", "nonfinite"])
 def test_submit_requires_complete_controller_performance_samples(defect):
     value = result()
-    value.update(verdict="accepted", label=LABELS["accepted"], passed=2, total=2)
+    value.update(
+        verdict="accepted",
+        label=LABELS["accepted"],
+        passed=2,
+        total=2,
+        compile_initialization_ms=1.0,
+    )
     value["public_cases"][0].update(verdict="accepted", label=LABELS["accepted"])
     value["performance"] = {
         "profile": PROFILE["id"],

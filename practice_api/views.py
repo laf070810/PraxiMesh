@@ -167,7 +167,9 @@ def result(request, job_id):
             "resource_reservation": reservation_data(job),
             "cpu_budget": usage(request.api_user),
             "evaluation_fingerprint": job.evaluation_fingerprint,
-            "evaluation_environment": result_environment_label(job.environment),
+            "evaluation_environment": result_environment_label(
+                job.environment, job.evaluation_fingerprint
+            ),
             "formal_result": is_formal_evidence(job),
         }
     )

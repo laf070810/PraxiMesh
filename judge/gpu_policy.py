@@ -4,28 +4,32 @@ import hashlib
 import json
 from pathlib import Path
 
-from judge.gpu_contract import BATCH_REPETITIONS, MESSAGE_BYTES
-
-PROFILE = {
+SESSION_V1 = {
     "id": "cuda-session-v1",
     "compile_seconds": 15,
     "request_seconds": 5,
     "run_seconds": 60,
     "submit_seconds": 120,
     "heartbeat_seconds": 0.25,
-    "frame_bytes": MESSAGE_BYTES,
+    "frame_bytes": 256 * 1024,
     "stdout_bytes": 2 * 1024 * 1024,
     "stderr_bytes": 32 * 1024,
     "warmup_batches": 2,
     "sample_batches": 5,
-    "batch_repetitions": BATCH_REPETITIONS,
+    "batch_repetitions": 16,
     "measurement": "controller-roundtrip-batch-wall-v1",
 }
+# Keep completed records interpretable when a later session profile is added.
+# Existing version definitions are immutable; new semantics require a new ID.
+PROFILES = {SESSION_V1["id"]: SESSION_V1}
+PROFILE = SESSION_V1
 
 
-def profile_digest():
+def profile_digest(profile=None):
     return hashlib.sha256(
-        json.dumps(PROFILE, sort_keys=True, separators=(",", ":")).encode()
+        json.dumps(
+            PROFILE if profile is None else profile, sort_keys=True, separators=(",", ":")
+        ).encode()
     ).hexdigest()
 
 
@@ -67,6 +71,8 @@ def execution_digest(root=None):
         "core/gpu_startup.py",
         "core/gpu_readiness.py",
         "core/gpu_worker.py",
+        "core/gpu_evidence.py",
+        "core/result_evidence.py",
         "core/management/commands/gpu_worker.py",
         "core/resources.py",
         "core/queue.py",

@@ -276,6 +276,10 @@ def verified_evidence(job):
     try:
         if not isinstance(job.version.data, dict):
             raise InvalidResult("Invalid problem version")
+        if job.version.data.get("evaluator") == "cuda-kernel-v1":
+            from core.gpu_evidence import verified
+
+            return verified(job)
         if job.version.data.get("evaluator") not in SPECIALISTS:
             return verified_metrics(job)
         metrics = _verified(job, specialist=True)
@@ -305,6 +309,14 @@ def is_formal_evidence(job):
 
 
 def safe_result(job):
+    if job.version.data.get("evaluator") == "cuda-kernel-v1":
+        from core.gpu_evidence import environment_profile, public_feedback
+
+        try:
+            profile = environment_profile(job.environment, job.evaluation_fingerprint)
+            return public_feedback(job.version, job.result, job.mode, profile=profile)
+        except (ValueError, TypeError, KeyError, OverflowError):
+            return {}
     if job.version.data.get("evaluator") not in SPECIALISTS:
         return job.result
     try:

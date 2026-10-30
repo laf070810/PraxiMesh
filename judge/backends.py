@@ -25,7 +25,16 @@ def configured_runtime_description():
     return "Python 3.11.15 标准库；每用例 128 MiB 内存、2 秒 CPU、8 秒总等待、32 KiB 输出。"
 
 
-def result_environment_label(environment):
+def result_environment_label(environment, fingerprint=None):
+    if environment.get("backend") == "gvisor-gpu":
+        from core.gpu_evidence import environment_profile
+
+        try:
+            profile = environment_profile(environment, fingerprint)
+        except (ValueError, TypeError, KeyError, OverflowError):
+            return ""
+        target = environment["target"]
+        return f"CUDA / {target['model']} / {target['driver']} / {profile['id']} / sha256:{fingerprint}"
     if environment.get("policy") == "wasi-functions-v2":
         return (
             f"CPython {environment['python']} / QuickJS {environment['quickjs']} / WASI · "
