@@ -43,6 +43,8 @@
 - [ADR-027：共用启动资源检查](adr/027-gpu-startup-resource-checks.md)
 - [G12 固定 CUDA 启动检查](acceptance-g12.md) — 协议与 CPU 管道中断通过，十九项 CUDA 用例待硬件重放
 - [ADR-028：固定 CUDA 启动用例与中断检查](adr/028-gpu-startup-kernel-checks.md)
+- [G13 控制器故障与新调用恢复](acceptance-g13.md) — 三类实际 CPU/runsc 故障、映射存储回收及新调用恢复通过
+- [ADR-029：整控制器故障与独立恢复检查](adr/029-gpu-controller-lifecycle-checks.md)
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

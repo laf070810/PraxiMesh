@@ -4,8 +4,10 @@ This adapter does not issue readiness receipts or register a web evaluator.
 """
 
 import copy
+import math
 import socket
 import sys
+import time
 import uuid
 from pathlib import Path
 
@@ -22,8 +24,16 @@ from judge.gpu_execution_contract import (
 )
 from judge.gpu_isolation import validate_report
 from judge.gpu_kernel_checks import check_request, validate_check_report
+from judge.gpu_lifecycle import (
+    FAULT_SECONDS,
+    RECOVERY_SECONDS,
+    STORAGE_SECONDS,
+    fault_request,
+    observe_fault,
+)
 from judge.gpu_monitor import DeviceMonitor, identify
 from judge.gpu_namespace import JobWorkspace
+from judge.gpu_policy import PROFILE
 from judge.gpu_recovery import recover_workspace
 from judge.gpu_service import OwnedJobService
 from judge.gpu_transport import PrivateListener
@@ -102,6 +112,38 @@ class GPUExecutionAdapter:
         )
         return copy.deepcopy(message["report"]), copy.deepcopy(self.environment)
 
+    def check_controller(self, service, name, *, deadline, on_tick):
+        """Fixed fault, physical cleanup, then a new independently correct session."""
+        if type(service) is not OwnedJobService or service.purpose != "maintenance":
+            raise ValueError("An owned maintenance service instance is required")
+        request = fault_request(name, uuid.uuid4().hex)
+        if (
+            type(deadline) not in {int, float}
+            or not math.isfinite(deadline)
+            or not 0 < deadline - time.monotonic() <= FAULT_SECONDS + RECOVERY_SECONDS
+        ):
+            raise ValueError("Controller fault checks require a bounded maintenance deadline")
+        fault_deadline = min(deadline - RECOVERY_SECONDS, time.monotonic() + FAULT_SECONDS)
+        if fault_deadline - time.monotonic() <= (
+            STORAGE_SECONDS
+            + CONTROLLER_MARGIN
+            + PROFILE["compile_seconds"]
+            + PROFILE["request_seconds"]
+        ):
+            raise SandboxUnavailable("Insufficient budget for controller fault and recovery")
+        report = self._exchange(
+            service, request, deadline=fault_deadline, on_tick=on_tick, on_begin=lambda: None
+        )
+        # _exchange has verified the old invocation stopped and removed its
+        # workspace. Only now may the same durable identity get a new invocation.
+        recovery = OwnedJobService(
+            service.guard, service.job_id, service.reservation_token, purpose="maintenance"
+        )
+        environment = self.recover(
+            recovery, deadline=min(deadline, time.monotonic() + RECOVERY_SECONDS), on_tick=on_tick
+        )
+        return {**report, "recovered": True}, environment
+
     def _exchange(self, service, request, *, deadline, on_tick, on_begin):
         guard = service.guard
         if type(guard) is not DeviceLock or guard.device_uuid != self.target["uuid"]:
@@ -124,6 +166,8 @@ class GPUExecutionAdapter:
 
         with JobWorkspace(self.directory, service) as workspace, PrivateListener() as listener:
             channel = None
+            lifecycle = request["event"] == "check-controller"
+            service_deadline = deadline - STORAGE_SECONDS if lifecycle else deadline
             try:
                 entry = Path(__file__).with_name("gpu_controller_entry.py")
                 command = workspace.command(
@@ -134,11 +178,12 @@ class GPUExecutionAdapter:
                         str(workspace.path),
                         str(listener.path),
                         *(str(path) for path in self.archives),
-                        str(deadline - CONTROLLER_MARGIN),
+                        str(service_deadline - CONTROLLER_MARGIN),
                     ]
                 )
-                service.start(command, deadline=deadline, on_tick=tick)
-                channel = listener.accept(service, deadline=deadline - 10, on_tick=tick)
+                started = time.monotonic()
+                service.start(command, deadline=service_deadline, on_tick=tick)
+                channel = listener.accept(service, deadline=service_deadline - 10, on_tick=tick)
                 connected = {
                     "event": "connected",
                     "protocol": PROTOCOL,
@@ -158,7 +203,17 @@ class GPUExecutionAdapter:
                 on_begin()
                 tick()
                 channel.send(request)
-                message = channel.receive()
+                if lifecycle:
+                    message = observe_fault(
+                        channel,
+                        service,
+                        request,
+                        started=started,
+                        deadline=service_deadline,
+                        on_tick=tick,
+                    )
+                else:
+                    message = channel.receive()
                 if request["event"] == "check-kernel":
                     if (
                         type(message) is not dict
@@ -182,7 +237,7 @@ class GPUExecutionAdapter:
                         {"event": "recovered", "recovered": True}
                     ):
                         raise SandboxUnavailable("GPU controller did not complete startup recovery")
-                else:
+                elif not lifecycle:
                     if (
                         type(message) is not dict
                         or set(message) != {"event", "result", "recovered"}
@@ -191,8 +246,9 @@ class GPUExecutionAdapter:
                     ):
                         raise SandboxUnavailable("GPU controller did not complete device recovery")
                     validate_result(message["result"], request["problem"], request["mode"])
-                channel.send({"event": "finish"})
-                channel.expect_eof()
+                if not lifecycle:
+                    channel.send({"event": "finish"})
+                    channel.expect_eof()
             finally:
                 if channel is not None:
                     channel.close()

@@ -290,3 +290,43 @@ def test_kernel_request_with_source_is_rejected_and_store_closed(controller):
         controller.run()
     assert ("store-closed", None) in controller.events
     assert ("recovery-checked", None) not in controller.events
+
+
+def test_controller_fault_is_armed_only_after_verified_live_cuda_session(controller, monkeypatch):
+    from judge.gpu_lifecycle import fault_request
+
+    class Injected(BaseException):
+        pass
+
+    def verify(_session):
+        controller.events.append(("live-cuda-verified", None))
+
+    def trigger(_channel, request):
+        assert request == controller.incoming_request
+        controller.events.append(("fault-triggered", None))
+        raise Injected
+
+    monkeypatch.setattr(gpu_controller, "verify_device_session", verify)
+    monkeypatch.setattr(gpu_controller, "trigger_fault", trigger)
+    controller.incoming_request = fault_request("controller-exit", "a" * 32)
+    controller.incoming[1] = controller.incoming_request
+    with pytest.raises(Injected):
+        controller.run()
+    events = controller.events
+    assert events.index(("live-cuda-verified", None)) < events.index(("fault-triggered", None))
+    assert ("recovery-checked", None) not in events
+    assert not any(name == "send" and value["event"] == "completed" for name, value in events)
+
+
+def test_failed_cuda_preparation_never_arms_controller_fault(controller, monkeypatch):
+    from judge.gpu_lifecycle import fault_request
+
+    def failed(_session):
+        raise SandboxUnavailable("fixed live CUDA failure")
+
+    monkeypatch.setattr(gpu_controller, "verify_device_session", failed)
+    monkeypatch.setattr(gpu_controller, "trigger_fault", lambda *_args: pytest.fail("must not arm"))
+    controller.incoming[1] = fault_request("controller-exit", "a" * 32)
+    with pytest.raises(SandboxUnavailable, match="live CUDA failure"):
+        controller.run()
+    assert ("store-closed", None) in controller.events

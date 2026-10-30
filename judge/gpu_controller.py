@@ -14,24 +14,29 @@ from judge.gpu_execution_contract import (
 )
 from judge.gpu_isolation import check_resources, request_values
 from judge.gpu_kernel_checks import check_kernel
+from judge.gpu_lifecycle import trigger_fault
+from judge.gpu_lifecycle import validate_request as validate_fault_request
 from judge.gpu_policy import execution_digest
 from judge.gpu_probes import VECTOR_REFERENCE
 from judge.gpu_session import GPUExecutionError
 from judge.sandbox import SandboxUnavailable
 
 
-def recover_device(runtime):
-    """A fresh guest/context must compile and execute a fixed known-correct kernel."""
+def verify_device_session(session):
+    """Controller comparison for a fixed known-correct kernel in an open session."""
     inputs = {"a": [float(i % 13 - 6) for i in range(257)], "b": [0.25] * 257}
     case = {"inputs": inputs}
     expected = reference_values("vector-add-f32-v1", inputs)
+    session.compile(VECTOR_REFERENCE, "vector-add-f32-v1")
+    values, _elapsed = session.execute(case)
+    if not output_matches(values, expected, {"kind": "float", "absolute": 1e-5, "relative": 1e-5}):
+        raise SandboxUnavailable("GPU correctness recovery failed")
+
+
+def recover_device(runtime):
+    """A fresh guest/context must compile and execute a fixed known-correct kernel."""
     with runtime.kernel_session("device-recovery", mode="run") as session:
-        session.compile(VECTOR_REFERENCE, "vector-add-f32-v1")
-        values, _elapsed = session.execute(case)
-        if not output_matches(
-            values, expected, {"kind": "float", "absolute": 1e-5, "relative": 1e-5}
-        ):
-            raise SandboxUnavailable("GPU correctness recovery failed")
+        verify_device_session(session)
         session.finish()
 
 
@@ -59,7 +64,14 @@ def serve(channel, base, archives, deadline):
         maintenance = request == {"event": "recover"}
         resource_check = type(request) is dict and request.get("event") == "check-resources"
         kernel_check = type(request) is dict and request.get("event") == "check-kernel"
-        if kernel_check:
+        controller_check = type(request) is dict and request.get("event") == "check-controller"
+        if controller_check:
+            validate_fault_request(request)
+            with runtime.kernel_session("controller-fault", mode="run") as session:
+                verify_device_session(session)
+                trigger_fault(channel, request)
+                raise SandboxUnavailable("Controller fault unexpectedly returned")
+        elif kernel_check:
             runtime.deadline = deadline - RECOVERY_MARGIN - CLEANUP_MARGIN
             kernel_report = check_kernel(runtime, request)
             runtime.deadline = deadline

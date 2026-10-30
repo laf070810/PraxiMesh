@@ -137,15 +137,33 @@ def controlled(monkeypatch):
             )
 
             def run(
-                *, on_begin=None, maintenance=False, purpose=None, resource_check=False, kernel=None
+                *,
+                on_begin=None,
+                maintenance=False,
+                purpose=None,
+                resource_check=False,
+                kernel=None,
+                controller_fault=None,
+                controller_seconds=180,
             ):
                 service = OwnedJobService(
                     guard,
                     uuid.uuid4(),
                     uuid.uuid4(),
                     purpose=purpose
-                    or ("maintenance" if maintenance or resource_check or kernel else "task"),
+                    or (
+                        "maintenance"
+                        if maintenance or resource_check or kernel or controller_fault
+                        else "task"
+                    ),
                 )
+                if controller_fault is not None:
+                    return adapter.check_controller(
+                        service,
+                        controller_fault,
+                        deadline=time.monotonic() + controller_seconds,
+                        on_tick=lambda: events.append(("poll", None)),
+                    )
                 if kernel is not None:
                     return adapter.check_kernel(
                         service,
@@ -243,6 +261,97 @@ def test_unknown_kernel_check_is_rejected_before_device_query(controlled):
     _adapter, _messages, events, run = controlled
     with pytest.raises(ValueError, match="fixed CUDA"):
         run(kernel="arbitrary-command")
+    assert events == []
+
+
+def test_controller_recovery_gets_new_invocation_only_after_fault_cleanup(controlled, monkeypatch):
+    adapter, _messages, events, run = controlled
+    previous = []
+
+    def exchange(service, request, *, deadline, on_tick, on_begin):
+        assert request["event"] == "check-controller"
+        assert 85 < deadline - time.monotonic() <= 90
+        previous.append(service)
+        events.append(("fault-cleaned", None))
+        return {
+            "name": request["name"],
+            "challenge": request["challenge"],
+            "independent_stop": True,
+        }
+
+    def recover(service, *, deadline, on_tick):
+        assert events[-1] == ("fault-cleaned", None)
+        assert service is not previous[0] and service.unit == previous[0].unit
+        assert service.guard is previous[0].guard
+        assert service.invocation is None
+        assert 85 < deadline - time.monotonic() <= 90
+        events.append(("new-recovery", None))
+        return copy.deepcopy(adapter.environment)
+
+    monkeypatch.setattr(adapter, "_exchange", exchange)
+    monkeypatch.setattr(adapter, "recover", recover)
+    report, environment = run(controller_fault="controller-exit")
+    assert report["recovered"] is True and environment == adapter.environment
+    assert events == [("fault-cleaned", None), ("new-recovery", None)]
+
+
+def test_failed_fault_cleanup_never_starts_recovery(controlled, monkeypatch):
+    adapter, _messages, _events, run = controlled
+
+    def failed(*_args, **_kwargs):
+        raise SandboxUnavailable("fixed lifecycle cleanup failure")
+
+    monkeypatch.setattr(adapter, "_exchange", failed)
+    monkeypatch.setattr(adapter, "recover", lambda *_args, **_kwargs: pytest.fail("cannot restart"))
+    with pytest.raises(SandboxUnavailable, match="cleanup failure"):
+        run(controller_fault="controller-exit")
+
+
+def test_controller_exchange_stops_and_removes_before_fresh_recovery(controlled, monkeypatch):
+    adapter, messages, events, run = controlled
+    messages[-1] = {"event": "fault-armed"}
+    messages.extend(
+        [
+            copy.deepcopy(messages[0]),
+            copy.deepcopy(messages[1]),
+            {"event": "recovered", "recovered": True},
+        ]
+    )
+
+    def observe(channel, service, request, *, started, deadline, on_tick):
+        assert request["event"] == "check-controller"
+        assert 55 < deadline - time.monotonic() <= 60
+        assert channel.receive() == {"event": "fault-armed"}
+        events.append(("fault-observed", service))
+        return {
+            "name": request["name"],
+            "challenge": request["challenge"],
+            "independent_stop": True,
+        }
+
+    monkeypatch.setattr(gpu_adapter, "observe_fault", observe)
+    report, _environment = run(controller_fault="controller-exit")
+    assert report["recovered"] is True
+    stops = [i for i, event in enumerate(events) if event == ("stop", None)]
+    starts = [i for i, event in enumerate(events) if event[0] == "start"]
+    assert len(stops) == len(starts) == 2 and starts[0] < stops[0] < starts[1] < stops[1]
+    assert events.count(("send", {"event": "finish"})) == 1
+    assert list(adapter.directory.iterdir()) == []
+
+
+@pytest.mark.parametrize("seconds", [-1, 60, 150, 181, float("inf"), float("nan")])
+def test_controller_fault_cannot_consume_recovery_budget_or_get_unbounded_time(controlled, seconds):
+    _adapter, _messages, events, run = controlled
+    with pytest.raises((ValueError, SandboxUnavailable)):
+        run(controller_fault="controller-exit", controller_seconds=seconds)
+    assert events == []
+
+
+@pytest.mark.parametrize("purpose", ["task", "recovery"])
+def test_controller_faults_need_a_maintenance_service(controlled, purpose):
+    _adapter, _messages, events, run = controlled
+    with pytest.raises(ValueError, match="maintenance"):
+        run(controller_fault="controller-exit", purpose=purpose)
     assert events == []
 
 

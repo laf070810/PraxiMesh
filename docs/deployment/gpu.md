@@ -30,6 +30,8 @@ G3 的 `gpu-slot-seconds-v1` 按 Run 90 秒、Submit 180 秒预约整卡时段�
 
 [G12](../acceptance-g12.md)把十九项固定 CUDA 正确解、错解、边界、设备故障及编译后中断接入同一维护协议。组件和实际 CPU 管道检查通过，新的 CUDA 用例尚未运行；整控制器退出/失联、完整启动编排和凭证仍待完成，当前没有新增 GPU 启动命令。
 
+[G13](../acceptance-g13.md)继续连接控制器退出、通道失联和独立服务硬期限；共用协议的三项实际 CPU/runsc 故障、映射存储回收及新服务恢复通过。CUDA 路径、完整启动编排、凭证和正式 worker 仍待完成。
+
 ## 不占 GPU 的控制链检查
 
 适用于显卡暂被占用时开发、检查 worker 控制链，或在目标 Linux 主机核对用户服务管理器及 CPU/内存/PID 委派。需要项目 Python 环境、可用的普通用户 systemd 管理器和 cgroup v2；不需要显卡、驱动或 CUDA 制品。不要用 sudo，也不在普通 Web/CPU worker 容器内执行。
@@ -99,6 +101,20 @@ G3 的 `gpu-slot-seconds-v1` 按 Run 90 秒、Submit 180 秒预约整卡时段�
 ```
 
 这组检查会自动清理自有数据库容器和卷；GPU 执行使用明确的测试替身，不能作为真实设备恢复证据。尚无正式 GPU worker 启动命令，不要直接调用数据库的恢复转换来绕过就绪检查。
+
+## 不占 GPU 的控制器故障检查
+
+适用于修改维护协议的握手、控制器退出、通道失联、服务硬期限或后续新调用恢复。复用上面的离线制品与用户服务依赖，串行运行：
+
+```sh
+.venv/bin/python scripts/gpu_lifecycle_acceptance.py \
+  --runtime-archive var/gpu-preflight/gvisor.tar.bz2 \
+  --image-archive var/gpu-preflight/python-image-20261030.oci.tar
+```
+
+它在真实 CPU/runsc 容器存活后，执行与 GPU 控制器共用的固定故障握手和终止观察。退出与硬期限须先独立停止；失联须由外层清理仍存活的服务。随后处理映射存储，以同一持久维护身份的新调用、新容器执行固定 CPU 检查。
+
+结果在 `test-results/px-gpu-lifecycle-*/result.json`，应有三个 `passed: true` 的 `checks`。每项 `fault` 与 `recovery` 的 `service_cleanup.cgroup_empty` 和 `workspace_removed` 均为 `true`，两者 `invocation` 及 `runtime.container_id` 不同；总 `passed` 与 `temporary_directory_removed` 也须为 `true`。此入口不映射 GPU、不调用 CUDA、不生成凭证，不证明正式 GPU 路径的恢复或总时限。
 
 ## 重放单卡环境检查
 
