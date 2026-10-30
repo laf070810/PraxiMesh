@@ -119,7 +119,13 @@ class Channel:
         while True:
             self.check()
             if select.select([self.sock], [], [], 0.05)[0]:
-                if self.sock.recv(1):
+                try:
+                    data = self.sock.recv(1)
+                except OSError:
+                    raise SandboxUnavailable(
+                        "GPU controller connection failed before clean completion"
+                    ) from None
+                if data:
                     raise SandboxUnavailable("Unexpected trailing controller output")
                 return
 

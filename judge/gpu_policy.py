@@ -42,6 +42,7 @@ def execution_digest(root=None):
         "judge/gpu_service.py",
         "judge/gpu_transport.py",
         "judge/gpu_monitor.py",
+        "judge/gpu_namespace.py",
         "judge/gpu_device_lock.py",
         "judge/results.py",
         "core/gpu_resources.py",

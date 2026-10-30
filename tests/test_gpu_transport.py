@@ -94,6 +94,18 @@ def test_callback_wait_cannot_extend_transport_deadline():
         receiver.close()
 
 
+def test_reset_with_unread_input_is_a_platform_failure_not_clean_completion():
+    sender, receiver = channels()
+    try:
+        sender.sock.sendall(b"rejected unread input")
+        receiver.close()
+        with pytest.raises(SandboxUnavailable, match="before clean completion"):
+            sender.expect_eof()
+    finally:
+        sender.close()
+        receiver.close()
+
+
 def test_peer_credentials_are_kernel_observed_and_cgroup_must_match():
     sender, receiver = socket.socketpair()
     try:
