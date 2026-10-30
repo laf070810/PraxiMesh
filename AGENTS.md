@@ -47,6 +47,7 @@
 - 浏览器、HTTPS、发布包和升级用现有 `scripts/*acceptance.py` 入口。使用一次性数据库、合成账号和明确属于本次测试的容器/卷；默认使用回环地址，按用户明确要求验证直接 IP 访问时使用独立测试端口。完成后核对清理，不删除未知资源。
 - Compose 单机入口为 `core/selfhost.py`，复用 `core/preview.py` 的原子数据库初始化；默认包括真实 WASI worker，可选 `compose.ai.yaml` 启动本地模型。修改时重放 `python3 scripts/compose_acceptance.py`；涉及模型或界面时使用 `--ai --browsers`。核对真实探针与七种题型、worker 离线关闭提交、直接 IP/CSRF、初始化恢复、旧内容不重导及成绩/会话跨重建保留。不得用旧 receipt 或宿主缓存代替镜像内自检。此入口不替代生产发布协调器。
 - 重型 WASI/worker 验收按资源预算串行安排，避免争用造成假超时。长进程须跟踪原进程或工具句柄；观察超时不代表进程结束，不据此重复启动。
+- 托管 CI、部署 runner 与 GPU 评测 worker 分别验证；接入步骤见 [CI 指南](docs/deployment/ci.md)。自定义 runner 标签不构成权限隔离，公开 PR 不能接触持有站点权限的 runner。GitHub 管理 API 查询失败不得当作 runner 不存在；部署 `status` 只验证记录读取，不证明站点健康。
 - 保留原始失败和修复后的结果，记录代码/策略/制品身份。结果文件放忽略目录 `test-results/`，必要的结论写入对应验收文档；不以单元 mock 证明真实隔离、GPU、模型或部署成功。
 - 文档变更核对链接、命令参数和当前行为。初始化、导入和恢复示例尽量在临时副本/数据库验证，避免改变开发者已有数据。
 

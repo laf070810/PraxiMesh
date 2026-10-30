@@ -1,5 +1,11 @@
 # 变更记录
 
+## GitHub CI、runner 与 GPU 接入指南 — 2026-10-30
+
+- 核对已配置的 `origin/main` 和真实托管 CI 运行，更新旧的无远端阻塞描述；runner 管理 API 未认证，不能据此断言是否注册。
+- 部署工作流增加默认 `status` 操作，用于在发布前查询预装协调器记录；保留固定路径、摘要、默认分支、environment 与显式启用门槛。
+- 在统一部署目录补充 runner 注册/权限/发布步骤和 GPU 实施顺序；定位本机 CPU 配额缺失为 rootless 用户服务未获 CPU 控制器委派。未修改宿主服务或 GPU 驱动，未注册 runner，GPU 仍待实现和真实验收。
+
 ## 集中部署文档 — 2026-10-30
 
 - 部署说明统一到 `docs/deployment/`，首页比较 Compose 自部署、PostgreSQL/HTTPS 发布协调器和源码开发的场景、依赖、数据、评测与 AI 能力。

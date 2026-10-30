@@ -116,13 +116,9 @@ docker exec praximesh-postgres pg_isready --username postgres
 
 ## CI/CD 接入
 
-WASI 工作流构建并验收固定制品；非 PR 的成功运行保留完整 `immutable-release` artifact 七天。部署工作流 [deploy.yml](../../.github/workflows/deploy.yml) 只接受手工触发的 `apply`/`recover`，默认禁用；实际服务端运行尚未验证。维护者先配置默认分支保护、受保护的 `production` environment 和专用 `praximesh-deploy` runner，最后显式设置仓库变量 `PRAXIMESH_DEPLOY_ENABLED=true`。该 runner 不能同时运行 PR 或普通构建任务。
+完整的仓库选择、runner 注册、固定路径、environment、启用变量、制品传输及排障步骤统一在 [CI 与部署 runner 指南](ci.md)。应用/WASI CI 使用托管 runner；部署工作流默认禁用，启用后默认执行只读 `status`，发布和恢复须明确选择 `apply`/`recover`。
 
-部署主机预先安装已审查控制器于 `/srv/praximesh/controller`、私有配置/状态及代理服务。通过可信传输将三个发布文件放入 `/srv/praximesh/releases/<manifest SHA-256>/`，并核对构建记录；工作流的输入仅是该摘要及操作。它不 checkout PR、不下载执行脚本，也不接受任意命令或路径。部署账号对 Docker 的访问等同于该实例的运维权限，应只供受信发布任务使用。
-
-工作流避免主动取消进行中的部署；主机故障或服务端作业超时仍可能中断进程，下一次需选择 `recover`。配置和凭证始终留在主机的私有文件，工作流不打印它们。这里提供自动激活入口及恢复流程，域名、主机、受保护环境和可信制品传输仍需在实际部署目标配置。
-
-触发与环境限制依据 [GitHub workflow_dispatch](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch)及[部署环境配置](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idenvironment)。服务示例使用 [systemd user units](https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html)，尚未在目标生产主机安装。
+当前代码仓库公开，带站点权限的 runner 必须限制到受信部署工作流；自定义标签不能代替权限隔离。先按上述指南准备运维仓库或有效的组织访问策略，再接入实际目标主机。服务示例使用 [systemd user units](https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html)，目标主机的安装与服务监管仍需验收。
 
 ## 首次升级
 

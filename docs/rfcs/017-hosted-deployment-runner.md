@@ -1,0 +1,25 @@
+# RFC-017：托管 CI 与部署 runner 接入
+
+状态：接受；工作流状态入口和接入文档已实现，目标 runner 尚未验收。日期：2026-10-30。关联 PRD R-09、AC-07；沿用 [RFC-005](005-deployment-coordination.md) 的发布协调器，决策见 [ADR-016](../adr/016-deployment-runner.md)。
+
+## 问题
+
+仓库已配置 GitHub 远端，默认分支为 `main`。应用与 WASI 工作流使用托管 runner，已出现实际服务端运行；这不依赖自托管部署 runner。原部署工作流只接受 `apply` 和 `recover`，操作者无法先通过工作流查询已有部署状态。
+
+当前代码仓库公开。仅在部署 job 中使用默认分支条件、environment 和自定义标签，不能约束同一仓库的其他工作流如何选择 runner。将带有站点配置、Docker 权限的长期 runner 直接注册到可执行外部 PR 的仓库，会把发布权限暴露给额外执行入口。
+
+## 决定
+
+1. 增加 `status` 并设为手工触发的默认操作；沿用已安装控制器的 `deploy.py status`。它读取部署摘要并持有既有状态锁，不迁移数据库、重建镜像、激活版本或检查实际服务健康。未初始化的空状态也可能返回成功，不能据此宣称站点可用。
+2. 保留 `apply`/`recover`、固定控制器/配置/状态路径、摘要输入校验、默认分支条件、显式启用变量及串行部署。部署 runner 不 checkout 或下载执行当前仓库代码。
+3. 推荐将部署工作流放入只允许受信维护者写入的私有运维仓库，并仅向该仓库注册专用部署 runner。组织级 runner 的选定工作流限制可作为另一条路径，但须确认实际套餐、仓库及工作流限制。标签本身不作为授权边界。
+4. `production` environment、分支限制及审核能力以所在仓库和 GitHub 套餐实际支持为准。不支持现有保护要求时先沿用主机上的协调器手工部署，不通过删除保护条件来接通自动部署。
+5. GPU 评测 worker、可销毁的隔离验收 runner 与部署 runner 使用不同权限和环境。原 `sandbox.yml` 验证现有 gVisor Python 适配器，并未实现 GPU 评测。
+
+外部仓库创建、runner 注册、系统服务安装和目标环境选择尚未执行。本次不变更运行中站点、Docker daemon 或 GPU 驱动。操作入口集中在 [CI 与 runner 指南](../deployment/ci.md)，GPU 条件见 [GPU 接入准备](../deployment/gpu.md)。
+
+## 验证
+
+核对工作流 YAML 和内嵌命令；验证 `status`、`apply`、`recover` 分派及非法操作/摘要拒绝。在临时私有配置和状态目录运行真实控制器 `status`，核对不修改部署记录、不连接数据库或启动容器。以上只证明本地命令行为；目标 runner 的接单、权限与实际发布/恢复仍需服务端验收。
+
+本次本地验证：9 组工作流分派/拒绝检查通过；真实控制器对临时空状态及已有记录的查询通过，记录未改写、配置凭证未输出、临时目录已清理。85 项协调器/发布包回归通过，406 个本地文档链接及新增指南的两段 shell 命令检查通过。结果见忽略目录 `test-results/runner-gpu-guide-validation.json`；主机和 GitHub 的已取得只读观测汇总在 `test-results/runner-gpu-readonly-audit.json`。未执行 GPU 工作负载、runner 注册或目标站点发布。

@@ -2,6 +2,7 @@
 
 [部署方案选择](README.md) · 本页供隔离运行时开发与目标节点验证，不属于已验收的安装方案。当前 Compose 和发布协调器使用 WASI；gVisor 适配器只支持 Python JSON 函数，也不提供 GPU 题型。
 
+GPU 的驱动/设备兼容性、已定位的 rootless CPU 委派问题和实现顺序见 [GPU 接入准备](gpu.md)。
 
 执行节点必须是专用、可销毁的 Linux 节点，不承载其他用户业务；运行时维护者参考 [gVisor 官方安装说明](https://gvisor.dev/docs/user_guide/install/) 安装受支持版本，并按 [Docker 集成文档](https://gvisor.dev/docs/user_guide/quick_start/docker/) 注册 `runsc`。本项目不自动修改宿主 Docker 配置或重启共享 daemon。记录 runsc 二进制校验、版本、Docker/内核版本、CPU 型号和 cgroup 配置，检查资源限制可用。
 

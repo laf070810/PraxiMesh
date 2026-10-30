@@ -5,8 +5,8 @@ on:
       action:
         description: Operation on the configured deployment
         type: choice
-        options: [apply, recover]
-        default: apply
+        options: [status, apply, recover]
+        default: status
         required: true
       release_sha256:
         description: Trusted manifest SHA-256 of the pre-staged release (apply only)
@@ -23,7 +23,8 @@ concurrency:
 jobs:
   activate:
     # Enable only after configuring protected environment/default-branch rules
-    # and a dedicated deployment runner. Never use this runner for PR/build jobs.
+    # and a runner restricted to trusted deployment workflows (see docs/deployment/ci.md).
+    # Labels alone do not isolate this runner from other workflows. Never run PR/build jobs here.
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && vars.PRAXIMESH_DEPLOY_ENABLED == 'true'
     environment: production
     runs-on: [self-hosted, linux, x64, praximesh-deploy]
@@ -31,8 +32,8 @@ jobs:
     steps:
       # No checkout or downloaded executable runs on the deployment host.
       # The controller and immutable release must be independently reviewed
-      # and installed under the fixed paths documented in deployment-coordination.md.
-      - name: Apply or recover with the installed controller
+      # and installed under the fixed paths documented in docs/deployment/production.md.
+      - name: Query, apply or recover with the installed controller
         env:
           DEPLOY_ACTION: ${{ inputs.action }}
           RELEASE_SHA256: ${{ inputs.release_sha256 }}
@@ -47,7 +48,7 @@ jobs:
                      str(root / 'controller/scripts/deploy.py'),
                      '--config', str(root / 'config.json'), '--state', str(root / 'state')]
           action = os.environ['DEPLOY_ACTION']
-          if action not in {'apply', 'recover'}:
+          if action not in {'status', 'apply', 'recover'}:
               raise SystemExit('Unsupported deployment action')
           command.append(action)
           if action == 'apply':

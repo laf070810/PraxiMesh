@@ -46,7 +46,7 @@ docker compose -f compose.yaml -f compose.ai.yaml up --build -d
 
 协调器在维护窗口排空任务、备份/恢复到候选库、迁移、验证真实正确与错误提交，再开放服务。升级期间会返回维护页；候选可能接收用户写入后，恢复保留当前库，避免回退旧快照丢失新写入或恢复已删除账号。
 
-固定镜像与本地 HTTPS 升级已有验收记录；目标主机的公有证书续期、容量和服务监管仍需现场验证。公开运营及项目许可证尚待维护者决定，托管 CI/CD 尚无服务端验收记录，范围见[需求追踪](../requirements.md)。
+固定镜像与本地 HTTPS 升级已有验收记录；目标主机的公有证书续期、容量和服务监管仍需现场验证。GitHub 托管 CI 已开始运行，最终验收结论和专用部署 runner 接入仍需核对；公开运营及项目许可证尚待维护者决定，范围见[需求追踪](../requirements.md)。
 
 <a id="development"></a>
 
@@ -90,6 +90,8 @@ uv sync --frozen
 | 从 SQLite 改到 PostgreSQL | 当前没有一键跨数据库迁移工具；单独设计并验证数据迁移。源码数据库、Compose 卷和协调器代际库不会自动互相导入 |
 | 只运行 `docker build` 或 `release.py load` | 分别完成镜像构建或导入；不会自动启动完整服务、迁移数据库或激活站点 |
 | 运行 `*acceptance.py` | 在可销毁环境做验证，脚本会清理自有服务和数据；日常站点应使用对应安装入口 |
+| 配好 Git 远端后是否还要部署 runner | 应用/WASI CI 使用托管 runner；只有自动操作发布协调器时才需专用部署 runner，见 [CI 接入](ci.md) |
+| 添加 GPU 或 Actions runner 后能否评测 CUDA | 还需 GPU 评测器、隔离、设备预约及真实验收；已定位的 rootless CPU 配额问题和实施顺序见 [GPU 准备](gpu.md) |
 | WASI、gVisor 是其他部署套餐吗 | 它们是代码执行后端。当前两种自部署入口使用已验证的 WASI；gVisor 路径未完成本机验收，也不代表已有 GPU 支持 |
 | 页面能打开但不能评测 | 先看 `/health/` 的 `evaluation` 和 worker 日志，再按[排障手册](operations.md)检查探针、心跳、暂停和额度 |
 
@@ -101,6 +103,8 @@ uv sync --frozen
 | PostgreSQL/HTTPS 安装、发布、升级与中断恢复 | [production.md](production.md) |
 | 监控、排障、数据库备份与恢复演练 | [operations.md](operations.md) |
 | 制作、校验和导入不可变发布包 | [releases.md](releases.md) |
+| 接入 GitHub CI、部署 runner 和检查作业等待原因 | [ci.md](ci.md) |
+| 准备 GPU 评测节点、修复 rootless CPU 委派与安排实现 | [gpu.md](gpu.md)，GPU 尚未交付 |
 | 单独构建 WASI 或开发执行后端 | [wasi.md](wasi.md) |
 | 研究尚未验收的 gVisor 后端 | [gvisor.md](gvisor.md)，不作为已交付部署方案 |
 | 已有模型接入、协议限制及模型验证 | [ai.md](ai.md) |
