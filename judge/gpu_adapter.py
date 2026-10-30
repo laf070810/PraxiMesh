@@ -4,7 +4,9 @@ This adapter does not issue readiness receipts or register a web evaluator.
 """
 
 import copy
+import socket
 import sys
+import uuid
 from pathlib import Path
 
 from judge.gpu_device_lock import DeviceLock
@@ -18,6 +20,7 @@ from judge.gpu_execution_contract import (
     validate_result,
     validate_target,
 )
+from judge.gpu_isolation import validate_report
 from judge.gpu_monitor import DeviceMonitor, identify
 from judge.gpu_namespace import JobWorkspace
 from judge.gpu_recovery import recover_workspace
@@ -70,6 +73,23 @@ class GPUExecutionAdapter:
             service, {"event": "recover"}, deadline=deadline, on_tick=on_tick, on_begin=lambda: None
         )
         return copy.deepcopy(self.environment)
+
+    def check_resources(self, service, *, deadline, on_tick):
+        """Fixed infrastructure checks; never a complete GPU readiness receipt."""
+        if type(service) is not OwnedJobService or service.purpose != "maintenance":
+            raise ValueError("An owned maintenance service instance is required")
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(1)
+            request = {
+                "event": "check-resources",
+                "canary": uuid.uuid4().hex,
+                "port": listener.getsockname()[1],
+            }
+            message = self._exchange(
+                service, request, deadline=deadline, on_tick=on_tick, on_begin=lambda: None
+            )
+        return copy.deepcopy(message["report"]), copy.deepcopy(self.environment)
 
     def _exchange(self, service, request, *, deadline, on_tick, on_begin):
         guard = service.guard
@@ -128,7 +148,16 @@ class GPUExecutionAdapter:
                 tick()
                 channel.send(request)
                 message = channel.receive()
-                if request["event"] == "recover":
+                if request["event"] == "check-resources":
+                    if (
+                        type(message) is not dict
+                        or set(message) != {"event", "report", "recovered"}
+                        or message["event"] != "resources-checked"
+                        or message["recovered"] is not True
+                    ):
+                        raise SandboxUnavailable("GPU resource checks did not finish recovery")
+                    validate_report(message["report"], request, self.target)
+                elif request["event"] == "recover":
                     if canonical_digest(message) != canonical_digest(
                         {"event": "recovered", "recovered": True}
                     ):

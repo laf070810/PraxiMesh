@@ -41,7 +41,7 @@
 
 | 未完成项 | 当前证据与限制 | 后续完成所需条件 |
 | --- | --- | --- |
-| GPU 题型（§2.2 C、§4.2/4.4、R-16） | GPU 0 已完成 [G1 的 7 组正确性检查](acceptance-g1.md)及 [G2 的 9 组故障/恢复检查](acceptance-g2.md)；[G3](acceptance-g3.md)验证主机锁、持久预约、独立账目和 PG 租约边界；[G4](acceptance-g4.md)实现交互评测与批次计时，新硬件重放因外部占用尚未执行。[G5](acceptance-g5.md)与 [G6](acceptance-g6.md)验证任务服务、控制通信及命名空间；[G7](acceptance-g7.md)接入共用离线 runsc 环境并通过七项实际 CPU guest 检查；[G8](acceptance-g8.md)通过三项实际 CPU 异常退出与私有存储回收检查；[G9](acceptance-g9.md)连接运行适配器、占用监测与数据库结算；[G10](acceptance-g10.md)连接启动接管及独立维护恢复，协议、PG 边界和四项 CPU 异常回收通过。新 GPU 路径未实测，正式题型、worker 和性能榜单仍未交付。 | 继续完成完整就绪检查、启动凭证、健康准入及正式 GPU worker；在独占条件恢复后验证新执行与恢复路径、完整时间预算、真实 GPU/队列/部署，再开放产品入口。组件检查成功不能代替正式评测验收。 |
+| GPU 题型（§2.2 C、§4.2/4.4、R-16） | GPU 0 已完成 [G1 的 7 组正确性检查](acceptance-g1.md)及 [G2 的 9 组故障/恢复检查](acceptance-g2.md)；[G3](acceptance-g3.md)验证主机锁、持久预约、独立账目和 PG 租约边界；[G4](acceptance-g4.md)实现交互评测与批次计时，新硬件重放因外部占用尚未执行。[G5](acceptance-g5.md)与 [G6](acceptance-g6.md)验证任务服务、控制通信及命名空间；[G7](acceptance-g7.md)接入共用离线 runsc 环境并通过七项实际 CPU guest 检查；[G8](acceptance-g8.md)通过三项实际 CPU 异常退出与私有存储回收检查；[G9](acceptance-g9.md)连接运行适配器、占用监测与数据库结算；[G10](acceptance-g10.md)连接启动接管及独立维护恢复，协议、PG 边界和四项 CPU 异常回收通过。[G11](acceptance-g11.md) 的共用资源检查已通过九项实际 CPU 场景。新 GPU 路径未实测，正式题型、worker 和性能榜单仍未交付。 | 继续完成完整就绪检查、启动凭证、健康准入及正式 GPU worker；在独占条件恢复后验证新执行与恢复路径、完整时间预算、真实 GPU/队列/部署，再开放产品入口。组件检查成功不能代替正式评测验收。 |
 | 托管 CI/CD（§8.2、R-09） | `origin` 已指向 GitHub，默认分支 `main`；应用与 WASI CI 已实际获得托管 runner 并运行，尚未确认最终全通过。部署工作流新增默认 `status`；runner 管理 API 未认证返回 401，不能据此确认是否已注册。 | 核对 CI 最终成功/失败记录；按 [CI 指南](deployment/ci.md)设置受信运维仓库/有效访问限制、分支/environment、专用部署节点，再验收状态、发布和恢复。部署 runner 不依赖 GPU。 |
 | 目标站点运维（§8.2/8.4、AC-07） | 本地固定镜像、回环 HTTPS、备份恢复、升级与容量样本已验证；没有指定长期部署目标。 | 在目标主机验收服务监管、容量、公有证书与续期、日志/备份保留和故障恢复。公开运营仍按维护者决定后续处理。 |
 | 开源与公开发布政策（§1、§8.3、§13） | `LICENSES.md` 仍为待确认状态；`SECURITY.md` 尚无正式私密报告渠道和负责人。维护者明确先交付自部署、公开运营及许可证后定。 | 维护者确认代码/内容/投稿授权，以及需要公开运营时的品牌、资源、治理、隐私和安全响应安排。开发者不能代为批准这些事项。 |
@@ -51,6 +51,8 @@
 2026-10-24 开发指南交付后的只读查询记录在 `test-results/post-onboarding-blockers-1.json`；其中无远端的历史条件已被 2026-10-30 的 GitHub 接入解除。CPU 委派缺口随后由维护者修复，实际限额结果见 `test-results/cpu-controller-restored/result.json`。候选 runsc 的精确驱动版本列表检查见 `test-results/gpu-runtime-preflight/result.json`；后续单卡 CUDA 样例与实际节流已通过，范围及失败修正见 [RFC-018](rfcs/018-gpu-environment-probe.md)。nvproxy 会将受支持的 GPU 调用转交宿主 NVIDIA 驱动，驱动本身仍在信任边界内，详见 [gVisor GPU 官方指南](https://gvisor.dev/docs/user_guide/gpu/)。
 
 ## 分批结果
+
+- 2026-10-31 R-16 启动资源检查：共用模块接入维护协议，九项真实 CPU 资源检查和十七个容器清理通过；104 项组件检查及实际控制器早期拒绝通过，见 [G11](acceptance-g11.md)。PID 探针三次失败及修正保留，未放宽限额；GPU 模式、完整启动凭证和 worker 仍待完成。
 
 - 2026-10-31 R-16 启动接管：保留旧预约，停止已知任务与维护服务后处理存储，独立维护协议不含学员输入；物理恢复成功仍保持停用。113 项组件检查、54 项实际 PostgreSQL 检查、四项真实 CPU/runsc 异常恢复及控制器早期拒绝通过；新共同策略的 129 个真实 WASI 探针也通过，旧 bundle 超时与诊断保留，见 [G10](acceptance-g10.md)。完整 GPU 就绪检查、凭证及硬件验收仍待完成。
 

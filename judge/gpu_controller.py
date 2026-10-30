@@ -12,6 +12,7 @@ from judge.gpu_execution_contract import (
     task_request,
     validate_target,
 )
+from judge.gpu_isolation import check_resources, request_values
 from judge.gpu_policy import execution_digest
 from judge.gpu_probes import VECTOR_REFERENCE
 from judge.gpu_session import GPUExecutionError
@@ -55,7 +56,15 @@ def serve(channel, base, archives, deadline):
         channel.send({"event": "prepared", "identity": identity, "target": prepare["target"]})
         request = channel.receive()
         maintenance = request == {"event": "recover"}
-        if not maintenance:
+        resource_check = type(request) is dict and request.get("event") == "check-resources"
+        if resource_check:
+            if set(request) != {"event", "canary", "port"}:
+                raise SandboxUnavailable("Unexpected GPU resource check request")
+            values = request_values({name: request[name] for name in ("canary", "port")})
+            runtime.deadline = deadline - RECOVERY_MARGIN - CLEANUP_MARGIN
+            resources = check_resources(runtime, values, expect_gpu=True, record={})
+            runtime.deadline = deadline
+        elif not maintenance:
             if type(request) is not dict or set(request) != {"event", "problem", "source", "mode"}:
                 raise SandboxUnavailable("Unexpected GPU execution request")
             if request != task_request(request["problem"], request["source"], request["mode"]):
@@ -82,11 +91,12 @@ def serve(channel, base, archives, deadline):
         runtime.deadline = deadline
         runtime.close()
         closed = True
-        channel.send(
-            {"event": "recovered", "recovered": True}
-            if maintenance
-            else {"event": "completed", "result": result, "recovered": True}
-        )
+        if resource_check:
+            channel.send({"event": "resources-checked", "report": resources, "recovered": True})
+        elif maintenance:
+            channel.send({"event": "recovered", "recovered": True})
+        else:
+            channel.send({"event": "completed", "result": result, "recovered": True})
         if channel.receive() != {"event": "finish"}:
             raise SandboxUnavailable("Unexpected GPU completion acknowledgement")
     finally:

@@ -26,6 +26,8 @@ G3 的 `gpu-slot-seconds-v1` 按 Run 90 秒、Submit 180 秒预约整卡时段�
 
 [G10](../acceptance-g10.md)连接启动接管与异常恢复：先停止数据库旧预约对应的服务，以及每卡固定身份的遗留维护服务，再清理私有目录、运行固定正确解。恢复成功仍保持隔离停用和旧预约，完整就绪检查及启动凭证尚未交付。所有控制器副本与后续升级必须共用原来的私有工作根和锁目录；换目录不能处理旧进程或存储，也不能据此恢复提交。
 
+[G11](../acceptance-g11.md)把共用资源检查接入维护协议，CPU 重放已验证内存、宿主 PID、实际节流、存储与异常清理。GPU 模式还会要求准确设备可见性及独立 CUDA 正确解恢复，该路径尚未实测；完整启动凭证、worker 和正式准入仍待完成。
+
 ## 不占 GPU 的控制链检查
 
 适用于显卡暂被占用时开发、检查 worker 控制链，或在目标 Linux 主机核对用户服务管理器及 CPU/内存/PID 委派。需要项目 Python 环境、可用的普通用户 systemd 管理器和 cgroup v2；不需要显卡、驱动或 CUDA 制品。不要用 sudo，也不在普通 Web/CPU worker 容器内执行。
@@ -66,9 +68,9 @@ G3 的 `gpu-slot-seconds-v1` 按 Run 90 秒、Submit 180 秒预约整卡时段�
   --image-archive var/gpu-preflight/python-image-20261030.oci.tar
 ```
 
-检查只在固定 runsc 内执行审阅过的 CPU 基础设施程序，不接受学员源码；明确关闭 nvproxy，不映射 GPU。它验证只读根文件系统、私有文件/宿主回环网络/设备隔离、输出限制、超时、取消、附着客户端异常退出、实际 CPU 节流和 32 MiB 临时存储限制；每个场景后启动新容器检查重新运行。
+检查不接受学员源码，明确关闭 nvproxy，不映射 GPU。固定 runsc guest 验证只读根文件系统、私有文件/宿主回环网络/设备隔离、输出限制、超时、取消、附着客户端异常退出、实际 CPU 节流、512 MiB 内存和 32 MiB 临时存储边界。宿主 PID 限额由私有控制器命名空间中的固定可信原生探针验证：在专用叶组实际触及父组 256 个任务的上限，再清理全部自有子进程；不会在共享主机 cgroup 中运行该探针。每个场景后启动新隔离容器检查重新运行。
 
-结果在 `test-results/px-gpu-runtime-*/result.json`。总 `passed` 和 `controller.passed` 应为 `true`，有七项成功 `controller.checks` 和十四项 `controller.cleanup`；`controller.private_store_removed`、`service_cleanup.cgroup_empty`、`workspace_removed`、`temporary_directory_removed` 均应为 `true`。任一失败保留原始记录，先修正原因再重放，不手动把设备标为可用。
+结果在 `test-results/px-gpu-runtime-*/result.json`。总 `passed` 和 `controller.passed` 应为 `true`，有九项成功 `controller.checks` 和十七项 `controller.cleanup`；`controller.private_store_removed`、`service_cleanup.cgroup_empty`、`workspace_removed`、`temporary_directory_removed` 均应为 `true`。PID 检查的 `details` 应记录 255 个子进程、至少一次内核拒绝及零剩余任务；探针自身计入第 256 个任务。任一失败保留原始记录，先修正原因再重放，不手动把设备标为可用。
 
 这个入口不会修改共享 Docker/Podman 存储或用户配置，也不生成 GPU receipt。容器正常退出和 CPU 重新运行成功，不证明 CUDA 设备已恢复；正式 GPU 提交仍关闭。
 

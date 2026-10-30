@@ -91,6 +91,8 @@ def controlled(monkeypatch):
             class Channel:
                 def receive(self):
                     message = messages.pop(0)
+                    if callable(message):
+                        message = message()
                     events.append(("receive", message["event"]))
                     return message
 
@@ -134,13 +136,19 @@ def controlled(monkeypatch):
                 lambda _self, command, **_kwargs: events.append(("start", command)),
             )
 
-            def run(*, on_begin=None, maintenance=False, purpose=None):
+            def run(*, on_begin=None, maintenance=False, purpose=None, resource_check=False):
                 service = OwnedJobService(
                     guard,
                     uuid.uuid4(),
                     uuid.uuid4(),
-                    purpose=purpose or ("maintenance" if maintenance else "task"),
+                    purpose=purpose or ("maintenance" if maintenance or resource_check else "task"),
                 )
+                if resource_check:
+                    return adapter.check_resources(
+                        service,
+                        deadline=time.monotonic() + 180,
+                        on_tick=lambda: events.append(("poll", None)),
+                    )
                 if maintenance:
                     return adapter.recover(
                         service,
@@ -218,6 +226,48 @@ def test_task_and_maintenance_services_cannot_be_interchanged(controlled, mainte
     with pytest.raises(ValueError, match="service instance"):
         run(maintenance=maintenance, purpose=purpose)
     assert not events
+
+
+def test_resource_checks_bind_fresh_host_listener_and_complete_cleanup(controlled):
+    import socket
+
+    from tests.test_gpu_isolation import resource_report
+
+    adapter, messages, events, run = controlled
+    observed = {}
+
+    def response():
+        request = next(
+            value
+            for name, value in events
+            if name == "send" and value["event"] == "check-resources"
+        )
+        assert set(request) == {"event", "canary", "port"}
+        with socket.create_connection(("127.0.0.1", request["port"]), timeout=1):
+            pass
+        observed.update(request)
+        return {
+            "event": "resources-checked",
+            "report": resource_report(request, TARGET),
+            "recovered": True,
+        }
+
+    messages[-1] = response
+    report, environment = run(resource_check=True)
+    assert report["gpu"] == TARGET["uuid"] and environment == adapter.environment
+    assert not any(name == "begin" for name, _value in events)
+    assert events[-1] == ("observe", False)
+    with pytest.raises(OSError):
+        socket.create_connection(("127.0.0.1", observed["port"]), timeout=1)
+
+
+def test_resource_checks_reject_partial_report_even_with_recovered_flag(controlled):
+    _adapter, messages, events, run = controlled
+    messages[-1] = {"event": "resources-checked", "report": {"passed": True}, "recovered": True}
+    with pytest.raises(SandboxUnavailable, match="Incomplete resource"):
+        run(resource_check=True)
+    assert ("stop", None) in events
+    assert ("send", {"event": "finish"}) not in events
 
 
 @pytest.mark.parametrize("stage", [0, 1])

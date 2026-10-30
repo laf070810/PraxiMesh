@@ -39,6 +39,8 @@
 - [ADR-025：GPU 执行适配器与结算边界](adr/025-gpu-execution-adapter.md)
 - [G10 启动接管与维护恢复](acceptance-g10.md) — 预约保留、实际 PostgreSQL 与四项 CPU 存储回收通过，正式就绪检查待完成
 - [ADR-026：GPU 启动接管与维护恢复](adr/026-gpu-startup-recovery.md)
+- [G11 启动资源检查](acceptance-g11.md) — 共用模块的九项实际 CPU 资源检查通过，GPU 模式待实测
+- [ADR-027：共用启动资源检查](adr/027-gpu-startup-resource-checks.md)
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

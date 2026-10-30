@@ -175,3 +175,59 @@ def test_recovery_request_with_source_is_rejected(controller):
     with pytest.raises(SandboxUnavailable, match="execution request"):
         controller.run()
     assert ("recovery-checked", None) not in controller.events
+
+
+def test_resource_checks_still_require_independent_gpu_recovery(controller, monkeypatch):
+    from tests.test_gpu_isolation import REQUEST, resource_report
+
+    def resources(runtime, request, *, expect_gpu, record):
+        assert expect_gpu is True and request == REQUEST
+        assert runtime.deadline < time.monotonic() + 60
+        controller.events.append(("resources-checked", None))
+        return resource_report(request, TARGET)
+
+    monkeypatch.setattr(gpu_controller, "check_resources", resources)
+    controller.incoming[1] = {"event": "check-resources", **REQUEST}
+    controller.run()
+    events = controller.events
+    assert not any(name in {"session", "evaluated"} for name, _value in events)
+    completed = next(
+        i
+        for i, (name, message) in enumerate(events)
+        if name == "send" and message["event"] == "resources-checked"
+    )
+    assert (
+        events.index(("resources-checked", None))
+        < events.index(("recovery-checked", None))
+        < events.index(("store-closed", None))
+        < completed
+    )
+
+
+def test_resource_request_cannot_include_source(controller):
+    controller.incoming[1] = {
+        "event": "check-resources",
+        "canary": "a" * 32,
+        "port": 12345,
+        "source": "not accepted",
+    }
+    with pytest.raises(SandboxUnavailable, match="resource check request"):
+        controller.run()
+    assert ("recovery-checked", None) not in controller.events
+
+
+def test_failed_resource_check_cannot_return_a_ready_report(controller, monkeypatch):
+    from tests.test_gpu_isolation import REQUEST
+
+    def failed(*_args, **_kwargs):
+        raise SandboxUnavailable("fixed resource check failure")
+
+    monkeypatch.setattr(gpu_controller, "check_resources", failed)
+    controller.incoming[1] = {"event": "check-resources", **REQUEST}
+    with pytest.raises(SandboxUnavailable, match="resource check failure"):
+        controller.run()
+    assert ("store-closed", None) in controller.events
+    assert not any(
+        name == "send" and message["event"] == "resources-checked"
+        for name, message in controller.events
+    )
