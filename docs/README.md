@@ -27,6 +27,8 @@
 - [ADR-018：GPU 所有权与恢复后释放预约](adr/018-gpu-device-ownership.md)
 - [G4 GPU 交互执行与控制器计时进度](acceptance-g4.md) — 协议检查通过，真实 GPU 验收待独占条件恢复
 - [ADR-019：CUDA 会话协议与控制器批次时间](adr/019-gpu-session-protocol.md)
+- [G5 非 GPU 任务服务与数据库控制检查](acceptance-g5.md) — 实际进程树、独立期限、接管及 PG 超时通过，正式 GPU worker 待接入
+- [ADR-020：任务服务硬期限与有界控制回调](adr/020-gpu-task-control.md)
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

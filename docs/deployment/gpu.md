@@ -14,6 +14,20 @@ G3 的 `gpu-slot-seconds-v1` 按 Run 90 秒、Submit 180 秒预约整卡时段�
 
 [G4](../acceptance-g4.md)新增交互式执行器和控制器批次计时，目前只有协议与拒绝路径的自动检查结果。首次真实重放发现目标卡存在其他账号的计算进程，在创建服务前退出；这些新路径尚未完成 GPU 验收。G1/G2 的历史通过记录不替代新代码的重放。
 
+[G5](../acceptance-g5.md)补充任务服务硬期限、整进程树清理及有界数据库回调。固定 CPU 进程树和真实 PostgreSQL 检查已通过；它们尚未与 GPU 运行环境合成正式 worker，也不改变 Compose 的可用题型。
+
+## 不占 GPU 的控制链检查
+
+适用于显卡暂被占用时开发、检查 worker 控制链，或在目标 Linux 主机核对用户服务管理器及 CPU/内存/PID 委派。需要项目 Python 环境、可用的普通用户 systemd 管理器和 cgroup v2；不需要显卡、驱动或 CUDA 制品。不要用 sudo，也不在普通 Web/CPU worker 容器内执行。
+
+```sh
+.venv/bin/python scripts/gpu_control_acceptance.py
+```
+
+脚本只启动固定 CPU 休眠进程树，创建本次独有的临时服务与合成锁身份，依次验证硬期限、主进程退出、控制器退出后的接管，以及拒绝停止身份不符的服务。结束后检查全部自有服务已停止、cgroup 无进程；原始记录保留在 `test-results/px-gpu-control-*/result.json`，须有 `passed: true` 和四项 `checks`、四项成功 `cleanup`。
+
+实际读取服务父 cgroup 的 2 核、2 GiB、零 swap 和 512 PID 限制。这不是 GPU 或显存验收，也不创建启动 receipt。配合开发测试使用现有 [PostgreSQL 验证入口](../../README.md#开发与检查)检查 `tests/test_gpu_control.py`、`tests/test_gpu_resources.py`。正式 worker 仍须在运行时验证设备占用与恢复，不能手工把数据库设备状态设为 ready。
+
 ## 重放单卡环境检查
 
 适用于准备 GPU 执行环境和排障；它不安装常驻 worker、不生成评测 receipt，也不会开放网站提交。需要维护者明确分配一张空闲 GPU。脚本拒绝 `all`，发现已有计算任务就退出。
