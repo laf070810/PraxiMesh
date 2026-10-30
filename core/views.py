@@ -21,7 +21,7 @@ from core.forms import ProfileForm, RecoveryForm, RegisterForm, SourceForm
 from core.limits import consume
 from core.models import AccountProfile, Draft, Enrollment, KnowledgeNode, Problem, Submission
 from core.queue import AdmissionError, available, enqueue
-from core.resources import reservation_data, reservation_units, usage
+from core.resources import GPU_BUDGET_POLICY, reservation_data, reservation_units, usage
 from core.result_evidence import SPECIALISTS, evidence_jobs, is_formal_evidence, safe_result
 from judge.backends import result_environment_label
 from learning.models import Bookmark, TutorialReading
@@ -496,6 +496,7 @@ def export_account(request):
     profile = AccountProfile.objects.filter(user=request.user).first()
     data = {
         "cpu_budget": usage(request.user),
+        "gpu_budget": usage(request.user, policy=GPU_BUDGET_POLICY),
         "username": request.user.username,
         "display_name": profile.display_name if profile else "",
         "submissions": [

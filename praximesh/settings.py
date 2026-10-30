@@ -154,6 +154,9 @@ JUDGE_MAX_QUEUE = 100
 JUDGE_DAILY_CPU_UNITS = int(os.environ.get("JUDGE_DAILY_CPU_UNITS", "120"))
 if not 1 <= JUDGE_DAILY_CPU_UNITS <= 10000:
     raise ImproperlyConfigured("JUDGE_DAILY_CPU_UNITS must be between 1 and 10000.")
+JUDGE_DAILY_GPU_SECONDS = int(os.environ.get("JUDGE_DAILY_GPU_SECONDS", "1800"))
+if not 1 <= JUDGE_DAILY_GPU_SECONDS <= 86400:
+    raise ImproperlyConfigured("JUDGE_DAILY_GPU_SECONDS must be between 1 and 86400.")
 JUDGE_LEASE_SECONDS = 180
 CONTENT_ROOT = BASE_DIR / "content"
 LOGGING = {

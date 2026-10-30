@@ -8,7 +8,14 @@ from django.utils import timezone
 from django.utils.translation import gettext
 
 from core.models import Problem, QueueLock, Submission, WorkerHealth
-from core.resources import BUDGET_POLICY, reservation_units, usage, utc_day
+from core.resources import (
+    BUDGET_POLICY,
+    GPU_BUDGET_POLICY,
+    GPU_EVALUATOR,
+    reservation_units,
+    usage,
+    utc_day,
+)
 from judge.results import LABELS
 
 
@@ -187,11 +194,16 @@ def claim(fingerprint=None):
     # PostgreSQL supports SKIP LOCKED; SQLite IMMEDIATE serializes this transaction.
     from django.db import connection
 
-    query = Submission.objects.filter(
-        status="queued", evaluation_fingerprint=fingerprint or configured_fingerprint()
-    ).order_by("created_at")
     query = (
-        query.select_for_update(skip_locked=True)
+        Submission.objects.filter(
+            status="queued", evaluation_fingerprint=fingerprint or configured_fingerprint()
+        )
+        .exclude(budget_policy=GPU_BUDGET_POLICY)
+        .exclude(version__data__evaluator=GPU_EVALUATOR)
+        .order_by("created_at")
+    )
+    query = (
+        query.select_for_update(of=("self",), skip_locked=True)
         if connection.features.has_select_for_update_skip_locked
         else query
     )
@@ -206,22 +218,39 @@ def claim(fingerprint=None):
     return job
 
 
+def _current_cpu(job):
+    # Only lock the task: published versions remain read-only to workers.
+    current = (
+        Submission.objects.select_for_update(of=("self",))
+        .filter(
+            id=job.id, status="running", lease_token=job.lease_token, lease_until__gt=timezone.now()
+        )
+        .exclude(budget_policy=GPU_BUDGET_POLICY)
+        .exclude(version__data__evaluator=GPU_EVALUATOR)
+        .first()
+    )
+    # Waiting for this row must never extend an expired execution lease.
+    if current is None or current.lease_until <= timezone.now():
+        return None
+    return current
+
+
+@transaction.atomic
 def renew(job):
-    return Submission.objects.filter(
-        id=job.id, status="running", lease_token=job.lease_token, lease_until__gt=timezone.now()
-    ).update(lease_until=timezone.now() + timedelta(seconds=settings.JUDGE_LEASE_SECONDS))
+    current = _current_cpu(job)
+    if current is None:
+        return 0
+    current.lease_until = timezone.now() + timedelta(seconds=settings.JUDGE_LEASE_SECONDS)
+    current.save(update_fields=["lease_until"])
+    return 1
 
 
 @transaction.atomic
 def begin_execution(job):
-    now = timezone.now()
-    current = (
-        Submission.objects.select_for_update()
-        .filter(id=job.id, status="running", lease_token=job.lease_token, lease_until__gt=now)
-        .first()
-    )
+    current = _current_cpu(job)
     if current is None or current.budget_state == "released":
         return False
+    now = timezone.now()
     fields = ["lease_until"]
     if current.budget_state == "reserved":
         current.budget_state = "consumed"
@@ -235,15 +264,15 @@ def begin_execution(job):
 
 @transaction.atomic
 def finish(job, result, environment):
-    current = (
-        Submission.objects.select_for_update()
-        .filter(
-            id=job.id, status="running", lease_token=job.lease_token, lease_until__gt=timezone.now()
-        )
-        .first()
-    )
+    current = _current_cpu(job)
     if current is None:
         return 0
+    return _finish_current(job, current, result, environment)
+
+
+def _finish_current(job, current, result, environment):
+    # Both CPU and GPU paths hold the current task row lock. GPU callers also
+    # hold their device row and matching host ownership/reservation fence.
     updates = {}
     if current.budget_state == "reserved":
         if result["verdict"] != "internal_error":
@@ -254,14 +283,15 @@ def finish(job, result, environment):
         "language": job.version.data["language"],
         "evaluator": job.version.data["evaluator"],
     }
+    now = timezone.now()
     return Submission.objects.filter(
-        id=job.id, status="running", lease_token=job.lease_token
+        id=job.id, status="running", lease_token=job.lease_token, lease_until__gt=now
     ).update(
         **updates,
         status="finished",
         verdict=result["verdict"],
         result=result,
         environment=environment,
-        finished_at=timezone.now(),
+        finished_at=now,
         lease_until=None,
     )

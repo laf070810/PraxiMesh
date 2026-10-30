@@ -191,6 +191,7 @@ def test_core_migration_preserves_old_jobs_without_backcharging():
     from django.db.migrations.executor import MigrationExecutor
 
     executor = MigrationExecutor(connection)
+    current_targets = executor.loader.graph.leaf_nodes()
     executor.migrate([("core", "0002_admission_and_policy")])
     apps = executor.loader.project_state([("core", "0002_admission_and_policy")]).apps
     try:
@@ -216,7 +217,7 @@ def test_core_migration_preserves_old_jobs_without_backcharging():
         assert migrated.budget_state == "legacy" and migrated.budget_day is None
         assert migrated.budget_units == 0 and migrated.execution_started_at is None
     finally:
-        MigrationExecutor(connection).migrate([("core", "0003_cpu_reservations")])
+        MigrationExecutor(connection).migrate(current_targets)
 
 
 @pytest.mark.parametrize("started", [False, True])

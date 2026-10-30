@@ -40,9 +40,9 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from scripts.browser_acceptance import bootstrap_moderator, cleanup_moderator  # noqa: E402
 from scripts.deploy_database import (  # noqa: E402
-    WORKER_PRIVILEGES,
     web_read_tables,
     web_write_tables,
+    worker_privileges,
 )
 
 POSTGRES = (
@@ -268,7 +268,7 @@ def database_roles(owner_url, web_password, worker_password):
         connection.execute(
             "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO acceptance_web"
         )
-        for table, privileges in WORKER_PRIVILEGES.items():
+        for table, privileges in worker_privileges(connection).items():
             connection.execute(
                 sql.SQL("GRANT {} ON {} TO acceptance_judge").format(
                     sql.SQL(privileges), sql.Identifier(table)

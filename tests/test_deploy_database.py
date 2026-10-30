@@ -163,6 +163,49 @@ def test_runtime_permissions_separate_private_accounts_content_and_health():
     assert not any(name.startswith(("learning_", "community_")) for name in WORKER_PRIVILEGES)
 
 
+@pytest.mark.parametrize("installed", [False, True])
+def test_gpu_worker_permissions_follow_recorded_migration(installed):
+    migration = ("core", "0004_gpu_resources")
+    tables = set(WORKER_PRIVILEGES)
+    if installed:
+        tables.add("core_gpudevice")
+
+    class Connection:
+        def execute(self, statement):
+            rows = (
+                ([migration] if installed else [])
+                if "django_migrations" in statement
+                else [(table,) for table in tables]
+            )
+            return SimpleNamespace(fetchall=lambda: rows)
+
+    expected = dict(WORKER_PRIVILEGES)
+    if installed:
+        expected["core_gpudevice"] = "SELECT, INSERT, UPDATE"
+    assert deploy_database.worker_privileges(Connection()) == expected
+    assert "core_gpudevice" in deploy_database.WEB_READ
+    assert "core_gpudevice" not in deploy_database.WEB_WRITE
+
+
+@pytest.mark.parametrize("recorded", [False, True])
+def test_gpu_worker_permissions_reject_inconsistent_schema(recorded):
+    tables = set(WORKER_PRIVILEGES)
+    if not recorded:
+        tables.add("core_gpudevice")
+
+    class Connection:
+        def execute(self, statement):
+            rows = (
+                ([("core", "0004_gpu_resources")] if recorded else [])
+                if "django_migrations" in statement
+                else [(table,) for table in tables]
+            )
+            return SimpleNamespace(fetchall=lambda: rows)
+
+    with pytest.raises(DeploymentDatabaseError):
+        deploy_database.worker_privileges(Connection())
+
+
 @pytest.mark.parametrize(
     "installed", [(), (("learning", "0001_initial"),), tuple(deploy_database.FEATURE_TABLES)]
 )

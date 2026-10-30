@@ -42,6 +42,7 @@ BASE_WEB_READ = (
     "django_content_type",
 )
 FEATURE_READ_TABLES = {
+    ("core", "0004_gpu_resources"): ("core_gpudevice",),
     ("challenges", "0001_initial"): (
         "challenges_challenge",
         "challenges_challengerevision",
@@ -123,6 +124,9 @@ WORKER_PRIVILEGES = {
     "core_problemversion": "SELECT",
     "core_workerhealth": "SELECT, INSERT, UPDATE",
 }
+FEATURE_WORKER_PRIVILEGES = {
+    ("core", "0004_gpu_resources"): {"core_gpudevice": "SELECT, INSERT, UPDATE"},
+}
 
 
 class DeploymentDatabaseError(RuntimeError):
@@ -156,6 +160,17 @@ def web_write_tables(connection):
 
 def web_read_tables(connection):
     return schema_tables(connection, BASE_WEB_READ, FEATURE_READ_TABLES)
+
+
+def worker_privileges(connection):
+    features = {migration: tuple(grants) for migration, grants in FEATURE_WORKER_PRIVILEGES.items()}
+    present = schema_tables(connection, tuple(WORKER_PRIVILEGES), features)
+    grants = dict(WORKER_PRIVILEGES)
+    for feature in FEATURE_WORKER_PRIVILEGES.values():
+        grants.update(
+            {table: permissions for table, permissions in feature.items() if table in present}
+        )
+    return grants
 
 
 def safe_errors(function):
@@ -488,7 +503,7 @@ class DeploymentDatabase:
                         sql.Identifier(self.roles["web"]),
                     )
                 )
-            for table, privileges in WORKER_PRIVILEGES.items():
+            for table, privileges in worker_privileges(connection).items():
                 connection.execute(
                     sql.SQL("GRANT {} ON {} TO {}").format(
                         sql.SQL(privileges),
@@ -537,7 +552,7 @@ class DeploymentDatabase:
                     if role == "web"
                     else {
                         table: set(privileges.split(", "))
-                        for table, privileges in WORKER_PRIVILEGES.items()
+                        for table, privileges in worker_privileges(connection).items()
                     }
                 )
                 privileges = [
@@ -888,6 +903,8 @@ class DeploymentDatabase:
         self._require_operation_lock()
         with self.connection(name) as connection:
             connection.execute("UPDATE core_workerhealth SET ready=false")
+            if "core_gpudevice" in worker_privileges(connection):
+                connection.execute("UPDATE core_gpudevice SET state='quarantined', checked_at=NULL")
 
     def url(self, name, role):
         self._validate_name(name)

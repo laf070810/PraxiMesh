@@ -73,7 +73,7 @@ uv sync --frozen --group browser
 | 目录 | 职责 |
 | --- | --- |
 | `core/` | 知识与题目版本、账户、Web 页面、队列与资源预约 |
-| `judge/` | 可信结果比较、WASI 执行器和独立的 gVisor 适配器 |
+| `judge/` | 可信结果比较、WASI 执行器、gVisor 适配器及开发中的 GPU 组件 |
 | `learning/`, `challenges/` | 私有学习记录、实践证据、成就与固定版本挑战 |
 | `community/` | 题解、讨论、博客、版本题目反馈、评论与审核申诉 |
 | `organizations/` | 组织角色、版本课程、第三方题库归属和发布 |

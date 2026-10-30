@@ -137,7 +137,7 @@ class Submission(models.Model):
                     )
                     | (
                         models.Q(
-                            budget_policy="cpu-invocations-v1",
+                            budget_policy__in=["cpu-invocations-v1", "gpu-slot-seconds-v1"],
                             budget_day__isnull=False,
                             budget_units__gte=1,
                         )
@@ -150,7 +150,7 @@ class Submission(models.Model):
                         )
                     )
                 ),
-                name="submission_cpu_reservation_shape",
+                name="submission_resource_reservation",
             )
         ]
 
@@ -160,6 +160,44 @@ class WorkerHealth(models.Model):
     checked_at = models.DateTimeField()
     ready = models.BooleanField(default=False)
     fingerprint = models.CharField(max_length=64)
+
+
+class GPUDevice(models.Model):
+    """Operational reservation survives deletion/expiry until physical recovery."""
+
+    class State(models.TextChoices):
+        QUARANTINED = "quarantined", "Quarantined"
+        READY = "ready", "Ready"
+        RESERVED = "reserved", "Reserved"
+
+    id = models.CharField(primary_key=True, max_length=80)
+    state = models.CharField(max_length=16, choices=State.choices, default=State.QUARANTINED)
+    worker_id = models.CharField(max_length=80)
+    owner_token = models.UUIDField()
+    fingerprint = models.CharField(max_length=64)
+    checked_at = models.DateTimeField(null=True)
+    # No FK: account deletion must not release physical device ownership.
+    job_id = models.UUIDField(null=True, unique=True)
+    reservation_token = models.UUIDField(null=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(job_id__isnull=True, reservation_token__isnull=True)
+                    | models.Q(job_id__isnull=False, reservation_token__isnull=False)
+                ),
+                name="gpu_reservation_identity_pair",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(state="quarantined")
+                    | models.Q(state="ready", job_id__isnull=True, checked_at__isnull=False)
+                    | models.Q(state="reserved", job_id__isnull=False, checked_at__isnull=False)
+                ),
+                name="gpu_device_state_shape",
+            ),
+        ]
 
 
 class RateBucket(models.Model):

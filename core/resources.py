@@ -9,6 +9,9 @@ from django.utils import timezone
 from core.models import Submission
 
 BUDGET_POLICY = "cpu-invocations-v1"
+GPU_BUDGET_POLICY = "gpu-slot-seconds-v1"
+GPU_EVALUATOR = "cuda-kernel-v1"
+GPU_SLOT_SECONDS = {"run": 90, "submit": 180}
 # Each invocation has at most the existing 15-second wall allowance. stdio has
 # separate compile and execution calls; content cannot override these costs.
 CALLS_PER_CASE = {
@@ -25,6 +28,16 @@ CALLS_PER_CASE = {
 def reservation_units(version, mode):
     evaluator = version.data.get("evaluator")
     cases = version.data.get("tests")
+    if evaluator == GPU_EVALUATOR:
+        if (
+            mode not in GPU_SLOT_SECONDS
+            or not isinstance(cases, list)
+            or not 2 <= len(cases) <= 8
+            or any(type(case) is not dict or type(case.get("public")) is not bool for case in cases)
+            or not any(mode == "submit" or case["public"] for case in cases)
+        ):
+            raise ValueError("Invalid GPU reservation contract.")
+        return GPU_SLOT_SECONDS[mode]
     if (
         evaluator not in CALLS_PER_CASE
         or mode not in {"run", "submit"}
@@ -54,20 +67,27 @@ def utc_day(now=None):
     return (now or timezone.now()).astimezone(UTC).date()
 
 
-def usage(user, day=None):
+def usage(user, day=None, *, policy=BUDGET_POLICY):
     day = day or utc_day()
-    totals = Submission.objects.filter(user=user, budget_day=day).aggregate(
+    if policy not in {BUDGET_POLICY, GPU_BUDGET_POLICY}:
+        raise ValueError("Unsupported resource budget policy.")
+    limit = (
+        settings.JUDGE_DAILY_GPU_SECONDS
+        if policy == GPU_BUDGET_POLICY
+        else settings.JUDGE_DAILY_CPU_UNITS
+    )
+    totals = Submission.objects.filter(user=user, budget_day=day, budget_policy=policy).aggregate(
         reserved=Sum("budget_units", filter=Q(budget_state="reserved")),
         consumed=Sum("budget_units", filter=Q(budget_state="consumed")),
     )
     reserved, consumed = totals["reserved"] or 0, totals["consumed"] or 0
     return {
-        "policy": BUDGET_POLICY,
+        "policy": policy,
         "day": day.isoformat(),
-        "limit": settings.JUDGE_DAILY_CPU_UNITS,
+        "limit": limit,
         "reserved": reserved,
         "consumed": consumed,
-        "remaining": max(0, settings.JUDGE_DAILY_CPU_UNITS - reserved - consumed),
+        "remaining": max(0, limit - reserved - consumed),
     }
 
 
