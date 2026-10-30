@@ -2,19 +2,21 @@
 
 [部署方案选择](README.md) · **GPU 评测尚未实现；本页是准备与实施顺序，不是已经可用的启动命令。** 当前 Compose 和发布协调器提供七种 CPU/WASI 评测。添加 `--gpus`、安装 NVIDIA runtime 或注册 Actions runner 都不会自动增加 GPU 题型。
 
-## 已定位的环境问题
+## 本机当前状态
 
-2026-10-30 的只读检查发现四张 RTX 3090，驱动 `590.48.01`，没有安装/注册 `runsc`。当前 Docker context 指向 `/run/user/2031/docker.sock`，是 **rootless Docker**；它报告 `MemoryLimit`、`SwapLimit`、`PidsLimit=true`，但 `CpuCfsQuota=false`。
+2026-10-30 维护者补齐 CPU 委派并重启用户 Docker 后，当前 context `/run/user/2031/docker.sock` 的 `MemoryLimit`、`SwapLimit`、`PidsLimit`、`CpuCfsQuota` 均为 `true`，资源控制警告为空。可信临时容器设置 `--cpus=0.5`，实际运行 5 秒消耗约 2.501 秒 CPU，`cpu.max=50000 100000`，发生 50 次节流；测试容器已清理。CPU 配额缺口已解决，结果见 `test-results/cpu-controller-restored/result.json`。
 
-CPU 配额缺失已定位到用户服务的控制器委派：
+维护者明确指定第 0 张 RTX 3090 供独占验收；检查时无计算进程，后续按其 UUID 选择设备。官方完整 gVisor `release-20261026.0` 已校验到本地忽略目录，驱动列表包含本机 `590.48.01`。运行中站点的 Docker 仍未注册 runsc；准备使用独立临时 daemon 验证实际 GPU 隔离，见 [RFC-018](../rfcs/018-gpu-environment-probe.md)。版本匹配不代表 GPU 执行或题型已验收。
+
+此前 CPU 配额缺失的原因是用户服务的控制器委派：
 
 - 内核启用 `CONFIG_CGROUPS`、`CONFIG_CGROUP_SCHED` 和 `CONFIG_CFS_BANDWIDTH`。
 - 系统 cgroup v2 包含 `cpu`；但 `user@2031.service` 只获委派 `memory pids`，其 cgroup 中没有 `cpu.max`。
 - rootless Docker 服务自身的 `Delegate=yes` 不能弥补上层用户管理器没有获得的 CPU 控制器。
 
-这是当前用户 Docker 的资源配置缺口，不能据此认定整台主机不支持 CPU 配额。Docker 官方说明了 [rootless 控制器委派要求](https://docs.docker.com/engine/security/rootless/tips/#limiting-resources)。
+这类问题应检查实际 Docker context 和用户服务，不能据此认定整台主机不支持 CPU 配额。Docker 官方说明了 [rootless 控制器委派要求](https://docs.docker.com/engine/security/rootless/tips/#limiting-resources)。
 
-## 环境怎么修
+## 其他主机遇到 CPU 配额缺失时
 
 优先在专用、可销毁的执行节点准备运行时和固定 GPU 设备；部署控制器、数据库凭证和科研任务不放进这个执行环境。若沿用现有共享主机，先确定专用执行账户、设备和维护窗口，系统配置由主机管理员处理。
 
