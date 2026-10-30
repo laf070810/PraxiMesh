@@ -2,6 +2,7 @@
 
 ## CPU 配额复验与 GPU 0 准备 — 2026-10-30
 
+- 修正部署指南中的 Docker CLI 模板字段为 `.CPUCfsQuota`；它与 Engine JSON 的 `CpuCfsQuota` 不同。实际复现旧命令报错，修正命令返回四项 true，控制器无需再次配置。
 - 维护者修复 rootless 用户控制器委派后，Docker 四项资源能力均为 true；独立可信容器实测 0.5 核限额与节流通过，容器已清理。
 - 记录维护者授权 GPU 0 独占验收；校验官方 gVisor release-20261026.0 完整归档，精确驱动支持列表匹配 590.48.01；按 RFC-018 完成独立临时环境检查，尚未开放 GPU 提交。
 - 初次独立 Docker/Podman 接入复现 runsc 的 rootless systemd/cgroup 权限问题；随后使用临时用户服务和 cgroup 命名空间解决，原始失败与修正过程保留在 RFC-018。
