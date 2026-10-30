@@ -24,4 +24,11 @@
 
 首次完整 Compose 重放 `test-results/px-compose-f1ea82adee37/` 在镜像内通过 129 个隔离探针、编辑器（含真实 Ctrl+Enter）、学习/正式提交、英文项目与类/API 浏览器流程；辅导流程发现选项容器 class 被 Django 继承到每个 checkbox，网格样式将点击宽度压为零。已将网格规则限于 div 容器，并补充最小点击尺寸、实际勾选与 Space 切换检查。修正后的源码专项及 30 组布局通过，记录在 `test-results/editor-choices-final.log`。该轮未通过的整体结果和清理记录保留，不计为完整 Compose 成功。
 
-上述浏览器在一次性 SQLite 数据库、合成账号及回环服务中运行；结束时删除账号和数据库并停止自有服务。Compose 镜像内真实评测、CPU 模型、重建保留与直接 IP 浏览器检查正在单独重放，结果另行追加。没有进行 GPU 执行、公开部署、数据库 schema 变更或旧内容重新发布；完整 PRD 的外部门槛继续保留在 [需求追踪](requirements.md)。
+最终完整 Compose 重放通过，记录在 `test-results/px-compose-f5b1318868df/result.json`（`passed=true`、`owned_resources_removed=true`）：
+
+- 镜像内重新执行 129 个 WASI 隔离探针，七类评测的正确提交、针对性错解和公开 Run 共九个场景通过；worker 离线后关闭提交。
+- 编辑器、学习/草稿/正式成绩、英文项目、类/API、学习目标与辅导五组浏览器通过。辅导使用真实 CPU 模型并经过明确输入预览，正式成绩保持不变；这验证调用和界面，不是对建议质量的认可。
+- `0.0.0.0` 的独立测试端口通过直接 IP 访问、同源保存和跨站拒绝；容器删除重建后账号、私有草稿、会话、密钥、成绩、自定义内容与撤回状态保留。
+- 从重建后的服务下载 `editor.js`、`worker.js`、`ruff.wasm`，字节均与已提交资源一致，记录在 `editor-assets.json`。编辑器代码为 `14313c9`，复选框修复为 `9666411`；静态资源摘要见 `static/editor/manifest.json`。从锁文件重新安装和构建也得到相同字节。
+
+源码浏览器使用一次性 SQLite 数据库、合成账号及回环服务；Compose 使用自有临时项目、账号和卷。结束时均清理自有资源，未改动已有站点。38 项发布与编辑器检查在可选 `.gitattributes` 加入后重新通过，148 个本地文档链接已核对。没有进行 GPU 执行、公开部署、数据库 schema 变更或旧内容重新发布；完整 PRD 的外部门槛继续保留在 [需求追踪](requirements.md)。

@@ -2,6 +2,8 @@
 
 日期：2026-10-30。范围为 [RFC-016](rfcs/016-compose-selfhost.md) 的 Web、真实 CPU/WASI worker 与可选本地 CPU 模型，使用 Linux x86_64、Docker Engine 29.9.2 和 Compose 5.6.1。基础组合与带模型组合均已通过完整容器验收。使用方法见 [Compose 指南](deployment/compose.md)。
 
+2026-10-31 编辑器和排版更新后，带 CPU AI 的完整组合再次通过：新增镜像内编辑器浏览器流程，覆盖五组浏览器、129 个真实隔离探针、七类评测、直接 IP/CSRF、离线准入和重建保留。最终记录为 `test-results/px-compose-f5b1318868df/result.json`，测试资源已清理；首次发现的复选框回归与修复记录见 [编辑器验收](acceptance-editor.md)。
+
 ## 已验证结果
 
 - 70 项初始化、服务配置、下载失败处理及发布兼容性检查通过，无跳过；证据为 `test-results/compose-full-unit.xml`。
