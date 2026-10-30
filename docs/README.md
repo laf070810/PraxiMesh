@@ -45,6 +45,8 @@
 - [ADR-028：固定 CUDA 启动用例与中断检查](adr/028-gpu-startup-kernel-checks.md)
 - [G13 控制器故障与新调用恢复](acceptance-g13.md) — 三类实际 CPU/runsc 故障、映射存储回收及新调用恢复通过
 - [ADR-029：整控制器故障与独立恢复检查](adr/029-gpu-controller-lifecycle-checks.md)
+- [G14 完整启动与私有凭证](acceptance-g14.md) — 文件、协议、实际 PostgreSQL 和 CPU 依赖验证通过，完整 GPU 路径待硬件验收
+- [ADR-030：完整 GPU 启动、私有凭证与就绪事务](adr/030-gpu-complete-startup-and-receipts.md)
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

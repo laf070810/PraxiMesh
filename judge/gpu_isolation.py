@@ -110,11 +110,21 @@ def verify_identity(value, request, target):
 
 
 def validate_report(report, request, target):
+    validate_structure(report, target)
+    require(
+        report["canary_sha256"] == hashlib.sha256(request["canary"].encode()).hexdigest(),
+        "Resource check report does not match its challenge",
+    )
+
+
+def validate_structure(report, target):
+    """Check complete results; the live adapter separately binds its fresh challenge."""
     require(
         type(report) is dict
         and set(report) == {"gpu", "canary_sha256", "checks", "cleanup"}
         and report["gpu"] == (target["uuid"] if target else None)
-        and report["canary_sha256"] == hashlib.sha256(request["canary"].encode()).hexdigest()
+        and type(report["canary_sha256"]) is str
+        and re.fullmatch(r"[a-f0-9]{64}", report["canary_sha256"])
         and type(report["checks"]) is list
         and len(report["checks"]) == len(CHECKS)
         and type(report["cleanup"]) is list

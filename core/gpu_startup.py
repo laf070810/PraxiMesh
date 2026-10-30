@@ -84,7 +84,12 @@ def recover_controller(guard, worker_id, adapter, *, deadline=None):
         for job, reservation, purposes in identities
         for purpose in purposes
     ]
-    record = {"previous_job": str(job_id) if job_id else None, "stopped": [], "removed": []}
+    record = {
+        "previous_job": str(job_id) if job_id else None,
+        "previous_reservation": str(reservation_token) if reservation_token else None,
+        "stopped": [],
+        "removed": [],
+    }
     # Database failure must not keep the old workload alive. Once the exact old
     # reservation is known, stop its services before doing any further DB work.
     failures = []

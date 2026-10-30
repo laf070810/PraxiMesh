@@ -4,33 +4,21 @@
 
 ## 本机当前状态
 
-2026-10-30 维护者补齐 CPU 委派并重启用户 Docker 后，当前 context `/run/user/2031/docker.sock` 的 `MemoryLimit`、`SwapLimit`、`PidsLimit`、`CpuCfsQuota` 均为 `true`，资源控制警告为空。可信临时容器设置 `--cpus=0.5`，实际运行 5 秒消耗约 2.501 秒 CPU，`cpu.max=50000 100000`，发生 50 次节流；测试容器已清理。CPU 配额缺口已解决，结果见 `test-results/cpu-controller-restored/result.json`。
+CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/docker.sock` 实测 CPU、内存、swap 和 PID 控制可用；0.5 核容器运行 5 秒消耗约 2.501 秒 CPU，见 `test-results/cpu-controller-restored/result.json`。最新共用 CPU/runsc 资源与异常回收结果见 [G14](../acceptance-g14.md)。
 
-维护者明确指定第 0 张 RTX 3090 供独占验收，按 UUID 选择设备。固定 gVisor `release-20261026.0` 与驱动 `590.48.01` 的实际组合已跑通：在独立用户 cgroup 命名空间、Podman、runsc 与 CDI 中，只识别目标卡，并完成 50,000 元素 CUDA 向量加法。最终 CPU 探针用时 9.002 秒、消耗 4.393 秒 CPU，发生 75 次节流，0.5 核限额生效。临时资源已清理，原站点正常。
+此前在 GPU 0（RTX 3090）完成了 [G1 的七组正确性检查](../acceptance-g1.md)及 [G2 的九组故障/恢复检查](../acceptance-g2.md)。发现其他账号占用后，维护者要求继续不占 GPU 的开发；新的完整执行路径尚未硬件验收，旧记录不能代替新代码重放。
 
-初次接入失败和修正见 [RFC-018](../rfcs/018-gpu-environment-probe.md#实际结果与下一步)。之后实现了有界 CUDA 内核契约和受信驱动，完成 [G1 的 7 组正确性检查](../acceptance-g1.md)，以及 [G2 的 9 组设备故障、终止与恢复检查](../acceptance-g2.md)。[G3](../acceptance-g3.md)增加了主机设备锁、持久预约、独立账目与租约组件；正式 GPU worker 尚未调用这些组件，GPU 提交仍关闭。完整资源/失联策略、性能比较与产品接入仍待完成。
+目前代码已连接设备锁、持久预约、私有执行环境、异常回收、二十四阶段启动检查和当前所有者的私有凭证。文件/协议、实际 PostgreSQL 及 CPU 依赖验证通过，范围见 [G14](../acceptance-g14.md)。**正式 GPU worker、完整 CUDA 验收、题型与性能榜单仍待完成，网站的 GPU 提交保持关闭。** 分批历史统一查阅[需求追踪](../requirements.md)和[验收索引](../README.md)。
 
-G3 的 `gpu-slot-seconds-v1` 按 Run 90 秒、Submit 180 秒预约整卡时段，默认每日账目上限 `JUDGE_DAILY_GPU_SECONDS=1800`，与 CPU 调用单位分开。它不是实际测得的 GPU 时间；此配置目前只用于调度组件，不能据此启用 GPU 评测。正式部署还须固定共享锁目录、执行指纹和启动检查，并验证执行总时限符合预约。账号删除只删除用户数据，设备的运行身份保留到受信控制器确认恢复，不能手工清空预约来恢复提交。
+所有控制器副本和升级必须共用原来的私有工作根与设备锁目录，不能换路径避开旧进程、存储或预约。调度组件使用 `gpu-slot-seconds-v1`：Run 90 秒、Submit 180 秒的整卡时段，默认每日 `JUDGE_DAILY_GPU_SECONDS=1800`，与 CPU 调用单位分开。这些是预约上限，不是测得的 GPU 时间；不能据此启用评测或手工清空预约。
 
-[G4](../acceptance-g4.md)新增交互式执行器和控制器批次计时，目前只有协议与拒绝路径的自动检查结果。首次真实重放发现目标卡存在其他账号的计算进程，在创建服务前退出；这些新路径尚未完成 GPU 验收。G1/G2 的历史通过记录不替代新代码的重放。
-
-[G5](../acceptance-g5.md)补充任务服务硬期限、整进程树清理及有界数据库回调。固定 CPU 进程树和真实 PostgreSQL 检查已通过；它们尚未与 GPU 运行环境合成正式 worker，也不改变 Compose 的可用题型。
-
-[G6](../acceptance-g6.md)进一步验证了真实 RootlessKit 命名空间与外层服务的私有通信、环境变量清理、断连及期限终止。这些检查不占 GPU；正式 Podman/runsc 会话、真实设备恢复和 worker 仍需连接及验收。
-
-[G7](../acceptance-g7.md)已把共用离线 Podman/runsc 环境、受限管道和容器回收接入控制链，并通过固定 CPU guest 的七项实际检查。CUDA 会话入口已有实现，尚未完成新 GPU 硬件重放、设备恢复和正式 worker 接入。
-
-[G8](../acceptance-g8.md)增加控制器异常退出后的私有存储回收，真实 CPU 容器的退出、终止及期限场景通过。该组件只恢复文件系统，设备预约仍须等待实际 GPU 恢复；正式 worker 尚未接入。
-
-[G9](../acceptance-g9.md)已实现运行适配器、私有 CUDA 控制器与数据库结算连接。协议及实际 PostgreSQL 边界通过，真实命名空间的检查仅覆盖准备前拒绝；完整 GPU 运行、独立正确解恢复、时间预算、正式 worker 和启动 receipt 尚未验收。
-
-[G10](../acceptance-g10.md)连接启动接管与异常恢复：先停止数据库旧预约对应的服务，以及每卡固定身份的遗留维护服务，再清理私有目录、运行固定正确解。恢复成功仍保持隔离停用和旧预约，完整就绪检查及启动凭证尚未交付。所有控制器副本与后续升级必须共用原来的私有工作根和锁目录；换目录不能处理旧进程或存储，也不能据此恢复提交。
-
-[G11](../acceptance-g11.md)把共用资源检查接入维护协议，CPU 重放已验证内存、宿主 PID、实际节流、存储与异常清理。GPU 模式还会要求准确设备可见性及独立 CUDA 正确解恢复，该路径尚未实测；完整启动凭证、worker 和正式准入仍待完成。
-
-[G12](../acceptance-g12.md)把十九项固定 CUDA 正确解、错解、边界、设备故障及编译后中断接入同一维护协议。组件和实际 CPU 管道检查通过，新的 CUDA 用例尚未运行；整控制器退出/失联、完整启动编排和凭证仍待完成，当前没有新增 GPU 启动命令。
-
-[G13](../acceptance-g13.md)继续连接控制器退出、通道失联和独立服务硬期限；共用协议的三项实际 CPU/runsc 故障、映射存储回收及新服务恢复通过。CUDA 路径、完整启动编排、凭证和正式 worker 仍待完成。
+| 要验证的改动 | 对应入口 |
+| --- | --- |
+| 用户服务、命名空间、控制连接 | [控制链检查](#不占-gpu-的控制链检查) |
+| 固定镜像、隔离和资源限额 | [离线容器检查](#不占-gpu-的离线容器检查) |
+| 崩溃后的存储回收、旧预约和就绪事务 | [异常恢复及 PostgreSQL 检查](#不占-gpu-的异常恢复检查) |
+| 整控制器退出、通道失联和独立硬期限 | [控制器故障检查](#不占-gpu-的控制器故障检查) |
+| 已获授权的空闲单卡与 CUDA 环境 | [单卡环境检查](#重放单卡环境检查)，再按需执行内核和故障检查 |
 
 ## 不占 GPU 的控制链检查
 
@@ -96,6 +84,7 @@ G3 的 `gpu-slot-seconds-v1` 按 Run 90 秒、Submit 180 秒预约整卡时段�
 
 ```sh
 .venv/bin/python scripts/postgres_tests.py -q \
+  tests/test_gpu_readiness.py tests/test_gpu_readiness_postgres.py \
   tests/test_gpu_startup.py tests/test_gpu_execution.py \
   tests/test_gpu_control.py tests/test_gpu_resources.py
 ```
