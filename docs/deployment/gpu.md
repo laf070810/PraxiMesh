@@ -20,6 +20,8 @@ G3 的 `gpu-slot-seconds-v1` 按 Run 90 秒、Submit 180 秒预约整卡时段�
 
 [G7](../acceptance-g7.md)已把共用离线 Podman/runsc 环境、受限管道和容器回收接入控制链，并通过固定 CPU guest 的七项实际检查。CUDA 会话入口已有实现，尚未完成新 GPU 硬件重放、设备恢复和正式 worker 接入。
 
+[G8](../acceptance-g8.md)增加控制器异常退出后的私有存储回收，真实 CPU 容器的退出、终止及期限场景通过。该组件只恢复文件系统，设备预约仍须等待实际 GPU 恢复；正式 worker 尚未接入。
+
 ## 不占 GPU 的控制链检查
 
 适用于显卡暂被占用时开发、检查 worker 控制链，或在目标 Linux 主机核对用户服务管理器及 CPU/内存/PID 委派。需要项目 Python 环境、可用的普通用户 systemd 管理器和 cgroup v2；不需要显卡、驱动或 CUDA 制品。不要用 sudo，也不在普通 Web/CPU worker 容器内执行。
@@ -57,6 +59,20 @@ G3 的 `gpu-slot-seconds-v1` 按 Run 90 秒、Submit 180 秒预约整卡时段�
 结果在 `test-results/px-gpu-runtime-*/result.json`。总 `passed` 和 `controller.passed` 应为 `true`，有七项成功 `controller.checks` 和十四项 `controller.cleanup`；`controller.private_store_removed`、`service_cleanup.cgroup_empty`、`workspace_removed`、`temporary_directory_removed` 均应为 `true`。任一失败保留原始记录，先修正原因再重放，不手动把设备标为可用。
 
 这个入口不会修改共享 Docker/Podman 存储或用户配置，也不生成 GPU receipt。容器正常退出和 CPU 重新运行成功，不证明 CUDA 设备已恢复；正式 GPU 提交仍关闭。
+
+## 不占 GPU 的异常恢复检查
+
+适用于验证控制器被强制终止后，替代进程能否回收映射 UID 的私有存储。使用与上节相同的用户服务、命名空间及离线制品依赖，串行执行：
+
+```sh
+.venv/bin/python scripts/gpu_recovery_acceptance.py \
+  --runtime-archive var/gpu-preflight/gvisor.tar.bz2 \
+  --image-archive var/gpu-preflight/python-image-20261030.oci.tar
+```
+
+脚本在固定 CPU guest 确实运行后，分别触发控制器立即退出、整服务终止和独立硬期限；确认原进程树停止，再用持久预约启动新的回收服务。还验证活动任务不能回收，以及回收服务在删除前中断后的接管。它只创建并处理本次独有服务、锁和目录，不访问 GPU、不修改共享容器存储。
+
+结果在 `test-results/px-gpu-recovery-*/result.json`，应有三项成功 `checks`；每项 `all_task_processes_stopped`、`recovery.workspace_removed`、`service_cleanup.cgroup_empty` 为 `true`，总 `passed` 和 `temporary_directory_removed` 为 `true`。回收过程核对原 UID/GID 映射及目录身份；错误、映射变化或残留挂载会保留现场。不要手工删除未知目录、调整 subuid/subgid 来绕过核对，或据此释放设备预约。下一步真实 CUDA 恢复与正式准入仍需独占卡。
 
 ## 重放单卡环境检查
 

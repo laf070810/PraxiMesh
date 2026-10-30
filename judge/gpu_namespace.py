@@ -20,6 +20,7 @@ WORKLOAD_LIMITS = {
     "memory.swap.max": "0",
     "pids.max": "256",
 }
+RUNTIME_OWNER = "runtime-owner.json"
 
 
 def private_directory(fd):
@@ -166,13 +167,7 @@ class JobWorkspace:
             *command,
         ]
 
-    def remove_after_stop(self):
-        """Delete only this identity, after verifying the owned service stopped.
-
-        The caller must separately recover any user-mapped runtime files first;
-        permission/mount failures leave this directory for explicit recovery.
-        This does not release a database reservation or prove GPU recovery.
-        """
+    def assert_stopped(self):
         self.check()
         state = self.service.inspect()
         if (
@@ -181,6 +176,15 @@ class JobWorkspace:
         ) or self.service.populated():
             raise SandboxUnavailable("Stop the owned task before removing its workspace")
         self.check()
+
+    def remove_after_stop(self):
+        """Delete only this identity, after verifying the owned service stopped.
+
+        The caller must separately recover any user-mapped runtime files first;
+        permission/mount failures leave this directory for explicit recovery.
+        This does not release a database reservation or prove GPU recovery.
+        """
+        self.assert_stopped()
         if not shutil.rmtree.avoids_symlink_attacks:
             raise SandboxUnavailable("Descriptor-based workspace cleanup is required")
         if any(path.is_relative_to(self.path.resolve()) for path in mounted_paths()):
@@ -188,7 +192,7 @@ class JobWorkspace:
         # Retain identity on a partial failure so a replacement controller can
         # still identify the remaining files. Never follow nested symlinks.
         for name in os.listdir(self._fd):
-            if name == "identity.json":
+            if name in {"identity.json", RUNTIME_OWNER}:
                 continue
             info = os.stat(name, dir_fd=self._fd, follow_symlinks=False)
             if stat.S_ISDIR(info.st_mode):
@@ -196,6 +200,10 @@ class JobWorkspace:
             else:
                 os.unlink(name, dir_fd=self._fd)
         self.check()
+        try:
+            os.unlink(RUNTIME_OWNER, dir_fd=self._fd)
+        except FileNotFoundError:
+            pass
         os.unlink("identity.json", dir_fd=self._fd)
         os.rmdir(self.name, dir_fd=self._root_fd)
         self.close()

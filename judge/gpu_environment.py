@@ -17,6 +17,7 @@ from judge import gpu_artifacts
 from judge.gpu_command import run_command
 from judge.gpu_device_lock import GPU_UUID
 from judge.gpu_namespace import prepare_workload_cgroup
+from judge.gpu_recovery import record_runtime_owner
 from judge.gpu_session import GPUSession
 from judge.sandbox import SandboxUnavailable
 
@@ -56,6 +57,7 @@ class PrivateRuntime:
         self.containers = {}
         self.store_started = False
         self.closed = False
+        record_runtime_owner(self.base)
         for name in ("data", "run", "tmp", "hooks", "cdi"):
             (self.base / name).mkdir(mode=0o700)
         configuration = self.base / "containers.conf"

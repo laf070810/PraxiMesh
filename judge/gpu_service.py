@@ -73,17 +73,28 @@ def duration_seconds(value):
 
 
 class OwnedJobService:
-    def __init__(self, guard, job_id, reservation_token):
+    def __init__(self, guard, job_id, reservation_token, *, purpose="task"):
         if type(guard) is not DeviceLock:
             raise ValueError("An owned GPU device lock is required")
         guard.assert_held()
+        if purpose not in {"task", "recovery"}:
+            raise ValueError("Unknown owned service purpose")
         self.guard = guard
+        self.purpose = purpose
         self.job_id = uuid.UUID(str(job_id))
         self.reservation_token = uuid.UUID(str(reservation_token))
         identity = f"v1:{os.getuid()}:{guard.device_uuid}:{self.job_id}:{self.reservation_token}"
+        if purpose == "recovery":
+            identity += ":recovery"
         digest = hashlib.sha256(identity.encode()).hexdigest()
-        self.unit = "praximesh-gpu-job-" + digest[:40] + ".service"
-        self.description = "PraxiMesh GPU task v1 " + digest
+        self.unit = (
+            "praximesh-gpu-"
+            + ("job" if purpose == "task" else purpose)
+            + "-"
+            + digest[:40]
+            + ".service"
+        )
+        self.description = "PraxiMesh GPU " + purpose + " v1 " + digest
         self.cgroup_name = (
             f"/user.slice/user-{os.getuid()}.slice/user@{os.getuid()}.service/app.slice/{self.unit}"
         )
@@ -290,10 +301,13 @@ class OwnedJobService:
     def stop(self):
         """Stop only the matching owned invocation and verify its entire cgroup."""
         state = self.inspect()
+        stop_failed = False
         if state is not None and state["ActiveState"] not in {"inactive", "failed"}:
             result = self._command("systemctl", "--user", "stop", "--no-block", self.unit)
-            if result.returncode:
-                raise SandboxUnavailable("Owned task service could not be stopped")
+            # A naturally exiting --collect unit can disappear between show
+            # and stop. Recheck identity and the entire cgroup even when the
+            # command fails; its return code alone proves neither outcome.
+            stop_failed = result.returncode != 0
         deadline = time.monotonic() + STOP_SECONDS + CONTROL_SECONDS
         while True:
             state = self.inspect()
@@ -307,6 +321,8 @@ class OwnedJobService:
                     "stopped": True,
                     "cgroup_empty": True,
                 }
+            if stop_failed:
+                raise SandboxUnavailable("Owned task service could not be stopped")
             if time.monotonic() >= deadline:
                 raise SandboxUnavailable("Owned task service still has running processes")
             time.sleep(0.05)

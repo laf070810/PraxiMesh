@@ -46,6 +46,8 @@ def execution_digest(root=None):
         "judge/gpu_artifacts.py",
         "judge/gpu_command.py",
         "judge/gpu_environment.py",
+        "judge/gpu_recovery.py",
+        "judge/gpu_recovery_entry.py",
         "judge/gpu_device_lock.py",
         "judge/results.py",
         "core/gpu_resources.py",

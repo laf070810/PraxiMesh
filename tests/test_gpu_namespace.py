@@ -116,6 +116,8 @@ def test_live_or_leftover_processes_prevent_cleanup(
 
 def test_partial_cleanup_preserves_recovery_identity(tmp_path, service, monkeypatch):
     with JobWorkspace(tmp_path / "jobs", service) as workspace:
+        owner = workspace.path / "runtime-owner.json"
+        owner.write_text("private recovery identity")
 
         def denied(*args, **kwargs):
             raise PermissionError("simulated user-mapped runtime directory")
@@ -125,6 +127,7 @@ def test_partial_cleanup_preserves_recovery_identity(tmp_path, service, monkeypa
         with pytest.raises(PermissionError):
             workspace.remove_after_stop()
         workspace.check()
+        assert owner.read_text() == "private recovery identity"
 
 
 def test_mounted_content_is_retained_for_runtime_recovery(tmp_path, service, monkeypatch):

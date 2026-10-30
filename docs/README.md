@@ -33,6 +33,8 @@
 - [ADR-022：私有控制器命名空间与预约工作目录](adr/022-gpu-controller-namespace.md)
 - [G7 离线 runsc 环境与回收检查](acceptance-g7.md) — 七项真实 CPU guest 检查通过，未执行 GPU 工作负载
 - [ADR-023：共用离线 GPU 运行模块与容器回收](adr/023-gpu-offline-runtime.md)
+- [G8 异常退出后的私有存储回收](acceptance-g8.md) — 实际 CPU 容器的退出、整服务终止、期限和回收接管通过
+- [ADR-024：异常退出后的私有存储回收](adr/024-gpu-crash-storage-recovery.md)
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

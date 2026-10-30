@@ -21,6 +21,26 @@ def service(tmp_path):
         yield OwnedJobService(guard, uuid.uuid4(), uuid.uuid4())
 
 
+def test_recovery_has_a_distinct_stable_identity_for_the_same_reservation(service):
+    recovery = OwnedJobService(
+        service.guard, service.job_id, service.reservation_token, purpose="recovery"
+    )
+    other = OwnedJobService(
+        service.guard, service.job_id, service.reservation_token, purpose="recovery"
+    )
+    assert recovery.unit == other.unit and recovery.unit != service.unit
+    assert recovery.description != service.description
+    assert recovery.unit.startswith("praximesh-gpu-recovery-")
+    assert (
+        recovery.job_id == service.job_id
+        and recovery.reservation_token == service.reservation_token
+    )
+    with pytest.raises(ValueError, match="purpose"):
+        OwnedJobService(
+            service.guard, service.job_id, service.reservation_token, purpose="arbitrary"
+        )
+
+
 def snapshot(service):
     return {
         "Id": service.unit,
@@ -131,6 +151,36 @@ def test_absent_unit_is_not_cleanup_if_its_cgroup_is_populated(service, monkeypa
     monkeypatch.setattr(gpu_service, "CONTROL_SECONDS", 0)
     with pytest.raises(SandboxUnavailable, match="still has running processes"):
         service.stop()
+
+
+@pytest.mark.parametrize("after", ["absent", "inactive", "running", "leftover", "replacement"])
+def test_failed_stop_requires_fresh_identity_and_empty_cgroup(service, monkeypatch, after):
+    state = snapshot(service)
+    calls = []
+
+    def command(program, *arguments):
+        calls.append(arguments)
+        if "stop" in arguments:
+            if after in {"absent", "leftover"}:
+                state.clear()
+                state.update(Id=service.unit, LoadState="not-found")
+            elif after == "inactive":
+                state.update(ActiveState="inactive", MainPID="0", ControlGroup="")
+            elif after == "replacement":
+                state["InvocationID"] = "b" * 32
+            return SimpleNamespace(returncode=1)
+        return SimpleNamespace(
+            returncode=0, stdout="\n".join(k + "=" + v for k, v in state.items())
+        )
+
+    monkeypatch.setattr(service, "_command", command)
+    monkeypatch.setattr(service, "populated", lambda: after == "leftover")
+    if after in {"absent", "inactive"}:
+        assert service.stop()["cgroup_empty"]
+    else:
+        with pytest.raises(SandboxUnavailable):
+            service.stop()
+    assert sum("stop" in arguments for arguments in calls) == 1
 
 
 @pytest.mark.parametrize(
