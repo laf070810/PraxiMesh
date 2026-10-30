@@ -16,7 +16,7 @@ from core.limits import consume
 from core.middleware import client_address
 from core.models import Problem, Submission
 from core.queue import AdmissionError
-from core.resources import reservation_data, usage
+from core.resources import GPU_BUDGET_POLICY, reservation_data, usage
 from core.result_evidence import is_formal_evidence, safe_result
 from judge.backends import result_environment_label
 from practice_api.forms import TokenForm
@@ -166,6 +166,7 @@ def result(request, job_id):
             "result": safe_result(job),
             "resource_reservation": reservation_data(job),
             "cpu_budget": usage(request.api_user),
+            "gpu_budget": usage(request.api_user, policy=GPU_BUDGET_POLICY),
             "evaluation_fingerprint": job.evaluation_fingerprint,
             "evaluation_environment": result_environment_label(
                 job.environment, job.evaluation_fingerprint

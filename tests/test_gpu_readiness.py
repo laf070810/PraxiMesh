@@ -129,6 +129,7 @@ def test_full_sequence_preserves_old_slot_until_private_receipt_is_verified(star
     assert check_receipt(startup.directory, startup.guard, startup.worker, startup.adapter) == value
     device = GPUDevice.objects.get(pk=startup.guard.device_uuid)
     assert device.state == "ready" and device.checked_at is not None
+    assert device.environment == startup.adapter.environment
     assert device.job_id is None and device.reservation_token is None
     startup.job.refresh_from_db()
     assert startup.job.status == "finished" and startup.job.verdict == "internal_error"
@@ -152,6 +153,7 @@ def test_any_incomplete_stage_retains_old_slot_and_cannot_issue_receipt(startup,
     assert startup.events[-1] == stage and not startup.path.exists()
     device = GPUDevice.objects.get(pk=startup.guard.device_uuid)
     assert device.state == "quarantined" and device.checked_at is None
+    assert device.environment == {}
     assert (device.job_id, device.reservation_token) == (startup.job.id, startup.job.lease_token)
     startup.job.refresh_from_db()
     assert startup.job.status == "running" and startup.job.budget_state == "reserved"

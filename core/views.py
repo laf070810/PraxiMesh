@@ -20,7 +20,7 @@ from core.discovery import EVALUATORS, LIBRARIES, RUNTIMES, choices, filter_reso
 from core.forms import ProfileForm, RecoveryForm, RegisterForm, SourceForm
 from core.limits import consume
 from core.models import AccountProfile, Draft, Enrollment, KnowledgeNode, Problem, Submission
-from core.queue import AdmissionError, available, enqueue
+from core.queue import AdmissionError, available, enqueue, gpu_available
 from core.resources import GPU_BUDGET_POLICY, reservation_data, reservation_units, usage
 from core.result_evidence import (
     SEQUENTIAL_EVALUATORS,
@@ -246,6 +246,9 @@ def problem_detail(request, slug):
             "version_id": problem.current_id,
             "source": source,
             "cpu_budget": usage(request.user) if request.user.is_authenticated else None,
+            "gpu_budget": usage(request.user, policy=GPU_BUDGET_POLICY)
+            if request.user.is_authenticated and data["evaluator"] == "cuda-kernel-v1"
+            else None,
             "run_units": reservation_units(problem.current, "run"),
             "submit_units": reservation_units(problem.current, "submit"),
             "concepts": [nodes[c] for c in data["concepts"]],
@@ -588,5 +591,9 @@ def health(request):
     except Exception:
         return JsonResponse({"status": "unavailable"}, status=503)
     return JsonResponse(
-        {"status": "ok", "evaluation": "available" if available() else "unavailable"}
+        {
+            "status": "ok",
+            "evaluation": "available" if available() else "unavailable",
+            "gpu_evaluation": "available" if gpu_available() else "unavailable",
+        }
     )

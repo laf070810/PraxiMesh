@@ -8,7 +8,7 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 
 此前在 GPU 0（RTX 3090）完成了 [G1 的七组正确性检查](../acceptance-g1.md)及 [G2 的九组故障/恢复检查](../acceptance-g2.md)。发现其他账号占用后，维护者要求继续不占 GPU 的开发；新的完整执行路径尚未硬件验收，旧记录不能代替新代码重放。
 
-目前宿主 worker 已连接设备锁、持久预约、私有执行环境、异常回收、二十四阶段启动检查、凭证续检与信号退出，见 [G15](../acceptance-g15.md)。持久成绩、私有学习证据及中英结果展示已接通，非 GPU 验证见 [G16](../acceptance-g16.md)。**完整 CUDA 验收、容器化部署、题型发布、提交准入与性能榜单仍待完成，网站的 GPU 提交保持关闭。** 分批历史统一查阅[需求追踪](../requirements.md)和[验收索引](../README.md)。
+目前宿主 worker 已连接设备锁、持久预约、私有执行环境、异常回收、二十四阶段启动检查、凭证续检与信号退出，见 [G15](../acceptance-g15.md)。持久成绩、私有学习证据及中英结果展示见 [G16](../acceptance-g16.md)，健康准入、独立额度、队列路由与部署排空见 [G17](../acceptance-g17.md)。**完整 CUDA 验收、容器化部署、题型发布与性能榜单仍待完成；设备允许列表默认空，网站的 GPU 提交保持关闭。** 分批历史统一查阅[需求追踪](../requirements.md)和[验收索引](../README.md)。
 
 所有控制器副本和升级必须共用原来的私有工作根与设备锁目录，不能换路径避开旧进程、存储或预约。调度组件使用 `gpu-slot-seconds-v1`：Run 90 秒、Submit 180 秒的整卡时段，默认每日 `JUDGE_DAILY_GPU_SECONDS=1800`，与 CPU 调用单位分开。这些是预约上限，不是测得的 GPU 时间；不能据此启用评测或手工清空预约。
 
@@ -21,6 +21,21 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 已获授权的空闲单卡与 CUDA 环境 | [单卡环境检查](#重放单卡环境检查)，再按需执行内核和故障检查 |
 | 完整启动、长期领取、取消与退出流程 | [宿主 worker](#gpu-worker)，需要独占卡；非 GPU 状态检查使用下方 PostgreSQL 测试 |
 | 历史 GPU 成绩、私有进度、中英反馈与布局 | [成绩展示检查](#gpu-results)，不使用 GPU |
+| 源码部署的 GPU 准入配置、额度与排空 | [准入门槛](#gpu-admission)，当前只做不占 GPU 的验证 |
+
+<a id="gpu-admission"></a>
+
+## GPU 准入配置与部署排空
+
+本节对应源码 Web/控制命令的配置。GPU Compose 与发布协调器容器接入尚未交付；不能将此变量直接当成完整 GPU 部署方案。在正式题型和当前完整 CUDA 路径验收完成前，保持 `JUDGE_GPU_DEVICES` 为空。
+
+完成这些验收后，Web 和控制命令可将 `JUDGE_GPU_DEVICES` 设置为逗号分隔的完整设备 UUID，最多十六个，不接受 `0`、`all`、通配符或重复设备。名单只选择容量，不签发凭证、不预约物理设备；worker 仍由其显式 `--gpu` 参数选择单卡并执行完整启动。`JUDGE_ENABLED=1` 是总开关，`JUDGE_DAILY_GPU_SECONDS` 默认 1800，独立于 CPU 调用额度。
+
+迁移 `core.0005_gpu_admission_environment` 为设备增加启动环境，旧记录保持原预约且环境为空。Web 只接受同一 UUID、指纹、当前执行策略和新鲜心跳；忙碌设备还须持有有效原任务租约。新 worker 完成全套检查后在同一事务发布环境与 ready。Web 不需要设备表写权限或私有凭证目录；不要手动填环境 JSON 来绕过启动。代码、环境或所有者变化后须由 worker 重新验证。
+
+`/health/` 的 `evaluation` 仍表示 CPU/WASI，新增 `gpu_evaluation` 独立表示 GPU 是否接受新任务。`judge_admission status` 保留原字段，增加 `gpu_configured`、`gpu_worker_available`、`gpu_reserved` 和 `incompatible_gpu_reservations`。`drain` 同时等待任务和物理预约；超时保持暂停，不清空设备。即使账号或任务被删除、设备移出配置，残留预约仍须由原持锁恢复流程处理。`resume` 要求当前 CPU worker、已配置 GPU 池的健康容量及兼容待处理任务；失效的物理预约阻止恢复。
+
+非 GPU 检查使用 `tests/test_gpu_admission.py`、`tests/test_gpu_admission_settings.py`，实际锁/角色/迁移检查使用下方既有 PostgreSQL 入口执行 `tests/test_gpu_admission_postgres.py`。测试只在自有临时数据库建立合成身份；详见 [G17](../acceptance-g17.md)。
 
 <a id="gpu-results"></a>
 
@@ -32,7 +47,7 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 .venv/bin/python scripts/browser_acceptance.py --gpu-results
 ```
 
-它通过现有验收入口创建一次性 SQLite、合成账号和回环 Web 服务，关闭评测，只写入明确的合成成绩；不连接 GPU worker，也不创建设备行或运行凭证。真实 Chromium 检查中英、390/768/1440 像素，以及正确 Submit、重复批次失败、公开 Run 和损坏记录共二十四组，并验证其他账号不能查看私有源码与成绩。结果在 `test-results/px-gpu-results-*/result.json`；须有 `passed: true`、`other_account_denied: true`、`gpu_executed: false`，记录的临时数据库在入口退出后应不存在。
+它通过现有验收入口创建一次性 SQLite、合成账号和回环 Web 服务，关闭评测，只写入明确的合成成绩；不连接 GPU worker，也不创建设备行或运行凭证。真实 Chromium 检查中英、390/768/1440 像素，以及正确 Submit、重复批次失败、公开 Run 和损坏记录共二十四组；另有六组做题页预算/关闭按钮检查，并验证其他账号不能查看私有源码与成绩。结果在 `test-results/px-gpu-results-*/result.json`；须有 `passed: true`、`other_account_denied: true`、`gpu_executed: false`，记录的临时数据库在入口退出后应不存在。
 
 修改结果或预约展示时，同时按开发指南运行 `scripts/browser_acceptance.py --interface`，核对现有编辑器和列表布局。成绩一致性与私有课程/挑战可用 `tests/test_gpu_evidence.py` 在 SQLite 和[临时 PostgreSQL](#不占-gpu-的异常恢复检查)上验证。这些合成计时不是 GPU 性能证据；正式结果仍须来自经过完整启动检查的真实执行路径。
 

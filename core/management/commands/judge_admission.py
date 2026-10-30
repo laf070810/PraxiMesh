@@ -99,7 +99,9 @@ class Command(BaseCommand):
             state = database_action(admission_state, database_timeout)
             if action == "drain" and state["token"] != str(token):
                 raise CommandError("Admission pause changed while draining; no state was reset.")
-            if action != "drain" or not (state["queued"] or state["running"]):
+            if action != "drain" or not (
+                state["queued"] or state["running"] or state["gpu_reserved"]
+            ):
                 self.stdout.write(json.dumps(state, sort_keys=True))
                 return
             if time.monotonic() >= deadline:

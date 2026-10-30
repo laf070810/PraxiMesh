@@ -112,6 +112,7 @@ def main():
                 "REGISTRATION_OPEN": "1",
                 "APP_ALLOWED_HOSTS": "127.0.0.1,localhost",
                 "JUDGE_ENABLED": "1" if options.judge else "0",
+                "JUDGE_GPU_DEVICES": "",
                 "JUDGE_RECEIPT": str(Path(temporary) / "receipt.json"),
                 "BROWSER_JUDGE": "1" if options.judge else "0",
             }

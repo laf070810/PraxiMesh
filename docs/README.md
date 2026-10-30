@@ -51,6 +51,8 @@
 - [ADR-031：GPU worker 生命周期与当前凭证](adr/031-gpu-worker-lifecycle.md)
 - [G16 GPU 持久成绩与结果展示](acceptance-g16.md) — 历史证据、私有进度和中英反馈已连接，真实 CUDA 与提交准入待验收
 - [ADR-032：GPU 持久成绩与版本化学习证据](adr/032-gpu-persisted-evidence.md)
+- [G17 GPU 健康准入与部署排空](acceptance-g17.md) — 独立预算、队列路由和保留物理预约；未开放实际 GPU 提交
+- [ADR-033：GPU 健康准入、独立额度与物理预约排空](adr/033-gpu-admission-and-drain.md)
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

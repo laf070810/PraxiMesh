@@ -82,6 +82,8 @@ def runtime_description(version=None):
     from django.conf import settings
     from django.utils.translation import gettext
 
+    if version and version.data["evaluator"] == "cuda-kernel-v1":
+        return gettext("CUDA C++ 设备内核；入口与启动参数由题目固定，只提交内核源码。")
     if (
         version
         and settings.JUDGE_BACKEND != "wasi"

@@ -64,9 +64,19 @@ def adopt(guard, worker_id, fingerprint):
     device.owner_token = guard.owner_token
     device.worker_id = worker_id
     device.fingerprint = fingerprint
+    device.environment = {}
     device.state = GPUDevice.State.QUARANTINED
     device.checked_at = None
-    device.save(update_fields=["owner_token", "worker_id", "fingerprint", "state", "checked_at"])
+    device.save(
+        update_fields=[
+            "owner_token",
+            "worker_id",
+            "fingerprint",
+            "environment",
+            "state",
+            "checked_at",
+        ]
+    )
     return device
 
 

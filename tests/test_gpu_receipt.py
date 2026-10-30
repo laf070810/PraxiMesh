@@ -16,13 +16,14 @@ from judge.gpu_device_lock import DeviceLock, DeviceLockError
 from judge.gpu_execution_contract import canonical_digest, environment_identity
 from judge.gpu_receipt import ReceiptStore, binding, check_receipt, validate_receipt
 from judge.sandbox import SandboxUnavailable
+from tests.gpu_evidence_fixtures import environment_fixture
 from tests.test_gpu_adapter import TARGET
 
 
 def adapter_for(directory):
     adapter = GPUExecutionAdapter.__new__(GPUExecutionAdapter)
     adapter.target = copy.deepcopy(TARGET)
-    adapter.identity = {"scope": "Synthetic protocol unit test; no GPU acceptance"}
+    adapter.identity = environment_fixture()["artifacts"]
     adapter.environment = environment_identity(adapter.target, adapter.identity)
     adapter.fingerprint = canonical_digest(adapter.environment)
     adapter.directory = directory / "jobs"

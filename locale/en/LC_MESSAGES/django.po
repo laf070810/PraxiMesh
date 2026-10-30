@@ -43,6 +43,32 @@ msgstr "This task reserves %(units)s GPU device-slot seconds for the UTC day %(d
 msgid "预约秒数是整卡时段上限，不是实测 GPU 时间或费用。"
 msgstr "Reserved seconds bound the exclusive device slot; they are not measured GPU time or a fee."
 
+msgid "今日 GPU 整卡时段预约额度不足，请在下个 UTC 日重试。"
+msgstr "Your GPU device-slot reservation budget is exhausted. Try again on the next UTC day."
+
+#, python-format
+msgid "%(day)s UTC 日 GPU 整卡时段：剩余 %(remaining)s / %(limit)s 秒。本题运行样例预约 %(run)s 秒，正式提交预约 %(submit)s 秒。"
+msgstr "GPU device-slot budget for %(day)s UTC: %(remaining)s / %(limit)s seconds remaining. This problem reserves %(run)s seconds for Run and %(submit)s seconds for Submit."
+
+msgid "CUDA C++ 设备内核；入口与启动参数由题目固定，只提交内核源码。"
+msgstr "CUDA C++ device kernels. The problem fixes the entry point and launch parameters; submit kernel source."
+
+msgid "输入数组与形状："
+msgstr "Input arrays and shapes:"
+
+msgid "预期输出数组："
+msgstr "Expected output array:"
+
+msgid "通过输出数组写入计算结果；用例之间重置输出缓冲区。"
+msgstr "Write results through the output array. Output buffers reset between cases."
+
+msgid "设备内核"
+msgstr "Device kernel"
+
+#, python-format
+msgid "定义 %(value1)s 设备内核 · 草稿仅自己可见"
+msgstr "Define the %(value1)s device kernel · Drafts are private"
+
 msgid "未开始"
 msgstr "Not started"
 

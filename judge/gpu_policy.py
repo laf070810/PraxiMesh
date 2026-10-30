@@ -72,6 +72,7 @@ def execution_digest(root=None):
         "core/gpu_readiness.py",
         "core/gpu_worker.py",
         "core/gpu_evidence.py",
+        "core/gpu_admission.py",
         "core/result_evidence.py",
         "core/management/commands/gpu_worker.py",
         "core/resources.py",

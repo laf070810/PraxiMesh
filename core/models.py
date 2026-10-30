@@ -175,6 +175,8 @@ class GPUDevice(models.Model):
     worker_id = models.CharField(max_length=80)
     owner_token = models.UUIDField()
     fingerprint = models.CharField(max_length=64)
+    # Published only after the complete startup suite; no private receipt or source.
+    environment = models.JSONField(default=dict)
     checked_at = models.DateTimeField(null=True)
     # No FK: account deletion must not release physical device ownership.
     job_id = models.UUIDField(null=True, unique=True)

@@ -1,6 +1,7 @@
 """Local defaults never enable execution. Production configuration fails closed."""
 
 import os
+import re
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -157,6 +158,20 @@ if not 1 <= JUDGE_DAILY_CPU_UNITS <= 10000:
 JUDGE_DAILY_GPU_SECONDS = int(os.environ.get("JUDGE_DAILY_GPU_SECONDS", "1800"))
 if not 1 <= JUDGE_DAILY_GPU_SECONDS <= 86400:
     raise ImproperlyConfigured("JUDGE_DAILY_GPU_SECONDS must be between 1 and 86400.")
+JUDGE_GPU_DEVICES = tuple(
+    value.strip()[:4] + value.strip()[4:].lower()
+    for value in os.environ.get("JUDGE_GPU_DEVICES", "").split(",")
+    if value.strip()
+)
+if (
+    len(JUDGE_GPU_DEVICES) > 16
+    or len(set(JUDGE_GPU_DEVICES)) != len(JUDGE_GPU_DEVICES)
+    or any(
+        not re.fullmatch(r"GPU-[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", value)
+        for value in JUDGE_GPU_DEVICES
+    )
+):
+    raise ImproperlyConfigured("JUDGE_GPU_DEVICES must list up to 16 distinct full GPU UUIDs.")
 JUDGE_LEASE_SECONDS = 180
 CONTENT_ROOT = BASE_DIR / "content"
 LOGGING = {

@@ -63,10 +63,14 @@ def main():
         "gpu_executed": False,
         "passed": False,
         "checks": [],
+        "closed_practice_checks": [],
         "sources": {
             name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
             for name in (
                 "core/gpu_evidence.py",
+                "core/gpu_admission.py",
+                "core/queue.py",
+                "core/models.py",
                 "core/result_evidence.py",
                 "core/content.py",
                 "core/views.py",
@@ -74,9 +78,12 @@ def main():
                 "judge/gpu_execution_contract.py",
                 "judge/gpu_policy.py",
                 "templates/submission.html",
+                "templates/problem.html",
+                "static/app.css",
                 "templates/gpu_feedback.html",
                 "templates/resource_reservation.html",
                 "locale/en/LC_MESSAGES/django.mo",
+                "localization/presentation.py",
                 "tests/gpu_evidence_fixtures.py",
                 "tests/browser_gpu_results.py",
                 "scripts/browser_acceptance.py",
@@ -156,6 +163,31 @@ def main():
                             record["checks"].append(
                                 {"language": language, "width": width, "case": kind, "passed": True}
                             )
+                        page.goto(address + reverse("problem", args=[version.problem_id]))
+                        body = page.locator("body").inner_text()
+                        assert (
+                            "GPU 整卡时段" if language == "zh-hans" else "GPU device-slot budget"
+                        ) in body
+                        assert "CPU 练习额度" not in body and "CPU practice budget" not in body
+                        assert page.locator('button[name="mode"][value="run"]').is_disabled()
+                        assert page.locator('button[name="mode"][value="submit"]').is_disabled()
+                        assert page.evaluate(
+                            "document.documentElement.scrollWidth <= innerWidth + 1"
+                        )
+                        assert "PRIVATE_REFERENCE_SENTINEL" not in body
+                        assert "PROTECTED_CASE_SENTINEL" not in body
+                        assert (
+                            "数值结果按绝对容差" if language == "zh-hans" else "absolute tolerance"
+                        ) in body
+                        if language == "en":
+                            assert "submit kernel source. Write results" in body
+                        if width == 390:
+                            page.screenshot(
+                                path=str(out / (language + "-390-practice.png")), full_page=True
+                            )
+                        record["closed_practice_checks"].append(
+                            {"language": language, "width": width, "passed": True}
+                        )
                     assert not errors, errors
                     context.close()
                 context = browser.new_context()

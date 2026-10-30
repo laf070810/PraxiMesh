@@ -237,6 +237,11 @@ def initialize_controller(
                     on_tick()
                 require(time.monotonic() < deadline, "Complete GPU startup deadline expired")
                 gpu_resources.confirm_recovered(guard, job_id=job, reservation_token=reservation)
+                # Same transaction as READY, after all checks and private receipt
+                # publication. Web can read this identity without receipt access.
+                GPUDevice.objects.filter(
+                    pk=guard.device_uuid, owner_token=guard.owner_token
+                ).update(environment=adapter.environment)
         return value
     except BaseException as error:
         _fail_closed(error, guard, receipt_directory)

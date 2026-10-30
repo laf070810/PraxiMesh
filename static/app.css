@@ -73,6 +73,16 @@ h3 {
   font-size: 19px;
   line-height: 1.5;
 }
+small.translation-fallback {
+  display: inline-block;
+  margin-inline-start: 0.5rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: normal;
+  vertical-align: middle;
+}
 p {
   margin-bottom: 1em;
 }

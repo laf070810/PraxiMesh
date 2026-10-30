@@ -4,10 +4,11 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext
 
-from core.models import Problem, QueueLock, Submission, WorkerHealth
+from core.models import GPUDevice, Problem, QueueLock, Submission, WorkerHealth
 from core.resources import (
     BUDGET_POLICY,
     GPU_BUDGET_POLICY,
@@ -52,6 +53,10 @@ def supports(version):
     from judge.evaluator import EVALUATORS
 
     evaluator = version.data.get("evaluator")
+    if evaluator == GPU_EVALUATOR:
+        from core.gpu_admission import configured
+
+        return version.data.get("language") == "cuda" and configured()
     return evaluator in EVALUATORS and (
         settings.JUDGE_BACKEND == "wasi"
         or (settings.JUDGE_BACKEND == "gvisor" and evaluator == "python-function-v1")
@@ -59,11 +64,45 @@ def supports(version):
 
 
 def available(version=None):
+    if version is not None and version.data.get("evaluator") == GPU_EVALUATOR:
+        return supports(version) and gpu_available()
     return (
         (version is None or supports(version))
         and worker_available()
         and not QueueLock.objects.filter(id=1, pause_token__isnull=False).exists()
     )
+
+
+def gpu_available():
+    from core.gpu_admission import candidates
+
+    return (
+        bool(candidates())
+        and not QueueLock.objects.filter(id=1, pause_token__isnull=False).exists()
+    )
+
+
+def _compatible_pending(pending, devices):
+    cpu = (
+        Q(evaluation_fingerprint=configured_fingerprint())
+        & ~Q(budget_policy=GPU_BUDGET_POLICY)
+        & ~Q(version__data__evaluator=GPU_EVALUATOR)
+    )
+    gpu = Q(
+        evaluation_fingerprint__in=[device.fingerprint for device in devices],
+        budget_policy=GPU_BUDGET_POLICY,
+        version__data__evaluator=GPU_EVALUATOR,
+        version__data__language="cuda",
+    )
+    return pending.filter(cpu | gpu)
+
+
+def _gpu_reservations(devices):
+    # All devices, including ones removed from configuration. A deleted account
+    # or finished task cannot erase the need for physical recovery.
+    reservations = GPUDevice.objects.filter(job_id__isnull=False)
+    healthy = [device.pk for device in devices if device.state == GPUDevice.State.RESERVED]
+    return reservations.count(), reservations.exclude(pk__in=healthy).count()
 
 
 def lock_queue():
@@ -94,12 +133,18 @@ def resume_admission(token):
         raise AdmissionError("Only the owning deployment can resume admission.", 409)
     if not worker_available():
         raise AdmissionError("A fresh matching worker must be ready before admission resumes.")
-    if (
-        Submission.objects.filter(status__in=["queued", "running"])
-        .exclude(evaluation_fingerprint=configured_fingerprint())
-        .exists()
-    ):
+    from core.gpu_admission import candidates, configured
+
+    devices = candidates()
+    if configured() and not devices:
+        raise AdmissionError("A fresh matching GPU worker must be ready before admission resumes.")
+    pending = Submission.objects.filter(status__in=["queued", "running"])
+    if pending.exclude(pk__in=_compatible_pending(pending, devices).values("pk")).exists():
         raise AdmissionError("Pending work from another evaluation policy must finish first.")
+    if _gpu_reservations(devices)[1]:
+        raise AdmissionError(
+            "Unrecovered GPU reservations must be resolved before admission resumes."
+        )
     control.pause_token = None
     control.paused_at = None
     control.save(update_fields=["pause_token", "paused_at"])
@@ -107,18 +152,28 @@ def resume_admission(token):
 
 @transaction.atomic
 def admission_state():
+    from core.gpu_admission import candidates, configured
+
     control = QueueLock.objects.select_for_update().filter(id=1).first()
     fingerprint = configured_fingerprint()
     pending = Submission.objects.filter(status__in=["queued", "running"])
+    devices = candidates()
+    reserved, incompatible_reservations = _gpu_reservations(devices)
     return {
         "admission": "paused" if control and control.pause_token else "open",
         "token": str(control.pause_token) if control and control.pause_token else None,
         "paused_at": control.paused_at.isoformat() if control and control.paused_at else None,
         "queued": pending.filter(status="queued").count(),
         "running": pending.filter(status="running").count(),
-        "incompatible_pending": pending.exclude(evaluation_fingerprint=fingerprint).count(),
+        "incompatible_pending": pending.exclude(
+            pk__in=_compatible_pending(pending, devices).values("pk")
+        ).count(),
         "worker_available": worker_available(),
         "fingerprint": fingerprint,
+        "gpu_configured": configured(),
+        "gpu_worker_available": bool(devices),
+        "gpu_reserved": reserved,
+        "incompatible_gpu_reservations": incompatible_reservations,
     }
 
 
@@ -157,7 +212,17 @@ def _expire(query, now, label):
 @transaction.atomic
 def enqueue(user, version, source, mode):
     lock_queue()
-    if not available(version):
+    gpu = version.data.get("evaluator") == GPU_EVALUATOR
+    target = None
+    if gpu:
+        from core.gpu_admission import candidates, select_target
+
+        if (
+            supports(version)
+            and not QueueLock.objects.filter(id=1, pause_token__isnull=False).exists()
+        ):
+            target = select_target(candidates())
+    if (gpu and target is None) or (not gpu and not available(version)):
         raise AdmissionError(gettext("评测暂不可用。你仍可阅读题目和保存草稿。"))
     if not Problem.objects.filter(id=version.problem_id, current=version, published=True).exists():
         raise AdmissionError(gettext("题目已更新或下线，请刷新后重新提交。"), 409)
@@ -172,16 +237,22 @@ def enqueue(user, version, source, mode):
         units = reservation_units(version, mode)
     except ValueError:
         raise AdmissionError(gettext("该题的资源预约策略无效，暂不能评测。")) from None
-    if units > usage(user, day)["remaining"]:
-        raise AdmissionError(gettext("今日 CPU 练习预约额度不足，请在下个 UTC 日重试。"), 429)
+    policy = GPU_BUDGET_POLICY if gpu else BUDGET_POLICY
+    if units > usage(user, day, policy=policy)["remaining"]:
+        message = (
+            gettext("今日 GPU 整卡时段预约额度不足，请在下个 UTC 日重试。")
+            if gpu
+            else gettext("今日 CPU 练习预约额度不足，请在下个 UTC 日重试。")
+        )
+        raise AdmissionError(message, 429)
     return Submission.objects.create(
         user=user,
         version=version,
         source=source,
         source_digest=hashlib.sha256(source.encode()).hexdigest(),
-        evaluation_fingerprint=configured_fingerprint(),
+        evaluation_fingerprint=target.fingerprint if gpu else configured_fingerprint(),
         mode=mode,
-        budget_policy=BUDGET_POLICY,
+        budget_policy=policy,
         budget_day=day,
         budget_units=units,
         budget_state="reserved",
