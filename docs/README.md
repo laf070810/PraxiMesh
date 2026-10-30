@@ -47,6 +47,8 @@
 - [ADR-029：整控制器故障与独立恢复检查](adr/029-gpu-controller-lifecycle-checks.md)
 - [G14 完整启动与私有凭证](acceptance-g14.md) — 文件、协议、实际 PostgreSQL 和 CPU 依赖验证通过，完整 GPU 路径待硬件验收
 - [ADR-030：完整 GPU 启动、私有凭证与就绪事务](adr/030-gpu-complete-startup-and-receipts.md)
+- [G15 宿主 GPU worker 生命周期](acceptance-g15.md) — 领取、取消恢复、凭证续检与退出已连接，完整 CUDA 与容器部署待验收
+- [ADR-031：GPU worker 生命周期与当前凭证](adr/031-gpu-worker-lifecycle.md)
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

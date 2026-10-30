@@ -1,6 +1,6 @@
 # GPU 评测：现状与接入准备
 
-[部署方案选择](README.md) · **GPU 正式评测尚未交付；本页提供环境和内核组件检查，不是 GPU worker 的部署入口。** 当前 Compose 和发布协调器提供七种 CPU/WASI 评测。添加 `--gpus`、安装 NVIDIA runtime 或注册 Actions runner 都不会自动增加 GPU 题型。
+[部署方案选择](README.md) · **GPU 正式评测尚未交付；本页集中维护宿主 worker 的开发验收配置、环境和组件检查。** 当前 Compose 和发布协调器提供七种 CPU/WASI 评测。添加 `--gpus`、安装 NVIDIA runtime 或注册 Actions runner 都不会自动增加 GPU 题型。
 
 ## 本机当前状态
 
@@ -8,7 +8,7 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 
 此前在 GPU 0（RTX 3090）完成了 [G1 的七组正确性检查](../acceptance-g1.md)及 [G2 的九组故障/恢复检查](../acceptance-g2.md)。发现其他账号占用后，维护者要求继续不占 GPU 的开发；新的完整执行路径尚未硬件验收，旧记录不能代替新代码重放。
 
-目前代码已连接设备锁、持久预约、私有执行环境、异常回收、二十四阶段启动检查和当前所有者的私有凭证。文件/协议、实际 PostgreSQL 及 CPU 依赖验证通过，范围见 [G14](../acceptance-g14.md)。**正式 GPU worker、完整 CUDA 验收、题型与性能榜单仍待完成，网站的 GPU 提交保持关闭。** 分批历史统一查阅[需求追踪](../requirements.md)和[验收索引](../README.md)。
+目前宿主 worker 已连接设备锁、持久预约、私有执行环境、异常回收、二十四阶段启动检查、凭证续检与信号退出。非 GPU 验证范围见 [G15](../acceptance-g15.md)。**完整 CUDA 验收、容器化部署、题型与性能榜单仍待完成，网站的 GPU 提交保持关闭。** 分批历史统一查阅[需求追踪](../requirements.md)和[验收索引](../README.md)。
 
 所有控制器副本和升级必须共用原来的私有工作根与设备锁目录，不能换路径避开旧进程、存储或预约。调度组件使用 `gpu-slot-seconds-v1`：Run 90 秒、Submit 180 秒的整卡时段，默认每日 `JUDGE_DAILY_GPU_SECONDS=1800`，与 CPU 调用单位分开。这些是预约上限，不是测得的 GPU 时间；不能据此启用评测或手工清空预约。
 
@@ -19,6 +19,36 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 崩溃后的存储回收、旧预约和就绪事务 | [异常恢复及 PostgreSQL 检查](#不占-gpu-的异常恢复检查) |
 | 整控制器退出、通道失联和独立硬期限 | [控制器故障检查](#不占-gpu-的控制器故障检查) |
 | 已获授权的空闲单卡与 CUDA 环境 | [单卡环境检查](#重放单卡环境检查)，再按需执行内核和故障检查 |
+| 完整启动、长期领取、取消与退出流程 | [宿主 worker](#gpu-worker)，需要独占卡；非 GPU 状态检查使用下方 PostgreSQL 测试 |
+
+<a id="gpu-worker"></a>
+
+## 宿主 worker：供独占硬件验收
+
+适用于完成节点准备、已获得空闲独占卡、准备重放完整 CUDA 路径的开发维护者。当前阶段尚未执行该命令的完整硬件验收；维护者要求暂不占 GPU 时，继续使用下文 CPU 和数据库检查。此入口不注册网站题型，也不提供 Compose GPU 容器。
+
+使用 Linux 宿主的固定项目 Python 环境和普通用户 systemd 管理器；需要下文列出的 cgroup v2、RootlessKit、Podman/runsc、NVIDIA 依赖与三个[固定离线归档](#提前保存固定镜像减少下载依赖)。连接与应用相同的数据库：源码开发沿用 `SQLITE_PATH`，PostgreSQL 使用专用 worker 角色的 `DATABASE_URL` 和对应 TLS 配置，具体见[生产指南](production.md)。凭据放私密环境中，不写进命令行。所有副本与升级保持同一工作根、锁目录和凭证目录。
+
+先用 `nvidia-smi --query-gpu=index,uuid,name --format=csv` 查到被分配设备的完整 UUID，并设置 `PRAXIMESH_GPU_UUID`。命令拒绝数字索引和 `all`，不因设备重新编号而换卡。示例对应本机 Podman `5.8.2`；其他节点填实际固定版本，并重新完整验收。准备私有目录后，在仓库根目录运行：
+
+```sh
+install -d -m 700 var/gpu-worker var/gpu-worker/jobs var/gpu-worker/receipts
+JUDGE_ENABLED=1 .venv/bin/python manage.py gpu_worker \
+  --gpu "$PRAXIMESH_GPU_UUID" --worker-id gpu-node-0 \
+  --runtime-archive "$PWD/var/gpu-preflight/gvisor.tar.bz2" \
+  --image-archive "$PWD/var/gpu-preflight/python-image-20261030.oci.tar" \
+  --nvrtc-archive "$PWD/var/gpu-preflight/nvrtc-13.1.115.tar.xz" \
+  --podman-version 5.8.2 \
+  --directory "$PWD/var/gpu-worker/jobs" \
+  --lock-directory "/run/user/$(id -u)/praximesh-gpu-locks" \
+  --receipt-directory "$PWD/var/gpu-worker/receipts"
+```
+
+每次启动先恢复旧预约，然后执行全部二十四阶段，单阶段最多 180 秒、总预算最多 4320 秒。日志依次出现 `gpu_startup_passed stage=...`，全部通过后才出现 `gpu_worker_ready`。没有跳过 GPU 启动检查、导入报告或复用旧进程凭证的参数；Django 自带的 `--skip-checks` 仅影响应用配置检查。`--once` 仍执行完整启动，只尝试领取一次；退出后撤销就绪，不能用于给另一进程预先“认证”。
+
+凭证最长有效 24 小时，空闲时不足完整任务余量会停用并重跑全部检查。文件缺失、时钟回拨、代码/主机/所有者变化会退出；运行中凭证失效丢弃结果并保留预约。取消、删除或租约丢失时，先核对原服务已停止，再独立恢复并核对相同预约，成功后才可领取下一任务。发现外部 GPU 进程只停止自有执行，不终止其他账号的工作。
+
+用前台 Ctrl-C 或向该 worker 进程发送 SIGTERM 停止。处理器只设置标志，常规回调负责清理、撤销本次凭证和停用设备；中断任务的预约保留到下一次完整启动恢复。数据库网络失联时不能保证 Python 立即返回，实际任务服务仍有独立硬期限。不要删除锁文件、手动释放预约或换工作根绕过故障。日志只包含固定阶段、任务 ID 和错误类别，保留最后成功阶段用于定位。
 
 ## 不占 GPU 的控制链检查
 
@@ -84,12 +114,13 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 
 ```sh
 .venv/bin/python scripts/postgres_tests.py -q \
+  tests/test_gpu_worker.py tests/test_gpu_worker_postgres.py \
   tests/test_gpu_readiness.py tests/test_gpu_readiness_postgres.py \
   tests/test_gpu_startup.py tests/test_gpu_execution.py \
   tests/test_gpu_control.py tests/test_gpu_resources.py
 ```
 
-这组检查会自动清理自有数据库容器和卷；GPU 执行使用明确的测试替身，不能作为真实设备恢复证据。尚无正式 GPU worker 启动命令，不要直接调用数据库的恢复转换来绕过就绪检查。
+这组检查会自动清理自有数据库容器和卷，覆盖 worker 循环、真实进程信号和领取/结算竞争；GPU 执行使用明确的测试替身，不能作为真实设备恢复证据。不要直接调用数据库的恢复转换来绕过就绪检查。
 
 ## 不占 GPU 的控制器故障检查
 

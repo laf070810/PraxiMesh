@@ -94,30 +94,43 @@ def _stage_report(name, report, adapter):
             )
 
 
-def _fail_closed(error, guard, directory):
-    # Do not hide the original failure, or change a replacement owner's state.
+def deactivate_controller(guard, *, receipt_directory):
+    """Revoke this owner's readiness; retain any task until verified recovery."""
+    failures = []
     try:
-        with ReceiptStore(directory, guard) as store:
+        with ReceiptStore(receipt_directory, guard) as store:
             if store.read().get("owner_token") == str(guard.owner_token):
                 store.invalidate()
     except FileNotFoundError:
         pass
-    except Exception as cleanup_error:
-        error.add_note("GPU receipt invalidation failed: " + type(cleanup_error).__name__)
+    except Exception as error:
+        failures.append(error)
     try:
         with bounded_database():
             gpu_resources.quarantine(guard)
+    except Exception as error:
+        failures.append(error)
+    if failures:
+        from judge.sandbox import SandboxUnavailable
+
+        raise SandboxUnavailable("GPU readiness could not be fully revoked") from failures[0]
+
+
+def _fail_closed(error, guard, directory):
+    # Keep the original failure, and never change a replacement owner's state.
+    try:
+        deactivate_controller(guard, receipt_directory=directory)
     except Exception as cleanup_error:
-        error.add_note("GPU startup quarantine failed: " + type(cleanup_error).__name__)
+        error.add_note("GPU readiness revocation failed: " + type(cleanup_error).__name__)
 
 
 def initialize_controller(
-    guard, worker_id, adapter, *, receipt_directory, deadline=None, on_progress=None
+    guard, worker_id, adapter, *, receipt_directory, deadline=None, on_progress=None, on_tick=None
 ):
     """Every invocation performs all real checks; never resume from a file/report.
 
     Unit tests may replace runtime methods but do not produce operational GPU
-    evidence. This entry is not exposed by the current web admission or worker.
+    evidence. Every worker start uses this entry; web admission remains separate.
     """
     if deadline is None:
         deadline = time.monotonic() + SUITE_SECONDS
@@ -140,7 +153,11 @@ def initialize_controller(
         ):
             raise ValueError("GPU startup requires a bounded complete-suite deadline")
         recovery = recover_controller(
-            guard, worker_id, adapter, deadline=min(deadline, time.monotonic() + CHECK_SECONDS)
+            guard,
+            worker_id,
+            adapter,
+            deadline=min(deadline, time.monotonic() + CHECK_SECONDS),
+            on_tick=on_tick,
         )
         require(
             recovery["recovered"] is True
@@ -157,12 +174,16 @@ def initialize_controller(
 
         def tick():
             guard.assert_held()
+            if on_tick is not None:
+                on_tick()
             require(time.monotonic() < deadline, "Complete GPU startup deadline expired")
             with bounded_database():
                 gpu_resources.verify_recovery_owner(
                     guard, job_id=job, reservation_token=reservation
                 )
                 _identity(guard, worker_id, adapter)
+                if on_tick is not None:
+                    on_tick()
             require(time.monotonic() < deadline, "Complete GPU startup deadline expired")
 
         tick()
@@ -212,6 +233,8 @@ def initialize_controller(
                     guard, job_id=job, reservation_token=reservation
                 )
                 _identity(guard, worker_id, adapter)
+                if on_tick is not None:
+                    on_tick()
                 require(time.monotonic() < deadline, "Complete GPU startup deadline expired")
                 gpu_resources.confirm_recovered(guard, job_id=job, reservation_token=reservation)
         return value
@@ -220,15 +243,50 @@ def initialize_controller(
         raise
 
 
-def heartbeat_ready(guard, worker_id, adapter, *, receipt_directory):
-    """An expired/missing/currently mismatched receipt cannot refresh readiness."""
+def _idle(guard, worker_id, adapter, receipt_directory, *, claim, on_check):
     try:
         check_receipt(receipt_directory, guard, worker_id, adapter)
         require(identify(guard.device_uuid) == adapter.target, "GPU identity changed after startup")
         DeviceMonitor(adapter.target).observe()
         with bounded_database():
             _identity(guard, worker_id, adapter)
-            return gpu_resources.heartbeat(guard)
+            check_receipt(receipt_directory, guard, worker_id, adapter)
+            if on_check is not None:
+                on_check()
+            healthy = gpu_resources.heartbeat(guard)
+            result = gpu_resources.claim(guard) if claim else healthy
+            if on_check is not None:
+                on_check()
+            return result
     except BaseException as error:
         _fail_closed(error, guard, receipt_directory)
         raise
+
+
+def heartbeat_ready(guard, worker_id, adapter, *, receipt_directory):
+    """An expired/missing/currently mismatched receipt cannot refresh readiness."""
+    return _idle(guard, worker_id, adapter, receipt_directory, claim=False, on_check=None)
+
+
+def claim_ready(guard, worker_id, adapter, *, receipt_directory, on_check=None):
+    """Heartbeat and claim under the same checked device identity row lock."""
+    return _idle(guard, worker_id, adapter, receipt_directory, claim=True, on_check=on_check)
+
+
+def recover_cancelled(guard, worker_id, adapter, job, *, receipt_directory, on_tick):
+    """The original execution service has stopped; now recover the exact slot."""
+    report = recover_controller(
+        guard, worker_id, adapter, on_tick=on_tick, expected_slot=(job.id, job.lease_token)
+    )
+    _stage_report("initial-recovery", report, adapter)
+    require(
+        (report["previous_job"], report["previous_reservation"])
+        == (str(job.id), str(job.lease_token)),
+        "GPU reservation changed before cancellation recovery",
+    )
+    with bounded_database():
+        _identity(guard, worker_id, adapter)
+        gpu_resources.verify_recovery_owner(guard, job_id=job.id, reservation_token=job.lease_token)
+        on_tick()
+        check_receipt(receipt_directory, guard, worker_id, adapter)
+        gpu_resources.confirm_recovered(guard, job_id=job.id, reservation_token=job.lease_token)

@@ -62,7 +62,7 @@ def bounded_database():
 
 
 class GPUJobControl:
-    def __init__(self, guard, job):
+    def __init__(self, guard, job, *, on_check=None):
         if type(guard) is not DeviceLock:
             raise ValueError("A held device lock is required")
         guard.assert_held()
@@ -77,6 +77,7 @@ class GPUJobControl:
         elapsed = max(0, (timezone.now() - job.started_at).total_seconds())
         self.deadline = time.monotonic() + job.budget_units - elapsed
         self.guard, self.job = guard, job
+        self.on_check = on_check
         self._check()
 
     def _check(self, *, cleanup=False):
@@ -89,9 +90,13 @@ class GPUJobControl:
         self._check(cleanup=cleanup)
         with bounded_database():
             self._check(cleanup=cleanup)
+            if self.on_check is not None:
+                self.on_check()
             result = function()
             # Roll back a renewal if a lock wait crossed the task's slot budget.
             self._check(cleanup=cleanup)
+            if self.on_check is not None:
+                self.on_check()
         return result
 
     def poll(self):

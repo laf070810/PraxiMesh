@@ -40,7 +40,9 @@ def clear_workspace(directory, service, *, deadline, on_tick):
     return True
 
 
-def recover_controller(guard, worker_id, adapter, *, deadline=None):
+def recover_controller(
+    guard, worker_id, adapter, *, deadline=None, on_tick=None, expected_slot=None
+):
     """Adopt, stop old owned work and run fixed maintenance, retaining quarantine.
 
     The caller holds the device lock throughout later readiness checks as well.
@@ -61,11 +63,15 @@ def recover_controller(guard, worker_id, adapter, *, deadline=None):
         raise ValueError("Startup recovery requires a finite bounded deadline")
     with bounded_database():
         device = gpu_resources.adopt(guard, worker_id, adapter.fingerprint)
+        if expected_slot is not None and (device.job_id, device.reservation_token) != expected_slot:
+            raise gpu_resources.DeviceOwnershipError("GPU reservation changed before recovery")
         gpu_resources.quarantine(guard)
         job_id, reservation_token = device.job_id, device.reservation_token
 
     def tick():
         guard.assert_held()
+        if on_tick is not None:
+            on_tick()
         if time.monotonic() >= deadline:
             raise SandboxUnavailable("GPU startup recovery deadline expired")
         with bounded_database():

@@ -29,6 +29,10 @@ SUITE_SECONDS = CHECK_SECONDS * len(CHECKS)
 MAX_BYTES = 64 * 1024
 
 
+class GPUReceiptExpired(SandboxUnavailable):
+    """An otherwise valid receipt needs a complete startup refresh."""
+
+
 def require(condition, message):
     if not condition:
         raise SandboxUnavailable(message)
@@ -94,15 +98,19 @@ def validate_receipt(value, guard, worker_id, adapter, *, minimum_remaining=CHEC
         and re.fullmatch(r"[a-f0-9]{64}", value["evidence_digest"]),
         "GPU startup evidence digest is missing",
     )
+    ages = []
     for key, now in (("created_wall", time.time()), ("created_monotonic", time.monotonic())):
         created = value[key]
         require(
             type(created) in {int, float}
             and math.isfinite(created)
             and created >= 0
-            and 0 <= now - created < TTL_SECONDS - minimum_remaining,
+            and now - created >= 0,
             "GPU startup receipt expired or its clock changed",
         )
+        ages.append(now - created)
+    if any(age >= TTL_SECONDS - minimum_remaining for age in ages):
+        raise GPUReceiptExpired("GPU startup receipt expired or needs renewal")
     guard.assert_held()
     return copy.deepcopy(value)
 
