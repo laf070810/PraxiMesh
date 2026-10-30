@@ -2,12 +2,13 @@
 
 import hashlib
 import json
+import re
 import shutil
 import tarfile
 from pathlib import Path
 
 from judge.gpu_contract import case_request, compile_request, output_matches, reference_values
-from judge.gpu_probes import correctness_fixtures
+from judge.gpu_probes import correctness_fixtures, fault_fixtures
 
 IMAGE = "docker.io/library/python:3.11.15-slim-bookworm@sha256:77923445c077d8eb971b14b2b114a1d9cd4a87edb4c75654820ca4832ee8cb15"
 NVRTC_ARCHIVE_SHA256 = "86077f16674ccea3e621ade9678887a37aca8f7500091aee4cabb1915e0c527b"
@@ -24,6 +25,75 @@ ALIASES = {
 }
 HARNESS = ("__init__.py", "gpu_contract.py", "gpu_runtime.py", "results.py")
 COMPARISON = {"kind": "float", "absolute": 1e-5, "relative": 1e-5}
+
+
+def verify_image_archive(archive):
+    """Validate the complete pinned OCI graph without extracting image layers."""
+    if archive.stat().st_size > 128 * 1024 * 1024:
+        raise ValueError("GPU image archive exceeds its size limit")
+    with tarfile.open(archive, "r:") as bundle:
+        files, names = {}, set()
+        for member in bundle:
+            name = member.name.rstrip("/")
+            if len(names) >= 12:
+                raise ValueError("Too many OCI archive members")
+            if name in names:
+                raise ValueError("Duplicate OCI archive member")
+            names.add(name)
+            if member.isdir() and name in {"blobs", "blobs/sha256"}:
+                continue
+            if not member.isfile() or not (
+                name in {"index.json", "oci-layout"}
+                or re.fullmatch(r"blobs/sha256/[0-9a-f]{64}", name)
+            ):
+                raise ValueError("Unexpected OCI archive member")
+            files[name] = member
+        if sum(member.size for member in files.values()) > 128 * 1024 * 1024:
+            raise ValueError("GPU image archive contents exceed their size limit")
+
+        def read_json(name):
+            if name not in files or files[name].size > 64 * 1024:
+                raise ValueError("Missing or oversized OCI metadata")
+            return json.load(bundle.extractfile(files[name]))
+
+        if read_json("oci-layout") != {"imageLayoutVersion": "1.0.0"}:
+            raise ValueError("Unexpected OCI layout version")
+        index = read_json("index.json")
+        pinned = IMAGE.split("@", 1)[1]
+        if (
+            index.get("schemaVersion") != 2
+            or type(index.get("manifests")) is not list
+            or len(index["manifests"]) != 1
+            or index["manifests"][0].get("digest") != pinned
+        ):
+            raise ValueError("OCI archive must contain the pinned GPU image manifest")
+        manifest_name = "blobs/" + pinned.replace(":", "/")
+        manifest = read_json(manifest_name)
+        descriptors = [index["manifests"][0], manifest["config"], *manifest["layers"]]
+        referenced = {"index.json", "oci-layout"}
+        for descriptor in descriptors:
+            digest = descriptor["digest"]
+            if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+                raise ValueError("Unsupported OCI blob digest")
+            name = "blobs/" + digest.replace(":", "/")
+            referenced.add(name)
+            if name not in files or files[name].size != descriptor["size"]:
+                raise ValueError("Missing or resized OCI blob")
+            with bundle.extractfile(files[name]) as stream:
+                actual = hashlib.file_digest(stream, "sha256").hexdigest()
+            if actual != digest.split(":", 1)[1]:
+                raise ValueError("OCI blob digest mismatch")
+        if set(files) != referenced:
+            raise ValueError("Unreferenced OCI archive content")
+        image_id = manifest["config"]["digest"]
+        config = read_json("blobs/" + image_id.replace(":", "/"))
+        if config.get("os") != "linux" or config.get("architecture") != "amd64":
+            raise ValueError("GPU probe requires the pinned Linux amd64 image")
+    return {
+        "image_archive_sha256": sha256(archive),
+        "image_manifest": pinned,
+        "image_id": image_id,
+    }
 
 
 def sha256(path):
@@ -87,21 +157,27 @@ def fixture_request(fixture):
     return "".join(json.dumps(request, allow_nan=False) + "\n" for request in requests)
 
 
+def valid_compiled_frame(frame):
+    return (
+        type(frame) is dict
+        and set(frame) == {"event", "architecture"}
+        and frame["event"] == "compiled"
+        and type(frame["architecture"]) is list
+        and len(frame["architecture"]) == 2
+        and all(type(value) is int and value >= 0 for value in frame["architecture"])
+    )
+
+
 def verify_output(fixture, output):
     frames = [json.loads(line) for line in output.splitlines()]
     if fixture["exit_code"]:
-        if frames:
+        if fixture.get("compiled"):
+            if len(frames) != 1 or not valid_compiled_frame(frames[0]):
+                raise ValueError("Runtime fault must follow compilation and emit no result")
+        elif frames:
             raise ValueError("Failed compilation or entrypoint must not emit result frames")
         return
-    if (
-        len(frames) != len(fixture["inputs"]) + 1
-        or type(frames[0]) is not dict
-        or set(frames[0]) != {"event", "architecture"}
-        or frames[0]["event"] != "compiled"
-        or type(frames[0]["architecture"]) is not list
-        or len(frames[0]["architecture"]) != 2
-        or any(type(value) is not int or value < 0 for value in frames[0]["architecture"])
-    ):
+    if len(frames) != len(fixture["inputs"]) + 1 or not valid_compiled_frame(frames[0]):
         raise ValueError("Invalid CUDA compilation/result frames")
     correct = []
     for inputs, frame in zip(fixture["inputs"], frames[1:], strict=True):
@@ -114,15 +190,17 @@ def verify_output(fixture, output):
         raise ValueError("Reference or incorrect fixture did not match controller expectation")
 
 
-def verify_fixtures(run, report, save):
+def verify_fixtures(run, report, save, *, faults=False):
     report["kernel_probes"] = []
-    for fixture in correctness_fixtures():
+    for fixture in fault_fixtures() if faults else correctness_fixtures():
         output = run(
             fixture["name"],
             "python",
             ["-B", "-m", "judge.gpu_runtime"],
             stdin=fixture_request(fixture),
             expected_exit=fixture["exit_code"],
+            timeout=fixture.get("timeout", 60),
+            expected_timeout=fixture.get("expected_timeout", False),
         )
         verify_output(fixture, output)
         report["kernel_probes"].append({"name": fixture["name"], "passed": True})

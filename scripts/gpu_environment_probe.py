@@ -85,10 +85,12 @@ def child(base, out, name):
     configuration = json.loads((base / "probe.json").read_text())
     kernel_probe = None
     image = IMAGE
-    if configuration["mode"] == "kernels":
+    if configuration["mode"] in {"kernels", "faults"}:
         from scripts import gpu_kernel_probe as kernel_probe
 
         image = kernel_probe.IMAGE
+    if configuration.get("image_id"):
+        image = configuration["image_id"]
     report = {
         "started_at": datetime.datetime.now(datetime.UTC).isoformat(),
         "base": str(base),
@@ -109,9 +111,21 @@ def child(base, out, name):
         (out / "result.json").write_text(json.dumps(report, indent=2) + "\n")
 
     def command(args, timeout=30, check=True, label=None, stdin=None):
-        result = subprocess.run(
-            args, capture_output=True, text=True, env=env, timeout=timeout, input=stdin
-        )
+        try:
+            result = subprocess.run(
+                args, capture_output=True, text=True, env=env, timeout=timeout, input=stdin
+            )
+        except subprocess.TimeoutExpired as error:
+            report["steps"].append(
+                {
+                    "label": label or args[0],
+                    "timed_out": True,
+                    "stdout": (error.stdout or b"").decode(errors="replace")[-16000:],
+                    "stderr": (error.stderr or b"").decode(errors="replace")[-6000:],
+                }
+            )
+            save()
+            raise
         report["steps"].append(
             {
                 "label": label or args[0],
@@ -153,7 +167,16 @@ def child(base, out, name):
             label="podman " + args[0],
         )
 
-    def run(label, entrypoint=None, args=(), *, stdin=None, expected_exit=0):
+    def run(
+        label,
+        entrypoint=None,
+        args=(),
+        *,
+        stdin=None,
+        expected_exit=0,
+        timeout=60,
+        expected_timeout=False,
+    ):
         container = name + "-" + label
         containers.append(container)
         options = [
@@ -189,12 +212,32 @@ def child(base, out, name):
             "--env=NVIDIA_VISIBLE_DEVICES=void",
             "--env=NVIDIA_DRIVER_CAPABILITIES=compute,utility",
         ]
-        result = podman(*options, image, *args, timeout=60, check=False, stdin=stdin)
+        timed_out = False
+        started = time.monotonic()
+        try:
+            result = podman(*options, image, *args, timeout=timeout, check=False, stdin=stdin)
+        except subprocess.TimeoutExpired as error:
+            if not expected_timeout:
+                raise
+            timed_out = True
+            # The CLI process timing out does not mean the workload stopped.
+            # Kill only this owned container, then wait for confirmed termination.
+            podman("kill", "--signal=KILL", container, timeout=15)
+            stopped = podman("wait", container, timeout=15)
+            require(stopped.stdout.strip() == "137", "Timed-out workload did not terminate")
+            result = subprocess.CompletedProcess([], 137, (error.stdout or b"").decode(), "")
+            report[label + "_termination"] = {
+                "deadline_seconds": timeout,
+                "elapsed_seconds": time.monotonic() - started,
+                "exit_code": 137,
+            }
+        require(timed_out == expected_timeout, f"{label}: timeout expectation mismatch")
         require(
             result.returncode == expected_exit,
             f"{label}: expected exit {expected_exit}, got {result.returncode}",
         )
         details = json.loads(podman("inspect", container).stdout)[0]
+        require(not details["State"]["Running"], "Workload still running after result")
         require(details.get("OCIRuntime") == str(base / "runtime/runsc"), "Unexpected OCI runtime")
         host = details["HostConfig"]
         require(
@@ -204,6 +247,27 @@ def child(base, out, name):
         report[label + "_inspection"] = {
             key: details.get(key) for key in ["Id", "Image", "OCIRuntime", "State", "HostConfig"]
         }
+        if configuration["mode"] == "faults":
+            # Host-side NVML observation in the trusted private controller;
+            # never terminate an unknown process or reset the card.
+            for attempt in range(10):
+                active = command(
+                    [
+                        "nvidia-smi",
+                        "-i",
+                        target["uuid"],
+                        "--query-compute-apps=pid",
+                        "--format=csv,noheader",
+                    ],
+                    timeout=10,
+                    label="device idle after " + label,
+                )
+                if not active.stdout.strip():
+                    break
+                if attempt == 9:
+                    raise RuntimeError("Target still has a compute task; device not reusable")
+                time.sleep(0.2)
+            report[label + "_device_idle"] = True
         save()
         return result.stdout.strip()
 
@@ -245,18 +309,26 @@ def child(base, out, name):
             json.dumps({"phase": "private_namespace_ready", "result": str(out / "result.json")}),
             flush=True,
         )
-        # Fixed public images must not inherit stale/private registry credentials.
-        authfile = base / "registry-auth.json"
-        authfile.write_text('{"auths": {}}\n')
-        authfile.chmod(0o600)
-        podman(
-            "pull",
-            "--authfile=" + str(authfile),
-            "--retry=3",
-            "--retry-delay=2s",
-            image,
-            timeout=240,
-        )
+        if configuration.get("image_id"):
+            podman("load", "--input=" + str(base / "image.oci.tar"), timeout=90)
+            loaded = json.loads(podman("image", "inspect", image).stdout)[0]
+            require(
+                loaded["Id"].removeprefix("sha256:") == image.removeprefix("sha256:"),
+                "Imported image identity mismatch",
+            )
+        else:
+            # Fixed public images must not inherit stale/private registry credentials.
+            authfile = base / "registry-auth.json"
+            authfile.write_text('{"auths": {}}\n')
+            authfile.chmod(0o600)
+            podman(
+                "pull",
+                "--authfile=" + str(authfile),
+                "--retry=3",
+                "--retry-delay=2s",
+                image,
+                timeout=240,
+            )
         report["sample_image"] = image
         print(json.dumps({"phase": "sample_image_ready"}), flush=True)
         visible = run(
@@ -271,7 +343,9 @@ def child(base, out, name):
         )
         print(json.dumps({"phase": "gpu_identity_passed", "visible_devices": visible}), flush=True)
         if kernel_probe is not None:
-            kernel_probe.verify_fixtures(run, report, save)
+            kernel_probe.verify_fixtures(
+                run, report, save, faults=configuration["mode"] == "faults"
+            )
         else:
             output = run("vectoradd")
             report["vectoradd_output"] = output
@@ -387,6 +461,10 @@ def child(base, out, name):
 
 
 def parent(options):
+    if options.fault_probes and not options.nvrtc_archive:
+        raise ValueError("--fault-probes requires the pinned --nvrtc-archive")
+    if options.image_archive and not options.nvrtc_archive:
+        raise ValueError("--image-archive requires the pinned --nvrtc-archive")
     if os.getuid() == 0:
         raise ValueError("Run as the delegated non-root user, not with sudo")
     check = subprocess.run(
@@ -432,13 +510,23 @@ def parent(options):
     try:
         digest = runtime_from_archive(options.runtime_archive, base / "runtime")
         outer["runsc_sha256"] = digest
-        mode = "kernels" if options.nvrtc_archive else "vendor"
+        mode = (
+            "faults" if options.fault_probes else "kernels" if options.nvrtc_archive else "vendor"
+        )
         if options.nvrtc_archive:
             from scripts.gpu_kernel_probe import prepare_artifacts
 
             outer.update(prepare_artifacts(base, options.nvrtc_archive, ROOT))
         outer["mode"] = mode
-        (base / "probe.json").write_text(json.dumps({"mode": mode}))
+        configuration = {"mode": mode}
+        if options.image_archive:
+            from scripts.gpu_kernel_probe import verify_image_archive
+
+            shutil.copyfile(options.image_archive, base / "image.oci.tar")
+            identity = verify_image_archive(base / "image.oci.tar")
+            outer.update(identity)
+            configuration["image_id"] = identity["image_id"]
+        (base / "probe.json").write_text(json.dumps(configuration))
         supported = subprocess.run(
             [str(base / "runtime/runsc"), "nvproxy", "list-supported-drivers"],
             capture_output=True,
@@ -578,6 +666,16 @@ def main():
         "--nvrtc-archive",
         type=Path,
         help="Optional pinned NVIDIA NVRTC 13.1.115 archive for CUDA kernel fixtures",
+    )
+    parser.add_argument(
+        "--fault-probes",
+        action="store_true",
+        help="With NVRTC, run reviewed GPU faults and recovery on the dedicated card",
+    )
+    parser.add_argument(
+        "--image-archive",
+        type=Path,
+        help="Optional OCI archive of the same pinned Python image, verified before import",
     )
     options = parser.parse_args()
     try:

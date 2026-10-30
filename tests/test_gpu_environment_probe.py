@@ -2,10 +2,11 @@
 
 import argparse
 from copy import deepcopy
+from types import SimpleNamespace
 
 import pytest
 
-from scripts.gpu_environment_probe import gpu_selector, runtime_from_archive, selected_cdi
+from scripts.gpu_environment_probe import gpu_selector, parent, runtime_from_archive, selected_cdi
 
 UUID = "GPU-12345678-1234-1234-1234-123456789abc"
 TARGET = {"index": 0, "uuid": UUID}
@@ -74,3 +75,12 @@ def test_unpinned_runtime_is_rejected_before_extraction(tmp_path):
     with pytest.raises(ValueError, match="SHA-512"):
         runtime_from_archive(archive, destination)
     assert not destination.exists()
+
+
+def test_fault_mode_requires_compiler_before_touching_device_or_starting_service(monkeypatch):
+    def forbidden(*args, **kwargs):
+        raise AssertionError("hardware or service must not be accessed")
+
+    monkeypatch.setattr("scripts.gpu_environment_probe.subprocess.run", forbidden)
+    with pytest.raises(ValueError, match="requires the pinned"):
+        parent(SimpleNamespace(fault_probes=True, nvrtc_archive=None))

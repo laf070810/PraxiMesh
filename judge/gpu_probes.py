@@ -27,6 +27,7 @@ def correctness_fixtures():
         {"a": [0.1, -4, 0, 5.75], "b": [0.2, 7, -2, -0.75]},
         {"a": [float(i % 13 - 6) for i in range(257)], "b": [0.25] * 257},
     ]
+
     matrix_inputs = [
         {"m": 2, "n": 3, "k": 2, "a": [1, 2, 3, 4], "b": [5, 6, 7, 8, 9, 10]},
         {
@@ -94,4 +95,67 @@ def correctness_fixtures():
             "exit_code": 2,
             "correct": False,
         },
+    ]
+
+
+def fault_fixtures():
+    """Faults run serially on an explicitly dedicated card, followed by recovery."""
+    inputs = [{"a": [1, -2, 0.5], "b": [3, 5, -0.25]}]
+
+    def fixture(name, source, *, exit_code=0, compiled=False, **extra):
+        return {
+            "name": name,
+            "operation": "vector-add-f32-v1",
+            "source": source,
+            "inputs": inputs,
+            "exit_code": exit_code,
+            "correct": exit_code == 0,
+            "compiled": compiled,
+            **extra,
+        }
+
+    spoof = VECTOR_REFERENCE.replace(
+        "if (i < n)",
+        'if (i == 0) printf("{\\"values\\":[999]}\\n");\n    if (i < n)',
+    )
+    heap = r"""
+extern "C" __device__ void *malloc(unsigned long);
+extern "C" __device__ void free(void*);
+extern "C" __global__ void solve(const float* a, const float* b, float* out, int n) {
+    if (blockIdx.x || threadIdx.x) return;
+    void* small = malloc(4UL * 1024 * 1024);
+    void* p = malloc(16UL * 1024 * 1024);
+    for (int i = 0; i < n; ++i) out[i] = small && !p ? a[i] + b[i] : 999;
+    if (small) free(small);
+    if (p) free(p);
+}
+"""
+    illegal = VECTOR_REFERENCE.replace("out[i] = a[i] + b[i]", "*((volatile float*)0) = 1")
+    oversized = (
+        "__device__ volatile char oversized[32ULL * 1024 * 1024 * 1024];\n"
+        + VECTOR_REFERENCE.replace("out[i] = a[i] + b[i]", "out[i] = oversized[i]")
+    )
+    invalid_ptx = VECTOR_REFERENCE.replace("out[i] = a[i] + b[i]", 'asm volatile("nop;")')
+    long_running = VECTOR_REFERENCE.replace(
+        "out[i] = a[i] + b[i]",
+        "{ unsigned long long start = clock64(); "
+        "while (clock64() - start < 60000000000ULL) {} out[i] = a[i] + b[i]; }",
+    )
+    return [
+        fixture("printf-spoof", spoof),
+        fixture("device-heap-bound", heap),
+        fixture("illegal-address", illegal, exit_code=2, compiled=True),
+        fixture("recover-illegal-address", VECTOR_REFERENCE),
+        fixture("module-memory-limit", oversized, exit_code=4),
+        fixture("recover-module-memory", VECTOR_REFERENCE),
+        fixture("invalid-ptx", invalid_ptx, exit_code=2),
+        fixture(
+            "kernel-timeout",
+            long_running,
+            exit_code=137,
+            compiled=True,
+            expected_timeout=True,
+            timeout=8,
+        ),
+        fixture("recover-kernel-timeout", VECTOR_REFERENCE),
     ]

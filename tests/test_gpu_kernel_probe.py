@@ -5,7 +5,7 @@ import json
 import pytest
 
 from judge.gpu_contract import reference_values
-from judge.gpu_probes import correctness_fixtures
+from judge.gpu_probes import correctness_fixtures, fault_fixtures
 from scripts.gpu_kernel_probe import fixture_request, prepare_artifacts, verify_output
 
 
@@ -80,3 +80,20 @@ def test_compilation_failure_cannot_also_emit_success():
 def test_valid_controller_comparison_is_independent_of_guest_verdicts():
     fixture = reference_fixture()
     verify_output(fixture, serialize(output_frames(fixture)))
+
+
+@pytest.mark.parametrize("name", ["illegal-address", "kernel-timeout"])
+def test_runtime_failure_or_timeout_requires_completed_compilation(name):
+    fixture = next(value for value in fault_fixtures() if value["name"] == name)
+    with pytest.raises(ValueError, match="must follow compilation"):
+        verify_output(fixture, "")
+    compiled = {"event": "compiled", "architecture": [8, 6]}
+    verify_output(fixture, serialize([compiled]))
+    with pytest.raises(ValueError, match="emit no result"):
+        verify_output(fixture, serialize([compiled, {"values": [4, 3, 0.25]}]))
+
+
+def test_out_of_memory_cannot_be_silently_accepted_as_compilation_success():
+    fixture = next(value for value in fault_fixtures() if value["name"] == "module-memory-limit")
+    with pytest.raises(ValueError, match="must not emit"):
+        verify_output(fixture, serialize([{"event": "compiled", "architecture": [8, 6]}]))

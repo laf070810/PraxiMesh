@@ -44,7 +44,8 @@
 - 先复现具体失败，再修改和验证对应路径。优先有意义的状态、权限、边界与恢复检查；无需为纯文字调整增加重复实现的测试。相关检查通过后，仅在新改动或未解决问题需要时扩大测试范围。
 - 上例以内容检查为例，测试路径按改动模块选择。涉及 PostgreSQL 锁、角色权限或迁移时使用 `scripts/postgres_tests.py`，例如 `.venv/bin/python scripts/postgres_tests.py -q tests/test_community.py`；它创建并清理自有临时数据库。
 - 真实评测先按 [WASI 指南](docs/deployment/wasi.md)配置可信 bundle、摘要及 `JUDGE_RECEIPT`，实际运行 `sandbox_check`。`RUN_SANDBOX_TESTS=1` 才启用相关集成场景；记录跳过原因，不把 skipped 当通过。
-- GPU 基础环境检查使用 `scripts/gpu_environment_probe.py`，按 [GPU 指南](docs/deployment/gpu.md)显式选择维护者授权的空闲单卡。检查采用固定完整 runsc 归档、临时用户服务和独立存储；不能以 CLI 参数代替真实父 cgroup 限额和节流检查。可选 `--nvrtc-archive` 重放审阅过的内核参考解/错解，编译也必须在隔离内进行，受保护答案留在控制器。两种模式串行执行，不生成正式评测 receipt；保留制品/源码身份、失败、最终结果和清理记录。
+- GPU 基础环境检查使用 `scripts/gpu_environment_probe.py`，按 [GPU 指南](docs/deployment/gpu.md)显式选择维护者授权的空闲单卡。检查采用固定完整 runsc 归档、临时用户服务和独立存储；不能以 CLI 参数代替真实父 cgroup 限额和节流检查。可选 `--nvrtc-archive` 重放审阅过的内核参考解/错解，编译也必须在隔离内进行，受保护答案留在控制器。各模式串行执行，不生成正式评测 receipt；保留制品/源码身份、失败、最终结果和清理记录。
+- GPU `--fault-probes` 只用于明确授权的独占卡，客户端超时后必须确认自有容器终止及设备无残留，并重跑正确解；不能终止未知进程或自动重置 GPU。`--image-archive` 可减少下载依赖，但必须校验固定清单与完整镜像层后导入独立存储，继续实际探针。CPU 内存配额、设备堆限制和整卡显存容量不能相互替代。
 - 浏览器、HTTPS、发布包和升级用现有 `scripts/*acceptance.py` 入口。使用一次性数据库、合成账号和明确属于本次测试的容器/卷；默认使用回环地址，按用户明确要求验证直接 IP 访问时使用独立测试端口。完成后核对清理，不删除未知资源。
 - Compose 单机入口为 `core/selfhost.py`，复用 `core/preview.py` 的原子数据库初始化；默认包括真实 WASI worker，可选 `compose.ai.yaml` 启动本地模型。修改时重放 `python3 scripts/compose_acceptance.py`；涉及模型或界面时使用 `--ai --browsers`。核对真实探针与七种题型、worker 离线关闭提交、直接 IP/CSRF、初始化恢复、旧内容不重导及成绩/会话跨重建保留。不得用旧 receipt 或宿主缓存代替镜像内自检。此入口不替代生产发布协调器。
 - 重型 WASI/worker 验收按资源预算串行安排，避免争用造成假超时。长进程须跟踪原进程或工具句柄；观察超时不代表进程结束，不据此重复启动。

@@ -8,7 +8,7 @@
 
 维护者明确指定第 0 张 RTX 3090 供独占验收，按 UUID 选择设备。固定 gVisor `release-20261026.0` 与驱动 `590.48.01` 的实际组合已跑通：在独立用户 cgroup 命名空间、Podman、runsc 与 CDI 中，只识别目标卡，并完成 50,000 元素 CUDA 向量加法。最终 CPU 探针用时 9.002 秒、消耗 4.393 秒 CPU，发生 75 次节流，0.5 核限额生效。临时资源已清理，原站点正常。
 
-初次接入失败和修正见 [RFC-018](../rfcs/018-gpu-environment-probe.md#实际结果与下一步)。之后实现了有界 CUDA 内核契约和受信驱动，真实向量/矩阵参考解、三种错解、编译错误及缺失入口共 7 组检查通过，见 [G1 组件验证](../acceptance-g1.md)。GPU 正式题型、worker、设备预约、显存与故障处理、性能比较仍未交付。
+初次接入失败和修正见 [RFC-018](../rfcs/018-gpu-environment-probe.md#实际结果与下一步)。之后实现了有界 CUDA 内核契约和受信驱动，完成 [G1 的 7 组正确性检查](../acceptance-g1.md)，以及 [G2 的 9 组设备故障、终止与恢复检查](../acceptance-g2.md)。GPU 正式题型、worker、设备预约、完整资源/失联策略和性能比较仍未交付。
 
 ## 重放单卡环境检查
 
@@ -50,7 +50,49 @@ curl --fail --location --retry 3 \
 
 脚本在解包前验证固定 SHA-256，再校验动态库；只将最小受信驱动和编译库只读挂载进固定 Python 镜像。向量加法、矩阵乘法的参考解和针对性错解均在 gVisor 内编译和执行，预期值留在控制器。`result.json` 还应包含 7 个通过的 `kernel_probes`；此模式同样检查单卡、实际 CPU 限额和清理。
 
-两种模式串行执行，不接受任意学员源码、不生成正式 receipt，也不开放网站提交。正常内核成功不能代替非法访存、显存耗尽、超时、设备恢复和可信性能验收。实现与未完成门槛见 [RFC-019](../rfcs/019-gpu-kernel-evaluation.md)和 [G1 记录](../acceptance-g1.md)。
+各模式串行执行，不接受任意学员源码、不生成正式 receipt，也不开放网站提交。正常内核成功不能代替非法访存、显存耗尽、超时、设备恢复和可信性能验收。实现与未完成门槛见 [RFC-019](../rfcs/019-gpu-kernel-evaluation.md)和 [G1 记录](../acceptance-g1.md)。
+
+## 重放设备故障与恢复检查
+
+仅在维护者专门分配的空闲单卡执行，不能与科研任务或其他评测并行。沿用上述两个固定归档，增加 `--fault-probes`：
+
+```sh
+.venv/bin/python scripts/gpu_environment_probe.py \
+  --gpu 0 --runtime-archive var/gpu-preflight/gvisor.tar.bz2 \
+  --nvrtc-archive var/gpu-preflight/nvrtc-13.1.115.tar.xz \
+  --fault-probes
+```
+
+此模式测试设备输出不能伪造协议、设备堆的小额成功/超额失败、非法访存、超过本卡容量的模块分配、非法 PTX、长运行内核终止及后续正确解恢复。必须出现 9 个通过的 `kernel_probes`，并有目标设备空闲记录和 `kernel-timeout_termination`。控制器在 8 秒期限后只终止本次创建的容器，等待实际退出；CLI 超时本身不算清理成功。
+
+每次结束后还通过宿主 `nvidia-smi` 检查目标卡无计算进程，未知进程不会被终止，设备不会被重置。仍有计算进程时检查失败，不把设备视为可用。超出整卡容量的分配失败不证明本卡支持任意较小显存配额；当前设备堆限制为 8 MiB，模块、驱动和整卡预算仍须在正式 worker 策略中单独定义。
+
+该入口仍是组件检查，不包括队列取消、worker 失联、租约争用或正式成绩。历史结果与尚未完成项见 [G2 记录](../acceptance-g2.md)。
+
+## 提前保存固定镜像，减少下载依赖
+
+内核和故障模式可使用同一固定 Python 镜像的 OCI 归档。需要 `skopeo` 才能制作归档；重放只需归档本身。本机已准备 `var/gpu-preflight/python-image-20261030.oci.tar`，无需再次下载。新环境先保存到尚不存在的目标文件：
+
+```sh
+GODEBUG=http2client=0 GOMAXPROCS=2 skopeo \
+  --override-os=linux --override-arch=amd64 --command-timeout=180s \
+  copy --preserve-digests --src-no-creds --retry-times=2 \
+  --image-parallel-copies=1 \
+  docker://docker.io/library/python@sha256:77923445c077d8eb971b14b2b114a1d9cd4a87edb4c75654820ca4832ee8cb15 \
+  oci-archive:var/gpu-preflight/python-image-20261030.oci.tar
+```
+
+使用归档重放全部设备故障检查；去掉 `--fault-probes` 即为参考解/错解模式：
+
+```sh
+.venv/bin/python scripts/gpu_environment_probe.py \
+  --gpu 0 --runtime-archive var/gpu-preflight/gvisor.tar.bz2 \
+  --nvrtc-archive var/gpu-preflight/nvrtc-13.1.115.tar.xz \
+  --image-archive var/gpu-preflight/python-image-20261030.oci.tar \
+  --fault-probes
+```
+
+探针先复制归档到自有临时目录，验证固定清单及所有配置/镜像层的摘要、大小和平台，拒绝多余文件、重复成员及链接，再导入独立存储并核对实际镜像 ID。它继续运行全部真实隔离、正确性或故障检查，不复用 receipt。归档保留用于后续重放，导入后的临时存储仍会清理。
 
 ## CPU 委派问题的原因
 
