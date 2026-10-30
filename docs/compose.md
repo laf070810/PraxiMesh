@@ -66,4 +66,6 @@ COACHING_PROVIDER_DESCRIPTION=填写实际服务方、发送范围和数据保�
 .venv/bin/python scripts/compose_acceptance.py --ai --browsers
 ```
 
-第二条需要独立开发环境的 judge/browser 依赖组及 Chromium；`--ai` 会自动包含浏览器检查。验收覆盖真实正确/错误提交、Run/Submit、全部 CPU 评测器、worker 离线关闭提交、重建后的数据与历史保留；浏览器检查包括注册、私有草稿、社区、项目、中英界面、类/API 和真实 AI 提示。结果在忽略目录 `test-results/px-compose-*/`，测试结束清理其自有容器、卷及网络。
+第二条需要独立开发环境的 judge/browser 依赖组及 Chromium；可用 `.venv/bin/playwright install chromium` 安装，若已有独立缓存则设置 `PLAYWRIGHT_BROWSERS_PATH` 指向它。脚本先确认浏览器能启动再创建测试服务；`--ai` 会自动包含浏览器检查。验收覆盖真实正确/错误提交、Run/Submit、全部 CPU 评测器、worker 离线关闭提交、重建后的数据与历史保留；浏览器检查包括注册、私有草稿、社区、项目、中英界面、类/API 和真实 AI 提示。结果在忽略目录 `test-results/px-compose-*/`，测试结束清理其自有容器、卷及网络。
+
+当前结果、原始失败与修复以及验证边界见 [Compose 验收记录](acceptance-compose.md)。

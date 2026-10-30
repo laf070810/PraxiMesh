@@ -56,7 +56,7 @@ docker compose up -d            # 使用已有镜像再次启动
 
 账号、会话、草稿和成绩保存在 `app-data` 命名卷，与仓库的 `db.sqlite3` 分开。原 Compose 页面体验版可直接升级并保留数据；已有库只迁移，不重导目录。`down -v` 会删除数据，勿用于日常停止。
 
-完整配置、资源、可选模型、恢复与验收见 [Compose 指南](docs/compose.md)。这是包含已有功能的单机 SQLite/HTTP 入口；长期 PostgreSQL、HTTPS 和受控升级使用下方发布与部署流程。GPU 评测尚未实现。
+完整配置、资源、可选模型及恢复见 [Compose 指南](docs/compose.md)，实际结果见 [Compose 验收记录](docs/acceptance-compose.md)。这是包含已有功能的单机 SQLite/HTTP 入口；长期 PostgreSQL、HTTPS 和受控升级使用下方发布与部署流程。GPU 评测尚未实现。
 
 ## Python 开发环境启动
 

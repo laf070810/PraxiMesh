@@ -82,6 +82,15 @@ def main():
     parser.add_argument("--browsers", action="store_true", help="Also run Playwright journeys")
     options = parser.parse_args()
     options.browsers = options.browsers or options.ai
+    if options.browsers:
+        from playwright.sync_api import sync_playwright
+
+        # Fail before builds and costly isolation checks if the host's browser
+        # installation or PLAYWRIGHT_BROWSERS_PATH is not ready.
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch()
+            browser.close()
+        print("Chromium startup preflight passed", flush=True)
     project = "px-compose-" + uuid.uuid4().hex[:12]
     artifacts = ROOT / "test-results" / project
     artifacts.mkdir(parents=True, mode=0o700)

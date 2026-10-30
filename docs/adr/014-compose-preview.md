@@ -1,6 +1,6 @@
 # ADR-014：持久数据的一键 Compose 本地体验
 
-状态：接受，2026-10-30。依据：[RFC-015](../rfcs/015-compose-preview.md)。
+状态：接受，2026-10-30。依据：[RFC-015](../rfcs/015-compose-preview.md)。同日默认 Compose 的功能范围由 [ADR-015](015-compose-selfhost.md) 扩展为真实评测及可选模型；这里保留页面体验入口与数据初始化的原决定。
 
 采用 `docker compose up --build -d` 启动本地页面体验。固定基础镜像使用默认值，随机实例密钥首次生成后保存在命名卷；现有显式密钥配置继续支持。`core.preview` 在加载 Django 设置前准备配置，并在启动成功后 exec Gunicorn。
 

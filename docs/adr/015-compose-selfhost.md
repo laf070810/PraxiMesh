@@ -1,6 +1,6 @@
 # ADR-015：默认 Compose 包含真实 CPU 评测
 
-状态：接受，2026-10-30；容器验收进行中。依据：[RFC-016](../rfcs/016-compose-selfhost.md)。本决定替代 [ADR-014](014-compose-preview.md) 中默认 Compose 仅提供页面体验的范围。
+状态：接受，2026-10-30；基础及可选模型组合的本地容器验收通过。依据：[RFC-016](../rfcs/016-compose-selfhost.md)。本决定替代 [ADR-014](014-compose-preview.md) 中默认 Compose 仅提供页面体验的范围。
 
 默认构建 Web 和独立 WASI worker，解释器及其摘要由 Docker 构建中校验过的固定来源产生。Web 只保存摘要，没有 Wasmtime 或执行制品；worker 在自身容器内执行完整探针，健康和策略匹配后接收任务。维持原有 receipt 有效期与所有资源、配额、租约和结果证据规则。worker 到期退出后，由 Compose 重启并重新检查。
 
