@@ -88,7 +88,7 @@ class JobWorkspace:
                     os.fsync(stream.fileno())
                 os.fsync(self._fd)
                 os.fsync(self._root_fd)
-                for name in ("config", "cache", "runtime-env", "temporary", "data-cache"):
+                for name in ("config", "cache", "runtime-env", "temporary", "data-cache", "home"):
                     os.mkdir(name, mode=0o700, dir_fd=self._fd)
             self.check()
         except BaseException:
@@ -134,6 +134,9 @@ class JobWorkspace:
         ):
             raise ValueError("An absolute trusted controller command is required")
         environment = {
+            # Podman/image libraries consult the child's home in addition to
+            # XDG paths. Give the isolated process its own empty home directory.
+            "HOME": str(self.path / "home"),
             "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
             "LANG": "C.UTF-8",
             "LC_ALL": "C.UTF-8",

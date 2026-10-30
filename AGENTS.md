@@ -51,6 +51,7 @@
 - GPU 交互协议与控制器比较在 `judge/gpu_session.py`、`judge/gpu.py`；`--session-probes` 复用实际会话路径。管道夹具不证明 CUDA 或性能成功；GPU 性能只能使用控制器测量，不采纳 guest 的计时字段。文件锁不隔离其他账号的 CUDA 进程，发现外部占用时停止启动并等待独占条件，不能用低利用率代替空闲证明。
 - GPU 服务监督在 `judge/gpu_service.py`，短事务回调在 `core/gpu_control.py`；仅可信控制器可传入启动命令，源码/答案/密钥不得放进命令行或日志。终止前核对预约及服务调用身份，终止后核对整个 cgroup；数据库等待失败不直接释放设备。服务控制改动用 [非 GPU 控制链检查](docs/deployment/gpu.md#不占-gpu-的控制链检查)和实际 PostgreSQL 验证；固定 CPU 进程树通过不替代 CUDA 清理、设备空闲与正确性恢复。
 - 私有控制器命名空间与工作目录在 `judge/gpu_namespace.py`，socket 在 `judge/gpu_transport.py`；保持环境变量白名单、完全断网、内核对端/cgroup 核对及预约身份绑定。用集中指南中的命名空间验收入口重放实际连接和终止；未停止、身份不符或仍有挂载的目录不能递归清理。此控制通道只连接受信进程，不能代替 guest 隔离、设备恢复或正式准入。
+- 共用离线制品与运行环境在 `judge/gpu_artifacts.py`、`judge/gpu_environment.py`，控制命令由 `judge/gpu_command.py` 有界执行。修改后按集中指南重放固定 CPU 的实际 runsc 验收；CUDA 仍须显式准备单卡和编译器。输出超限时先关闭并终止附着客户端，再独立核对、终止和等待自有容器；不能把关闭管道视为 GPU 清理完成。保留私有存储、空 hook 目录、固定镜像校验和子进程独立 home，不继承操作者配置来修复启动失败。
 - 浏览器、HTTPS、发布包和升级用现有 `scripts/*acceptance.py` 入口。使用一次性数据库、合成账号和明确属于本次测试的容器/卷；默认使用回环地址，按用户明确要求验证直接 IP 访问时使用独立测试端口。完成后核对清理，不删除未知资源。
 - Compose 单机入口为 `core/selfhost.py`，复用 `core/preview.py` 的原子数据库初始化；默认包括真实 WASI worker，可选 `compose.ai.yaml` 启动本地模型。修改时重放 `python3 scripts/compose_acceptance.py`；涉及模型或界面时使用 `--ai --browsers`。核对真实探针与七种题型、worker 离线关闭提交、直接 IP/CSRF、初始化恢复、旧内容不重导及成绩/会话跨重建保留。不得用旧 receipt 或宿主缓存代替镜像内自检。此入口不替代生产发布协调器。
 - 重型 WASI/worker 验收按资源预算串行安排，避免争用造成假超时。长进程须跟踪原进程或工具句柄；观察超时不代表进程结束，不据此重复启动。

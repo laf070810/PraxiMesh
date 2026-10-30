@@ -195,6 +195,27 @@ def test_output_is_bounded_before_a_delimiter_or_process_exit(harness, scenario)
     assert result["verdict"] == "output_limit"
 
 
+def test_full_attach_pipe_is_closed_before_container_cleanup(harness):
+    with harness("frame") as (session, _captured):
+        cleanup = session.cleanup
+
+        def require_detached_client():
+            assert session.process.poll() is not None
+            assert all(
+                stream.closed
+                for stream in (
+                    session.process.stdin,
+                    session.process.stdout,
+                    session.process.stderr,
+                )
+            )
+            cleanup()
+
+        session.cleanup = require_detached_client
+        result = evaluate_kernel(problem(), "transport marker", "submit", session)
+        assert result["verdict"] == "output_limit"
+
+
 def test_compilation_deadline_and_heartbeat_cancellation_cleanup_owned_process(
     harness, monkeypatch
 ):

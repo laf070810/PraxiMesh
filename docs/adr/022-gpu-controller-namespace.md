@@ -19,3 +19,5 @@ RootlessKit 使用独立 user、mount、PID、network、IPC、UTS、cgroup 命�
 五项实际命名空间检查通过：753,740 字节消息往返、断连终止、额外消息拒绝、停止轮询后的服务硬期限，以及同 UID 的错误 cgroup 拒绝。对应进程树和目录已清理。95 项定向组件检查覆盖目录替换、链接、挂载、部分清理失败、协议及既有服务回归。
 
 此增量纳入 GPU 执行摘要，CPU 策略未变化，不生成 GPU receipt。后续连接离线 Podman/runsc 环境、GPU 会话、设备监测与恢复，再进行独占 GPU、队列和部署验收。
+
+同日 G7 补充：Podman 的镜像库会额外检查子进程 home 内的配置，因此为隔离子进程创建独立空 home；继续使用显式私有存储和配置路径。该变更已重新通过五项实际命名空间检查，并完成固定 CPU guest 的离线 runsc 验证，见 [ADR-023](023-gpu-offline-runtime.md)与 [G7](../acceptance-g7.md)。

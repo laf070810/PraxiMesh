@@ -197,19 +197,26 @@ class GPUSession:
             return
         self.closed = True
         try:
-            # Always inspect/stop/wait for the owned container. A detached or
-            # exited CLI is insufficient evidence that GPU work has stopped.
-            self.cleanup()
+            # An unread full attach pipe can block conmon/container teardown.
+            # Detach this owned CLI first, then independently stop the container.
+            self.selector.close()
             for stream in (self.process.stdin, self.process.stdout, self.process.stderr):
                 stream.close()
+            if self.process.poll() is None:
+                self.process.kill()
             try:
                 self.process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 raise SandboxUnavailable("GPU attach process did not terminate") from None
         finally:
-            self.selector.close()
-            for stream in (self.process.stdin, self.process.stdout, self.process.stderr):
-                stream.close()
+            try:
+                # Always inspect/stop/wait, even after CLI termination failure.
+                # A detached CLI never proves GPU/container termination.
+                self.cleanup()
+            finally:
+                self.selector.close()
+                for stream in (self.process.stdin, self.process.stdout, self.process.stderr):
+                    stream.close()
 
     def __enter__(self):
         return self

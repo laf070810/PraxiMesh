@@ -31,6 +31,8 @@
 - [ADR-020：任务服务硬期限与有界控制回调](adr/020-gpu-task-control.md)
 - [G6 GPU 控制连接与占用监测组件](acceptance-g6.md) — 实际 RootlessKit 私有连接、断连与期限通过，完整 GPU 运行适配器待连接
 - [ADR-022：私有控制器命名空间与预约工作目录](adr/022-gpu-controller-namespace.md)
+- [G7 离线 runsc 环境与回收检查](acceptance-g7.md) — 七项真实 CPU guest 检查通过，未执行 GPU 工作负载
+- [ADR-023：共用离线 GPU 运行模块与容器回收](adr/023-gpu-offline-runtime.md)
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

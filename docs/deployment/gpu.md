@@ -18,6 +18,8 @@ G3 的 `gpu-slot-seconds-v1` 按 Run 90 秒、Submit 180 秒预约整卡时段�
 
 [G6](../acceptance-g6.md)进一步验证了真实 RootlessKit 命名空间与外层服务的私有通信、环境变量清理、断连及期限终止。这些检查不占 GPU；正式 Podman/runsc 会话、真实设备恢复和 worker 仍需连接及验收。
 
+[G7](../acceptance-g7.md)已把共用离线 Podman/runsc 环境、受限管道和容器回收接入控制链，并通过固定 CPU guest 的七项实际检查。CUDA 会话入口已有实现，尚未完成新 GPU 硬件重放、设备恢复和正式 worker 接入。
+
 ## 不占 GPU 的控制链检查
 
 适用于显卡暂被占用时开发、检查 worker 控制链，或在目标 Linux 主机核对用户服务管理器及 CPU/内存/PID 委派。需要项目 Python 环境、可用的普通用户 systemd 管理器和 cgroup v2；不需要显卡、驱动或 CUDA 制品。不要用 sudo，也不在普通 Web/CPU worker 容器内执行。
@@ -40,6 +42,22 @@ G3 的 `gpu-slot-seconds-v1` 按 Run 90 秒、Submit 180 秒预约整卡时段�
 
 该脚本只运行控制进程，没有运行 Podman guest、CUDA 或 GPU 恢复探针。启动失败时保留失败结果，先核对 RootlessKit 与 `ip` 是否位于系统路径；不要通过继承整套 worker 环境变量修复，也不要把残留目录或设备预约直接删除。
 
+## 不占 GPU 的离线容器检查
+
+适用于继续验证真实隔离容器启动、管道、资源限制和回收。除上述用户服务及命名空间依赖，还需 Podman、fuse-overlayfs、固定完整 runsc 归档和 Python OCI 归档；不需要 NVIDIA 驱动、Toolkit 或 NVRTC。本机已有这两个归档；新环境先按[固定制品准备](#提前保存固定镜像减少下载依赖)下载：
+
+```sh
+.venv/bin/python scripts/gpu_runtime_acceptance.py \
+  --runtime-archive var/gpu-preflight/gvisor.tar.bz2 \
+  --image-archive var/gpu-preflight/python-image-20261030.oci.tar
+```
+
+检查只在固定 runsc 内执行审阅过的 CPU 基础设施程序，不接受学员源码；明确关闭 nvproxy，不映射 GPU。它验证只读根文件系统、私有文件/宿主回环网络/设备隔离、输出限制、超时、取消、附着客户端异常退出、实际 CPU 节流和 32 MiB 临时存储限制；每个场景后启动新容器检查重新运行。
+
+结果在 `test-results/px-gpu-runtime-*/result.json`。总 `passed` 和 `controller.passed` 应为 `true`，有七项成功 `controller.checks` 和十四项 `controller.cleanup`；`controller.private_store_removed`、`service_cleanup.cgroup_empty`、`workspace_removed`、`temporary_directory_removed` 均应为 `true`。任一失败保留原始记录，先修正原因再重放，不手动把设备标为可用。
+
+这个入口不会修改共享 Docker/Podman 存储或用户配置，也不生成 GPU receipt。容器正常退出和 CPU 重新运行成功，不证明 CUDA 设备已恢复；正式 GPU 提交仍关闭。
+
 ## 重放单卡环境检查
 
 适用于准备 GPU 执行环境和排障；它不安装常驻 worker、不生成评测 receipt，也不会开放网站提交。需要维护者明确分配一张空闲 GPU。脚本拒绝 `all`，发现已有计算任务就退出。
@@ -48,14 +66,9 @@ G3 的 `gpu-slot-seconds-v1` 按 Run 90 秒、Submit 180 秒预约整卡时段�
 
 本机已具备：普通用户可用的 systemd 管理器及委派的 cgroup v2 控制器、RootlessKit 3.3、Podman 5.8、slirp4netns、fuse-overlayfs、NVIDIA Container Toolkit 和受固定 runsc 支持的驱动。使用项目 Python 3.11+ 环境；不要使用 sudo。其他机器先准备这些依赖与权限，并允许拉取固定的 NVIDIA 样例镜像。
 
-本机归档已在 `var/gpu-preflight/gvisor.tar.bz2`，可直接执行最后一条命令。新环境先下载固定完整归档，脚本会核对内置 SHA-512 并保留 sidecar 二进制：
+本机归档已在 `var/gpu-preflight/gvisor.tar.bz2`。新环境先按[固定制品准备](#提前保存固定镜像减少下载依赖)下载完整 runsc 归档，确认单卡授权与空闲后执行：
 
 ```sh
-mkdir -p var/gpu-preflight
-curl --fail --location --retry 3 \
-  --output var/gpu-preflight/gvisor.tar.bz2 \
-  https://storage.googleapis.com/gvisor/releases/release/20261026.0/x86_64/gvisor.tar.bz2
-
 .venv/bin/python scripts/gpu_environment_probe.py \
   --gpu 0 --runtime-archive var/gpu-preflight/gvisor.tar.bz2
 ```
@@ -103,7 +116,16 @@ curl --fail --location --retry 3 \
 
 ## 提前保存固定镜像，减少下载依赖
 
-内核和故障模式可使用同一固定 Python 镜像的 OCI 归档。需要 `skopeo` 才能制作归档；重放只需归档本身。本机已准备 `var/gpu-preflight/python-image-20261030.oci.tar`，无需再次下载。新环境先保存到尚不存在的目标文件：
+离线 CPU 检查与 GPU 组件共用完整 runsc 归档；内核、故障和离线 CPU 模式还共用固定 Python OCI 归档。本机已准备下列两个文件，无需再次下载。新环境先下载完整 runsc；程序会核对内置 SHA-512 和 runsc 摘要，并保留 sidecar 二进制：
+
+```sh
+mkdir -p var/gpu-preflight
+curl --fail --location --retry 3 \
+  --output var/gpu-preflight/gvisor.tar.bz2 \
+  https://storage.googleapis.com/gvisor/releases/release/20261026.0/x86_64/gvisor.tar.bz2
+```
+
+需要 `skopeo` 才能制作 Python 镜像归档，重放只需归档本身。保存到尚不存在的目标文件：
 
 ```sh
 GODEBUG=http2client=0 GOMAXPROCS=2 skopeo \

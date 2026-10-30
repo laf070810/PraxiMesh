@@ -14,20 +14,21 @@ import re
 import shutil
 import subprocess
 import sys
-import tarfile
 import tempfile
 import time
 import uuid
-from copy import deepcopy
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+from judge.gpu_artifacts import (  # noqa: E402
+    RELEASE,
+    runtime_from_archive,
+    selected_cdi,
+)
+
 IMAGE = "nvcr.io/nvidia/k8s/cuda-sample@sha256:6337237230602d2c063263922dc1db6c8ecc8d23c1f8438e172fe912f10f3973"
-RELEASE = "release-20261026.0"
-ARCHIVE_SHA512 = "26e4a327565f5da0f73261a6387e2c20f4695a232e330095a3111b70efd604fdf09d734e8cc8f714dbb5c5607ce8c87ea80b26df549d83a146f2efd5a1af448a"
-RUNSC_SHA256 = "7d658f2c3a5602d28c391285eb4ee0740e7dd21d40731324049a29620e51cf5e"
 
 
 def require(condition, message):
@@ -43,41 +44,6 @@ def gpu_selector(value):
             "Select exactly one GPU index or full UUID; all is forbidden"
         )
     return value
-
-
-def runtime_from_archive(archive, destination):
-    with archive.open("rb") as stream:
-        digest = hashlib.file_digest(stream, "sha512").hexdigest()
-    if digest != ARCHIVE_SHA512:
-        raise ValueError(f"Archive must match the pinned {RELEASE} SHA-512")
-    destination.mkdir(mode=0o700)
-    with tarfile.open(archive) as bundle:
-        bundle.extractall(destination, filter="data")
-    with (destination / "runsc").open("rb") as stream:
-        digest = hashlib.file_digest(stream, "sha256").hexdigest()
-    if digest != RUNSC_SHA256 or not (destination / "gvisor-bin").is_dir():
-        raise ValueError("Pinned runsc and its sidecar directory are required")
-    return digest
-
-
-def selected_cdi(spec, target):
-    spec = deepcopy(spec)
-    spec["devices"] = [d for d in spec["devices"] if d["name"] == target["uuid"]]
-    if len(spec["devices"]) != 1:
-        raise ValueError("CDI must contain exactly one matching GPU UUID")
-    gpu_node = f"/dev/nvidia{target['index']}"
-    allowed = {gpu_node, "/dev/nvidiactl", "/dev/nvidia-uvm"}
-    selected = set()
-    for edits in [spec["containerEdits"], spec["devices"][0]["containerEdits"]]:
-        edits["deviceNodes"] = [d for d in edits.get("deviceNodes", []) if d["path"] in allowed]
-        selected.update(d["path"] for d in edits["deviceNodes"])
-        for hook in edits.get("hooks", []):
-            hook["env"] = [
-                value for value in hook.get("env", []) if not value.startswith("GOMAXPROCS=")
-            ] + ["GOMAXPROCS=2"]
-    if selected != allowed:
-        raise ValueError("CDI is missing a required GPU device node")
-    return spec
 
 
 def child(base, out, name):

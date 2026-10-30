@@ -21,7 +21,7 @@ def archive_fixture(tmp_path, monkeypatch, defect=None):
         {"schemaVersion": 2, "config": descriptor(config), "layers": [descriptor(layer)]}
     ).encode()
     pinned = descriptor(manifest)
-    monkeypatch.setattr("scripts.gpu_kernel_probe.IMAGE", "example/image@" + pinned["digest"])
+    monkeypatch.setattr("judge.gpu_artifacts.IMAGE", "example/image@" + pinned["digest"])
     files = {
         "oci-layout": b'{"imageLayoutVersion": "1.0.0"}',
         "index.json": json.dumps({"schemaVersion": 2, "manifests": [pinned]}).encode(),
@@ -36,7 +36,7 @@ def archive_fixture(tmp_path, monkeypatch, defect=None):
     elif defect == "unreferenced":
         files["blobs/sha256/" + hashlib.sha256(b"extra").hexdigest()] = b"extra"
     elif defect == "different_image":
-        monkeypatch.setattr("scripts.gpu_kernel_probe.IMAGE", "example/image@sha256:" + "0" * 64)
+        monkeypatch.setattr("judge.gpu_artifacts.IMAGE", "example/image@sha256:" + "0" * 64)
     archive = tmp_path / "image.oci.tar"
     with tarfile.open(archive, "w") as bundle:
         for name, data in files.items():

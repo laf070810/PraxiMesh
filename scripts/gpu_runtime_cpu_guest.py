@@ -1,0 +1,87 @@
+"""Fixed infrastructure fixture, run only inside the pinned runsc guest."""
+
+import errno
+import hashlib
+import json
+import os
+import socket
+import sys
+import time
+from pathlib import Path
+
+
+def identity(request):
+    try:
+        Path("/praximesh-readonly-check").write_text("fixed infrastructure fixture")
+        root_write = True
+    except OSError:
+        root_write = False
+    try:
+        connection = socket.create_connection(("127.0.0.1", request["port"]), timeout=0.3)
+    except OSError:
+        reachable = False
+    else:
+        connection.close()
+        reachable = True
+    status = dict(
+        line.split(":", 1)
+        for line in Path("/proc/self/status").read_text().splitlines()
+        if ":" in line
+    )
+    return {
+        "event": "identity",
+        "uid": os.getuid(),
+        "root_write": root_write,
+        "private_file_visible": Path(request["protected_path"]).exists(),
+        "host_loopback_reachable": reachable,
+        "gpu_nodes": [p.name for p in Path("/dev").glob("nvidia*")],
+        "capabilities": status["CapEff"].strip(),
+        "environment_names": sorted(os.environ),
+        "sha256": hashlib.sha256(request["canary"].encode()).hexdigest(),
+    }
+
+
+def main():
+    for line in sys.stdin:
+        request = json.loads(line)
+        operation = request["operation"]
+        if operation == "identity":
+            result = identity(request)
+        elif operation == "hang":
+            time.sleep(30)
+            return
+        elif operation == "started-hang":
+            print('{"event":"busy"}', flush=True)
+            time.sleep(30)
+            return
+        elif operation == "output":
+            while True:
+                sys.stdout.write("x" * 8192)
+                sys.stdout.flush()
+        elif operation == "busy":
+            end = time.monotonic() + 3
+            while time.monotonic() < end:
+                pass
+            result = {"event": "busy-finished"}
+        elif operation == "temporary-storage":
+            filename = Path("/tmp/fixed-storage-check")
+            count = 0
+            try:
+                with filename.open("wb") as stream:
+                    for _index in range(40):
+                        stream.write(b"x" * 1024 * 1024)
+                        stream.flush()
+                        count += 1
+            except OSError as error:
+                result = {"event": "storage", "limited": error.errno == errno.ENOSPC, "mib": count}
+            else:
+                result = {"event": "storage", "limited": False, "mib": count}
+            finally:
+                filename.unlink(missing_ok=True)
+        else:
+            raise ValueError("Unknown fixed infrastructure operation")
+        print(json.dumps(result), flush=True)
+
+
+if __name__ == "__main__":
+    main()
