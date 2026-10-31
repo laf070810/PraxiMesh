@@ -2,6 +2,12 @@
 
 日期：2026-10-31。设计：[RFC-020](rfcs/020-browser-editor.md)、[ADR-021](adr/021-browser-editor.md)。使用和构建说明集中在 [编辑器指南](editor.md)。本轮在维护者要求的不占 GPU 范围内进行。
 
+## 当前源码复查
+
+2026-10-31 在 `main` 的 `207ed76` 界面基线上重放 `scripts/browser_acceptance.py --interface`，结果在 `test-results/g26-interface.log` 与 `test-results/g26-interface/editor/`。此次未修改页面或编辑器代码。Python/JavaScript 的高亮、补全、真实本地检查与格式化、快捷键、私有草稿及降级行为通过；没有执行评测或占用 GPU。
+
+中英文、1440/768/390 像素的练习筛选、知识列表、学习目标、组织列表和做题页共 30 组布局通过，未发现横向溢出。检查了标题边距、同排筛选控件底边、复选框尺寸、实际点击与 Space 切换；并查看了桌面练习页及编辑器、平板知识页、手机英文目标选项页的实际截图，未发现本次检查范围内的新增错位。源码测试使用一次性数据库与回环服务，不表示已替换正在运行的站点镜像。
+
 ## 已验证的源码行为
 
 - Python/JavaScript 编辑器加载、高亮、行号、本地检查、格式化、撤销、内置名称补全、查找、Tab/Shift+Tab 缩进、注释、Esc 后 Tab 离开编辑器、Ctrl+S 私有保存与重开；worker 离线时不开放运行。
