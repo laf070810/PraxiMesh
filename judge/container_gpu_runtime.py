@@ -4,17 +4,24 @@ import re
 from copy import deepcopy
 from pathlib import Path
 
-from judge.container_contract import WORKLOAD_PROFILE
+from judge.container_contract import PYTHON, WORKLOAD_PROFILE
 from judge.container_devices import check_nodes, kernel_uvm_major, oci_devices, validate_selection
 from judge.container_oci import ContainerRuntime
 from judge.driver_artifacts import verify_bundle, version_from_kernel
+from judge.gpu_task_protocol import validate_target
 from judge.sandbox import SandboxUnavailable
 
 
 class GPUContainerRuntime(ContainerRuntime):
-    def __init__(self, *, device_spec, driver_manifest, **kwargs):
+    def __init__(self, *, device_spec, driver_manifest, target=None, **kwargs):
         self.device_spec = deepcopy(validate_selection(device_spec))
         self.driver_manifest = deepcopy(driver_manifest)
+        self.target = deepcopy(target)
+        self.kernel_cleanup = []
+        if target is not None:
+            validate_target(target)
+            if target["uuid"] != device_spec["uuid"] or target["driver"] != device_spec["driver"]:
+                raise SandboxUnavailable("Kernel target does not match its selected device")
         super().__init__(**kwargs)
         if self.resource_profile != WORKLOAD_PROFILE:
             raise SandboxUnavailable("GPU task requires the fixed whole-task resource budget")
@@ -39,6 +46,18 @@ class GPUContainerRuntime(ContainerRuntime):
     def tick(self):
         super().tick()
         check_nodes(self.device_spec)
+
+    def kernel_session(self, label, *, mode, on_tick=None):
+        if self.target is None:
+            raise SandboxUnavailable("An explicit kernel target is required")
+        self.create(label, PYTHON, ["-I", "/opt/praximesh/judge/container_kernel_guest.py"])
+        return self.session(
+            label,
+            mode=mode,
+            on_tick=on_tick or self.tick,
+            on_cleanup=self.kernel_cleanup.append,
+            architecture=self.target["architecture"],
+        )
 
     def arguments(self, *args):
         return super().arguments(

@@ -17,10 +17,13 @@ from judge.sandbox import SandboxUnavailable
 
 class ContainerConnection:
     def __init__(self, service, status, *, on_tick):
+        from judge.container_gpu import GPUContainerService
+
         if type(service) not in {
             RuntimeContainerService,
             PersistentRuntimeService,
             CompilerContainerService,
+            GPUContainerService,
         }:
             raise ValueError("A verified runtime container is required")
         self.service, self.on_tick = service, on_tick

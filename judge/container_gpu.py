@@ -18,6 +18,9 @@ SOURCES = tuple(
             "judge/container_gpu.py",
             "judge/container_gpu_runtime.py",
             "judge/container_gpu_guest.py",
+            "judge/container_kernel_entry.py",
+            "judge/container_kernel_guest.py",
+            "judge/container_execution.py",
             "scripts/container_gpu_fixture.py",
             "deploy/container-gpu.fragment",
         )

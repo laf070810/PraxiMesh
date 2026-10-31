@@ -3,7 +3,6 @@
 import time
 
 from judge.gpu import evaluate_kernel
-from judge.gpu_contract import output_matches, reference_values
 from judge.gpu_environment import PrivateRuntime
 from judge.gpu_execution_contract import (
     CLEANUP_MARGIN,
@@ -17,27 +16,10 @@ from judge.gpu_kernel_checks import check_kernel
 from judge.gpu_lifecycle import trigger_fault
 from judge.gpu_lifecycle import validate_request as validate_fault_request
 from judge.gpu_policy import execution_digest
-from judge.gpu_probes import VECTOR_REFERENCE
+from judge.gpu_probes import VECTOR_REFERENCE as VECTOR_REFERENCE
+from judge.gpu_recovery_kernel import recover_device, verify_device_session
 from judge.gpu_session import GPUExecutionError
 from judge.sandbox import SandboxUnavailable
-
-
-def verify_device_session(session):
-    """Controller comparison for a fixed known-correct kernel in an open session."""
-    inputs = {"a": [float(i % 13 - 6) for i in range(257)], "b": [0.25] * 257}
-    case = {"inputs": inputs}
-    expected = reference_values("vector-add-f32-v1", inputs)
-    session.compile(VECTOR_REFERENCE, "vector-add-f32-v1")
-    values, _elapsed = session.execute(case)
-    if not output_matches(values, expected, {"kind": "float", "absolute": 1e-5, "relative": 1e-5}):
-        raise SandboxUnavailable("GPU correctness recovery failed")
-
-
-def recover_device(runtime):
-    """A fresh guest/context must compile and execute a fixed known-correct kernel."""
-    with runtime.kernel_session("device-recovery", mode="run") as session:
-        verify_device_session(session)
-        session.finish()
 
 
 def serve(channel, base, archives, deadline):

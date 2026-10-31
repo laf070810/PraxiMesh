@@ -133,6 +133,7 @@ class ContainerRuntime:
         self.base = Path(STATE) / "oci"
         self.base.mkdir(mode=0o700)
         self.deadline, self.on_tick = deadline, on_tick
+        self._cleanup_deadline = deadline
         self.diagnostics = diagnostics
         self.containers = {}
         self.environment = {
@@ -163,13 +164,27 @@ class ContainerRuntime:
             *args,
         ]
 
-    def command(self, *args):
+    def cleanup_tick(self):
+        if time.monotonic() >= self._cleanup_deadline:
+            raise SandboxUnavailable("Owned OCI cleanup deadline expired")
+
+    def command(self, *args, cleanup=False):
+        if cleanup and not (
+            args == ("list", "--format=json")
+            or len(args) == 2
+            and args[0] == "state"
+            and args[1] in self.containers
+            or len(args) == 3
+            and args[:2] == ("delete", "--force")
+            and args[2] in self.containers
+        ):
+            raise ValueError("Cleanup permits only observing or deleting original OCI guests")
         return run_command(
             self.arguments(*args),
             env=self.environment,
-            deadline=self.deadline,
+            deadline=self._cleanup_deadline if cleanup else self.deadline,
             seconds=4,
-            on_tick=self.tick,
+            on_tick=self.cleanup_tick if cleanup else self.tick,
             max_output=65536,
         )
 
@@ -213,9 +228,9 @@ class ContainerRuntime:
         record["process"] = process
         return process
 
-    def inspect(self, label):
+    def inspect(self, label, *, cleanup=False):
         record = self.containers[label]
-        state = json.loads(self.command("state", label).stdout)
+        state = json.loads(self.command("state", label, cleanup=cleanup).stdout)
         if (
             state["id"] != label
             or state["bundle"] != str(record["bundle"])
@@ -269,8 +284,8 @@ class ContainerRuntime:
             exit_verdict=exit_verdict,
         )
 
-    def list_containers(self):
-        states = json.loads(self.command("list", "--format=json").stdout)
+    def list_containers(self, *, cleanup=False):
+        states = json.loads(self.command("list", "--format=json", cleanup=cleanup).stdout)
         if states is None:  # runsc serializes an empty Go slice as JSON null.
             return []
         if type(states) is not list or any(
@@ -279,13 +294,22 @@ class ContainerRuntime:
             raise SandboxUnavailable("Invalid owned OCI runtime state list")
         return states
 
+    def close(self):
+        if any(item["id"] not in self.containers for item in self.list_containers(cleanup=True)):
+            raise SandboxUnavailable("Refusing cleanup of an unknown OCI guest")
+        for label, record in self.containers.items():
+            if not record.get("closed"):
+                self.stop_container(label)
+        if self.list_containers(cleanup=True):
+            raise SandboxUnavailable("Owned OCI runtime did not become empty")
+
     def stop_container(self, label):
         record = self.containers[label]
-        states = self.list_containers()
+        states = self.list_containers(cleanup=True)
         if any(item["id"] == label for item in states):
-            self.inspect(label)
-            self.command("delete", "--force", label)
-        states = self.list_containers()
+            self.inspect(label, cleanup=True)
+            self.command("delete", "--force", label, cleanup=True)
+        states = self.list_containers(cleanup=True)
         if any(item["id"] == label for item in states):
             raise SandboxUnavailable("Owned OCI container removal was not confirmed")
         process = record["process"]
@@ -299,7 +323,7 @@ class ContainerRuntime:
         # This runtime permits one active guest. New private-namespace processes
         # must disappear too; an empty state list or dead CLI is insufficient.
         if record.get("before") is not None:
-            end = min(self.deadline, time.monotonic() + 4)
+            end = min(self._cleanup_deadline, time.monotonic() + 4)
             while True:
                 remaining = {
                     pid: born

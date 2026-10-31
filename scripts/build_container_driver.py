@@ -179,10 +179,17 @@ def build_image(
         # Precreate them in the image so its root can remain read-only at runtime.
         mount_targets = context / "device-mounts"
         mount_targets.mkdir(mode=0o755)
+        mount_targets.chmod(0o755)
         for name in [*(f"nvidia{minor}" for minor in range(255)), "nvidiactl", "nvidia-uvm"]:
             target = mount_targets / name
             target.touch(mode=0o444)
-        for name in ("container_gpu_runtime.py", "container_gpu_guest.py"):
+            target.chmod(0o444)
+        for name in (
+            "container_gpu_runtime.py",
+            "container_gpu_guest.py",
+            "container_kernel_entry.py",
+            "container_kernel_guest.py",
+        ):
             shutil.copyfile(ROOT / "judge" / name, context / name)
         shutil.copyfile(
             ROOT / "scripts/container_gpu_fixture.py", context / "container_gpu_fixture.py"

@@ -51,6 +51,8 @@ def stage_context(archive, out):
         "container_transport_fixture.py",
         "container_workload_fixture.py",
         "gpu_runtime_cpu_guest.py",
+        "container_kernel_cpu_guest.py",
+        "container_kernel_fixture.py",
     ):
         shutil.copyfile(ROOT / "scripts" / name, context / name)
     (context / "judge").mkdir()

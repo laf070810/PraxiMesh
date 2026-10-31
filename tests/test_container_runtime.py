@@ -160,6 +160,7 @@ def runtime(tmp_path):
     instance = ContainerRuntime.__new__(ContainerRuntime)
     instance.base = tmp_path
     instance.deadline = time.monotonic() + 20
+    instance._cleanup_deadline = instance.deadline
     instance.on_tick = lambda: None
     instance.containers = {}
     instance.environment = {}
@@ -203,7 +204,7 @@ def test_mismatched_runtime_bundle_never_authorizes_delete(runtime):
     runtime.create("one", "/bin/false", [])
     calls = []
 
-    def command(*args):
+    def command(*args, **_kwargs):
         calls.append(args)
         data = (
             [{"id": "one"}]
@@ -220,14 +221,46 @@ def test_mismatched_runtime_bundle_never_authorizes_delete(runtime):
 
 def test_empty_runtime_list_and_unobserved_processes_are_distinct(runtime, monkeypatch):
     runtime.create("one", "/bin/false", [])
-    runtime.command = lambda *_a: SimpleNamespace(stdout=b"null")
+    runtime.command = lambda *_a, **_k: SimpleNamespace(stdout=b"null")
     assert runtime.list_containers() == []
     runtime.containers["one"]["before"] = {}
     runtime.deadline = time.monotonic()
+    runtime._cleanup_deadline = runtime.deadline
     monkeypatch.setattr(container_oci, "processes", lambda: {123: 456})
     with pytest.raises(SandboxUnavailable, match="processes remain"):
         runtime.stop_container("one")
     assert not runtime.containers["one"].get("closed")
+
+
+def test_cleanup_ignores_cancelled_channel_but_keeps_original_deadline(runtime, monkeypatch):
+    calls = []
+
+    def cancelled():
+        raise SandboxUnavailable("channel disconnected")
+
+    def run(_args, **kwargs):
+        kwargs["on_tick"]()
+        calls.append(kwargs["deadline"])
+        return SimpleNamespace(stdout=b"null")
+
+    monkeypatch.setattr(container_oci, "run_command", run)
+    runtime.on_tick = cancelled
+    runtime.deadline = time.monotonic() - 1  # The execution budget can be exhausted.
+    assert runtime.list_containers(cleanup=True) == []
+    assert calls == [runtime._cleanup_deadline]
+    with pytest.raises(SandboxUnavailable, match="deadline"):
+        runtime.list_containers()
+    runtime._cleanup_deadline = time.monotonic() - 1
+    with pytest.raises(SandboxUnavailable, match="cleanup deadline"):
+        runtime.list_containers(cleanup=True)
+
+
+@pytest.mark.parametrize(
+    "args", [("run", "new"), ("delete", "--force", "unknown"), ("state", "unknown")]
+)
+def test_cleanup_channel_cannot_start_or_claim_another_guest(runtime, args):
+    with pytest.raises(ValueError, match="Cleanup"):
+        runtime.command(*args, cleanup=True)
 
 
 @pytest.mark.parametrize("kind", ["symlink", "fifo", "oversized", "wrong-digest"])

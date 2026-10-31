@@ -3,3 +3,5 @@ COPY device-mounts /opt/guest-root/dev/
 COPY container_gpu_runtime.py /opt/praximesh/judge/
 COPY container_gpu_guest.py /opt/guest-root/opt/praximesh/
 COPY container_gpu_fixture.py /opt/praximesh/
+COPY container_kernel_entry.py /opt/praximesh/
+COPY container_kernel_guest.py /opt/guest-root/opt/praximesh/judge/

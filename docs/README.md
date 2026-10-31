@@ -90,6 +90,8 @@
 - [G33 完整设备进程来源验收](acceptance-g33.md) — 固定 SMI/NVML、完整列表与旧契约兼容；真实非空 GPU 来源仍待验收
 - [ADR-050：单卡容器任务与持久设备记录](adr/050-single-card-container-task.md)
 - [G34 单卡设备配置与旧记录恢复](acceptance-g34.md) — 组件与数据库边界验证；设备 guest 启动曾失败，修复后实测待授权重放
+- [ADR-051：容器任务的完整内核调用](adr/051-container-kernel-execution.md)
+- [G35 容器内核调用与取消清理](acceptance-g35.md) — 真实 CPU 协议、独立恢复与结果扣留；GPU 专用路径仍待硬件验收
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

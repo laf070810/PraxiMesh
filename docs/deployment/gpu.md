@@ -40,6 +40,23 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 控制容器辨认宿主 PID、任务归属与失效记录 | [进程归属检查](#container-process-observer)；只读 CPU 进程观察，不查询 GPU |
 | 控制容器的 NVIDIA 身份、完整进程来源与占用拒绝 | [只读管理检查](#container-device-observer)；读取明确选定卡的管理元数据，不创建 CUDA 上下文或运行内核 |
 | 单卡设备传入任务/guest、新版记录与控制器中断恢复 | [设备节点检查](#container-device-nodes)；需要明确授权映射真实设备；固定 CPU guest 只读节点元信息，修复后实测待重放 |
+| 容器内核协议、答案比较、结果扣留与独立恢复 | [无设备调用链检查](#container-kernel-flow)；固定 CPU 夹具，不编译学员源码，不接入 GPU |
+
+<a id="container-kernel-flow"></a>
+
+## 不接入 GPU 的容器内核调用链检查
+
+适用于修改内核任务消息、源码发送门槛、可信数值比较、错误分类、取消或清理顺序。使用私有 rootless Docker 和下方[固定 runsc 归档](#提前保存固定镜像减少下载依赖)，不需要 CUDA 驱动库、GPU UUID 或设备映射。
+
+```sh
+.venv/bin/python scripts/container_kernel_acceptance.py \
+  --docker-socket /run/user/$(id -u)/docker.sock \
+  --runtime-archive var/gpu-preflight/gvisor.tar.bz2
+```
+
+此入口构建独立无设备镜像，在真实 runsc 中运行固定 CPU 程序；输入源码仅作为协议数据，不编译或执行。它复用实际可信任务流程和结果校验，检查保护答案不进入 guest、Run/Submit 差异、错解及错误分类、恢复失败与取消后的结果扣留、维护调用和后续新调用。CPU 产生的计时字段只用于检查协议，不能公开为 GPU 性能或写正式成绩。
+
+每个场景按原 journal 恢复并核对进程退出；临时数据保存在自有目录，待恢复记录存在时保留现场。原报告在 `test-results/px-container-kernel-*/result.json`。这里不执行 [G34 设备节点检查](#container-device-nodes)，也不替代真实 CUDA、完整启动凭证或 GPU Compose 验收。
 
 <a id="container-device-nodes"></a>
 
