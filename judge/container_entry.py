@@ -64,6 +64,19 @@ def containment():
     return actual
 
 
+def reap_children(child):
+    """PID 1 also owns orphaned runtime helpers; preserve the main child's status."""
+    while True:
+        try:
+            pid, status = os.waitpid(-1, os.WNOHANG)
+        except ChildProcessError:
+            return
+        if pid == 0:
+            return
+        if pid == child.pid:
+            child.returncode = os.waitstatus_to_exitcode(status)
+
+
 def main(values=None):
     values = sys.argv[1:] if values is None else values
     try:
@@ -112,6 +125,7 @@ def main(values=None):
         while not stopping:
             if time.monotonic() >= deadline:
                 return 124
+            reap_children(child)
             result = child.poll()
             if result is not None:
                 return 0 if result == 0 else 70

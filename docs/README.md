@@ -64,6 +64,8 @@
 - [RFC-021：GPU 容器部署的独立任务监督](rfcs/021-gpu-container-supervision.md)
 - [ADR-037：可信容器监督与接管](adr/037-trusted-container-supervision.md)
 - [G21 容器监督基础的 CPU 验证](acceptance-g21.md) — 独立期限、身份与清理；尚未接入 GPU worker
+- [ADR-038：容器内直接 OCI runsc](adr/038-nested-runsc-container.md)
+- [G22 容器内 runsc 的 CPU 验证](acceptance-g22.md) — 运行与故障基础；整容器上限不等于独立 guest 配额
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

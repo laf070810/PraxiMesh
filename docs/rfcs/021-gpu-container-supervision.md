@@ -28,6 +28,14 @@ PID 1 在绝对启动期限后拒绝启动；终止期限不因重连、观察�
 
 ## 后续集成与发布门槛
 
+### 容器内 runsc 可行性验证
+
+2026-10-31 的固定 CPU 前提检查确认：当前监督容器内 `unshare(CLONE_NEWUSER)` 返回 EPERM，cgroup 为只读。现有依赖 RootlessKit、Podman 及可写子 cgroup 的宿主运行时不能原样搬入。原始结果在 `test-results/g22-namespace-prerequisite.json`；没有修改主机服务或执行 GPU。
+
+下一步以独立、未接入正式评测的实验镜像验证直接 OCI runsc：固定完整运行时归档，构建只读 guest 根目录；仅对可信外层程序提供经过审阅的命名空间系统调用配置，继续使用 rootless、无额外能力、无宿主挂载、无网络和无设备。不能使用 privileged 或 unconfined 代替确定所需权限。gVisor 的[无特权嵌套运行说明](https://gvisor.dev/docs/user_guide/rootless/)和 [OCI 入口](https://gvisor.dev/docs/user_guide/quick_start/oci/)提供机制依据，实际可用性仍以本机探针为准；外层 syscall 配置参照 [Docker seccomp 说明](https://docs.docker.com/engine/security/seccomp/)。
+
+实验必须明确资源属于哪一层：外层现有 2 CPU、2 GiB、512 任务上限覆盖监督器和所有 guest；这不能冒充宿主路径独立的 0.5 CPU、512 MiB guest 配额。接入正式评测前须选定并版本化资源契约、证明内存/进程/CPU 故障和独立期限，重新验证执行环境及凭证。外层期限必须仍覆盖 runsc、gofer、Sentry 和脱离父进程的后代，不能仅终止附着 CLI。CPU 探针只能证明所执行的基础路径，不能启用 GPU、正式成绩或普通容器回退。
+
 必须解决并验证：容器化 worker 与既有设备锁/UID/主机身份兼容；持久保存并恢复旧镜像和容器身份；可信通信、取消和租约；gVisor/NVIDIA 单卡注入、PID 对应和持续占用检测；完整启动与资源/内核/故障探针；Compose 数据库初始化与发布协调器的排空、升级和回退。GPU 驱动仍在信任边界内，Docker GPU 选项不能替代 [gVisor GPU 检查](https://gvisor.dev/docs/user_guide/gpu/)。
 
 本阶段不修改当前执行策略、设备允许列表、默认题库或现有服务；不占用 GPU，不设置 privileged，不以普通容器运行学员代码。后续任何需要放宽监督容器权限的方案必须重新记录取舍和验证，不能悄悄扩大此契约。

@@ -28,6 +28,25 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 源码部署的 GPU 准入配置、额度与排空 | [准入门槛](#gpu-admission)，当前只做不占 GPU 的验证 |
 | CUDA 候选合并、静态检查和参考解/错解 | [内容准备与验收](#cuda-content)；静态检查不占 GPU，真实 API 验收需要独占卡 |
 | 容器监督的独立期限、进程树与接管 | [可信容器监督检查](#container-supervision)；仅固定 CPU 基础设施，不是 GPU 部署入口 |
+| 容器内 runsc、会话故障和整树终止 | [嵌套运行时检查](#container-runtime)；固定 CPU guest，尚无 GPU 或正式准入 |
+
+<a id="container-runtime"></a>
+
+## 不占 GPU 的容器内 runsc 检查
+
+在具备下方监督检查条件的同一用户环境，使用已下载的固定完整 runsc 归档：
+
+```sh
+.venv/bin/python scripts/container_runtime_acceptance.py \
+  --docker-socket /run/user/$(id -u)/docker.sock \
+  --runtime-archive var/gpu-preflight/gvisor.tar.bz2
+```
+
+归档准备与摘要见[单卡环境检查](#重放单卡环境检查)的制品说明；此命令本身不读显卡、不调用 CUDA，也不需要编译器归档。它使用自有构建目录、镜像标签、容器和合成锁身份，不导入应用数据库。构建仅传递固定源码契约摘要，客户端不继承代理或应用凭据。
+
+新镜像使用专门审阅的 syscall 配置，让固定 runsc 在可信外层中创建私有命名空间；不修改 daemon，不使用 privileged/unconfined。直接 OCI guest 使用虚拟 UID 0、空能力、只读根、断网和有限临时目录。外层仍为非 root UID 65532，**2 CPU、2 GiB、512 任务是整个监督容器的总上限，不是独立 guest 配额**。
+
+工具检查私有控制文件与网络不可见、输出/时间超限、临时存储、附着客户端退出及每次故障后的新 guest 恢复；另检查可信控制器退出和独立期限下的整棵进程树。结果保存在 `test-results/px-container-runtime-*/result.json`，只有检查和自有资源清理全部成功才标记 `passed: true`。失败报告保留，不表示 GPU 可用。设计及限制见 [ADR-038](../adr/038-nested-runsc-container.md)和 [G22](../acceptance-g22.md)。
 
 <a id="container-supervision"></a>
 

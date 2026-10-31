@@ -9,6 +9,7 @@ import stat
 import tempfile
 import time
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 
 from judge.container_contract import (
@@ -102,6 +103,18 @@ class LocalEngine:
 
 
 class ContainerService:
+    SCOPE = PROTOCOL
+
+    def required_image_labels(self):
+        return {PREFIX + "protocol": PROTOCOL}
+
+    def valid_security_options(self, options):
+        return options == ["no-new-privileges"]
+
+    @contextmanager
+    def creation_options(self):
+        yield ()
+
     def __init__(self, guard, job_id, reservation_token, *, engine, image, purpose="task"):
         if type(guard) is not DeviceLock:
             raise ValueError("An owned device lock is required")
@@ -119,7 +132,7 @@ class ContainerService:
         )
         self.owner = digest(
             [
-                PROTOCOL,
+                self.SCOPE,
                 os.getuid(),
                 guard.device_uuid,
                 str(self.job_id),
@@ -150,7 +163,10 @@ class ContainerService:
                     image["Id"] != self.image
                     or image["Os"] != "linux"
                     or type(labels) is not dict
-                    or labels.get(PREFIX + "protocol") != PROTOCOL
+                    or any(
+                        labels.get(key) != value
+                        for key, value in self.required_image_labels().items()
+                    )
                     or type(environment) is not list
                     or any(type(item) is not str for item in environment)
                     or config.get("Entrypoint") != [PYTHON, "-I", ENTRY]
@@ -198,14 +214,16 @@ class ContainerService:
                 or record["Name"] != "/" + self.name
                 or record["Image"] != self.image
                 or record.get("RestartCount") != 0
-                or set(labels) != {PREFIX + key for key in ("protocol", "owner", "command")}
-                or labels[PREFIX + "protocol"] != PROTOCOL
-                or labels[PREFIX + "owner"] != self.owner
+                or labels
+                != {
+                    **self.required_image_labels(),
+                    PREFIX + "owner": self.owner,
+                    PREFIX + "command": digest(arguments),
+                }
                 or len(arguments) < 5
                 or arguments[3] != "--"
                 or not re.fullmatch("[a-f0-9]{32}", arguments[2])
                 or not Path(arguments[4]).is_absolute()
-                or labels[PREFIX + "command"] != digest(arguments)
                 or not math.isfinite(before)
                 or not math.isfinite(deadline)
                 or not 0 < deadline - before <= MAX_SECONDS
@@ -236,7 +254,6 @@ class ContainerService:
                 "Privileged": False,
                 "ReadonlyRootfs": True,
                 "CapDrop": ["ALL"],
-                "SecurityOpt": ["no-new-privileges"],
                 "Memory": MEMORY_BYTES,
                 "MemorySwap": MEMORY_BYTES,
                 "CpuQuota": CPU_QUOTA,
@@ -248,20 +265,24 @@ class ContainerService:
                 "LogConfig": {"Type": "none", "Config": {}},
                 "Tmpfs": {STATE: TMPFS},
             }
-            if any(host.get(key) != value for key, value in expected.items()) or any(
-                host.get(key)
-                for key in (
-                    "Binds",
-                    "Mounts",
-                    "VolumesFrom",
-                    "Devices",
-                    "DeviceRequests",
-                    "DeviceCgroupRules",
-                    "CapAdd",
-                    "GroupAdd",
-                    "Init",
-                    "Links",
-                    "CgroupParent",
+            if (
+                not self.valid_security_options(host.get("SecurityOpt"))
+                or any(host.get(key) != value for key, value in expected.items())
+                or any(
+                    host.get(key)
+                    for key in (
+                        "Binds",
+                        "Mounts",
+                        "VolumesFrom",
+                        "Devices",
+                        "DeviceRequests",
+                        "DeviceCgroupRules",
+                        "CapAdd",
+                        "GroupAdd",
+                        "Init",
+                        "Links",
+                        "CgroupParent",
+                    )
                 )
             ):
                 raise ValueError
@@ -304,54 +325,56 @@ class ContainerService:
         if before >= until:
             raise SandboxUnavailable("Reservation expired before creation")
         arguments = [str(before), str(until), uuid.uuid4().hex, "--", *command]
-        created = (
-            self._run(
-                "container",
-                "create",
-                "--pull=never",
-                "--name",
-                self.name,
-                "--label",
-                PREFIX + "protocol=" + PROTOCOL,
-                "--label",
-                PREFIX + "owner=" + self.owner,
-                "--label",
-                PREFIX + "command=" + digest(arguments),
-                "--user",
-                USER,
-                "--workdir",
-                STATE,
-                "--network=none",
-                "--runtime=runc",
-                "--ipc=private",
-                "--cgroupns=private",
-                "--read-only",
-                "--cap-drop=ALL",
-                "--security-opt=no-new-privileges",
-                "--memory",
-                str(MEMORY_BYTES),
-                "--memory-swap",
-                str(MEMORY_BYTES),
-                "--cpu-period",
-                str(CPU_PERIOD),
-                "--cpu-quota",
-                str(CPU_QUOTA),
-                "--pids-limit",
-                str(PIDS),
-                "--restart=no",
-                "--stop-signal=SIGKILL",
-                "--stop-timeout",
-                str(STOP_SECONDS),
-                "--log-driver=none",
-                "--tmpfs",
-                STATE + ":" + TMPFS,
-                self.image,
-                *arguments,
-                on_tick=on_tick,
+        with self.creation_options() as extra_options:
+            created = (
+                self._run(
+                    "container",
+                    "create",
+                    "--pull=never",
+                    "--name",
+                    self.name,
+                    "--label",
+                    PREFIX + "protocol=" + PROTOCOL,
+                    "--label",
+                    PREFIX + "owner=" + self.owner,
+                    "--label",
+                    PREFIX + "command=" + digest(arguments),
+                    "--user",
+                    USER,
+                    "--workdir",
+                    STATE,
+                    "--network=none",
+                    "--runtime=runc",
+                    "--ipc=private",
+                    "--cgroupns=private",
+                    "--read-only",
+                    "--cap-drop=ALL",
+                    "--security-opt=no-new-privileges",
+                    *extra_options,
+                    "--memory",
+                    str(MEMORY_BYTES),
+                    "--memory-swap",
+                    str(MEMORY_BYTES),
+                    "--cpu-period",
+                    str(CPU_PERIOD),
+                    "--cpu-quota",
+                    str(CPU_QUOTA),
+                    "--pids-limit",
+                    str(PIDS),
+                    "--restart=no",
+                    "--stop-signal=SIGKILL",
+                    "--stop-timeout",
+                    str(STOP_SECONDS),
+                    "--log-driver=none",
+                    "--tmpfs",
+                    STATE + ":" + TMPFS,
+                    self.image,
+                    *arguments,
+                    on_tick=on_tick,
+                )
+                .stdout.decode()
+                .strip()
             )
-            .stdout.decode()
-            .strip()
-        )
         if not HEX_ID.fullmatch(created):
             raise SandboxUnavailable("Container creation did not return an identity")
         self.container_id = created
