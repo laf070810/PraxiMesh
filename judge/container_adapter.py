@@ -1,6 +1,7 @@
 """Container GPU execution and identity; complete startup admission remains separate."""
 
 from copy import deepcopy
+from uuid import uuid4
 
 from judge import gpu_artifacts
 from judge.container_controller import (
@@ -18,6 +19,7 @@ from judge.container_runtime_service import contract_digest
 from judge.container_service import IMAGE_ID
 from judge.driver_artifacts import manifest_digest, validate_manifest
 from judge.gpu_execution_contract import canonical_digest
+from judge.gpu_kernel_checks import check_request
 from judge.gpu_policy import execution_digest
 from judge.gpu_task_protocol import task_request
 from judge.sandbox import SandboxUnavailable
@@ -128,3 +130,13 @@ class ContainerGPUAdapter:
             on_begin=lambda: None,
         )
         return deepcopy(self.environment)
+
+    def check_kernel(self, task, name, *, deadline, on_tick):
+        completed = self.exchange(
+            task,
+            check_request(name, uuid4().hex),
+            deadline=deadline,
+            on_tick=on_tick,
+            on_begin=lambda: None,
+        )
+        return deepcopy(completed["report"]), deepcopy(self.environment)

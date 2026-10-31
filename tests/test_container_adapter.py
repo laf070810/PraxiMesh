@@ -203,6 +203,40 @@ def test_maintenance_reuses_kernel_recovery_without_publishing_ready(configured)
         binding(configured.control.guard, "synthetic-worker", adapter)
 
 
+def test_adapter_named_check_sends_only_fixed_name_and_fresh_challenge(configured):
+    from tests.test_container_kernel_checks import check_report
+
+    requests = []
+
+    def run(task, request, *, deadline, on_tick, on_begin):
+        assert task.service.purpose == "maintenance" and deadline == 100
+        assert set(request) == {"event", "name", "challenge"}
+        assert request["event"] == "check-kernel" and request["name"] == "public-run"
+        requests.append(request)
+        on_tick()
+        on_begin()
+        return {
+            "report": check_report(request),
+            "artifacts": {
+                "image": task.service.image,
+                "task_contract": configured.adapter.environment["artifacts"]["task_contract"],
+                "resource_profile": configured.adapter.environment["resource_profile"],
+                "limits": copy.deepcopy(configured.adapter.environment["workload_limits"]),
+            },
+        }
+
+    configured.run = run
+    adapter = configured.adapter
+    for _ in range(2):
+        task = adapter.task(configured.control.guard, "job", "reservation", purpose="maintenance")
+        report, environment = adapter.check_kernel(
+            task, "public-run", deadline=100, on_tick=lambda: None
+        )
+        assert report["name"] == "public-run" and environment == adapter.environment
+    assert requests[0]["challenge"] != requests[1]["challenge"]
+    assert "ready" not in environment
+
+
 def test_saved_container_identity_never_hashes_live_source(configured, monkeypatch):
     env = copy.deepcopy(configured.adapter.environment)
     env["execution_digest"] = "0" * 64

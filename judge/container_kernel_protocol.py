@@ -7,6 +7,7 @@ from judge.container_contract import WORKLOAD_PROFILE, resource_limits
 from judge.container_devices import validate_selection
 from judge.driver_artifacts import manifest_digest
 from judge.gpu_artifacts import RUNSC_SHA256
+from judge.gpu_kernel_checks import check_request
 from judge.gpu_task_protocol import task_request, validate_result, validate_target
 from judge.sandbox import SandboxUnavailable
 
@@ -41,6 +42,10 @@ def prepared(selection, manifest, target):
 def validate_request(value):
     if value == {"event": "recover"}:
         return value
+    if type(value) is dict and set(value) == {"event", "name", "challenge"}:
+        if value == check_request(value["name"], value["challenge"]):
+            return value
+        raise ValueError("Unexpected kernel check request")
     if type(value) is not dict or set(value) != {"event", "source", "problem", "mode"}:
         raise ValueError("Unexpected kernel task request")
     if value != task_request(value["problem"], value["source"], value["mode"]):
@@ -61,14 +66,24 @@ def check_prepared(value, expected):
 
 
 def expected_cleanup(request):
-    labels = ["device-recovery"] if request["event"] == "recover" else ["task", "device-recovery"]
+    if request["event"] == "recover":
+        labels = ["device-recovery"]
+    else:
+        labels = [
+            "startup-check" if request["event"] == "check-kernel" else "task",
+            "device-recovery",
+        ]
     return [{"id": name, "stopped": True, "removed": True} for name in labels]
 
 
 def checked_completion(value, request):
+    validate_request(request)
     fields = {"event", "protocol", "recovered", "cleanup", "ready"}
     maintenance = request["event"] == "recover"
-    if not maintenance:
+    check = request["event"] == "check-kernel"
+    if check:
+        fields.add("report")
+    elif not maintenance:
         fields.add("result")
     if (
         type(value) is not dict
@@ -83,6 +98,10 @@ def checked_completion(value, request):
         )
     ):
         raise SandboxUnavailable("Kernel task did not confirm independent recovery and cleanup")
-    if not maintenance:
+    if check:
+        from judge.container_kernel_checks import validate_check_report
+
+        validate_check_report(value["report"], request)
+    elif not maintenance:
         validate_result(value["result"], request["problem"], request["mode"])
     return deepcopy(value)

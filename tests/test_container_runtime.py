@@ -230,6 +230,33 @@ def test_empty_runtime_list_and_unobserved_processes_are_distinct(runtime, monke
     with pytest.raises(SandboxUnavailable, match="processes remain"):
         runtime.stop_container("one")
     assert not runtime.containers["one"].get("closed")
+    assert "cleanup_evidence" not in runtime.containers["one"]
+
+
+def test_repeated_cleanup_preserves_first_running_state_and_attach_exit(runtime, monkeypatch):
+    runtime.create("one", "/bin/false", [])
+    process = SimpleNamespace(returncode=4, wait=lambda **_kw: 4)
+    runtime.containers["one"].update(process=process, before={})
+    states = [{"id": "one"}]
+
+    def command(*args, **_kw):
+        if args[0] == "delete":
+            states.clear()
+        value = (
+            states
+            if args[0] == "list"
+            else {"id": "one", "bundle": str(runtime.base / "one"), "status": "running"}
+        )
+        return SimpleNamespace(stdout=json.dumps(value).encode())
+
+    monkeypatch.setattr(container_oci, "processes", lambda: {})
+    runtime.command = command
+    assert runtime.stop_container("one") == {"id": "one", "stopped": True, "removed": True}
+    original = dict(runtime.containers["one"]["cleanup_evidence"])
+    assert original["exit_code"] == 4 and original["running_before_cleanup"] is True
+    assert original["scope"] == "runsc-guest-v1"
+    runtime.stop_container("one")
+    assert runtime.containers["one"]["cleanup_evidence"] == original
 
 
 def test_cleanup_ignores_cancelled_channel_but_keeps_original_deadline(runtime, monkeypatch):

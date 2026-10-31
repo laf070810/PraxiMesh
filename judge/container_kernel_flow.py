@@ -2,6 +2,7 @@
 
 import time
 
+from judge.container_kernel_checks import check_kernel
 from judge.container_kernel_protocol import PROTOCOL, checked_completion, validate_request
 from judge.gpu import evaluate_kernel
 from judge.gpu_recovery_kernel import recover_device
@@ -16,6 +17,7 @@ def serve_kernel(channel, runtime, identity):
     request = validate_request(channel.receive())
     deadline = runtime.deadline
     maintenance = request["event"] == "recover"
+    check = request["event"] == "check-kernel"
     try:
         if not maintenance:
             execution_deadline = deadline - RECOVERY_MARGIN - CLEANUP_MARGIN
@@ -30,12 +32,17 @@ def serve_kernel(channel, runtime, identity):
                 if time.monotonic() >= execution_deadline:
                     raise GPUExecutionError("time_limit")
 
-            with runtime.kernel_session(
-                "task", mode=request["mode"], on_tick=execution_tick
-            ) as session:
-                result = evaluate_kernel(
-                    request["problem"], request["source"], request["mode"], session
-                )
+            if check:
+                runtime.deadline = execution_deadline
+                report = check_kernel(runtime, request)
+                runtime.deadline = deadline
+            else:
+                with runtime.kernel_session(
+                    "task", mode=request["mode"], on_tick=execution_tick
+                ) as session:
+                    result = evaluate_kernel(
+                        request["problem"], request["source"], request["mode"], session
+                    )
         # The task guest has stopped before an independently compiled correct
         # recovery guest is created. A raw runtime error cannot stand in for it.
         runtime.deadline = deadline - CLEANUP_MARGIN
@@ -50,7 +57,9 @@ def serve_kernel(channel, runtime, identity):
             "ready": False,
             "cleanup": runtime.kernel_cleanup,
         }
-        if not maintenance:
+        if check:
+            completed["report"] = report
+        elif not maintenance:
             completed["result"] = result
         checked_completion(completed, request)
         del request

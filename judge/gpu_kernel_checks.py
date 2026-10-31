@@ -9,9 +9,9 @@ import time
 
 from judge.gpu import evaluate_kernel
 from judge.gpu_contract import reference_values
-from judge.gpu_execution_contract import validate_result
 from judge.gpu_probes import VECTOR_REFERENCE, correctness_fixtures, fault_fixtures
 from judge.gpu_session import GPUDriverExited
+from judge.gpu_task_protocol import validate_result
 from judge.sandbox import SandboxUnavailable
 
 CHECKS = (
@@ -171,8 +171,20 @@ def validate_check_report(report, request):
     )
     if name in INTERRUPTIONS:
         require(
-            report["interruption"] == name and cleanup["running_before_cleanup"] is True,
+            cleanup["running_before_cleanup"] is True,
             "CUDA interruption did not require physical container cleanup",
+        )
+    validate_outcome(report, request)
+
+
+def validate_outcome(report, request):
+    """Shared check semantics after the caller verifies its own cleanup schema."""
+    name = request["name"]
+    cleanup = report["cleanup"]
+    if name in INTERRUPTIONS:
+        require(
+            report["interruption"] == name,
+            "CUDA interruption does not match the requested check",
         )
         return
     case = case_for(name)
@@ -200,7 +212,7 @@ class _Cancelled(Exception):
     pass
 
 
-def interrupt_session(runtime, session, name):
+def interrupt_session(runtime, session, name, *, before_interrupt=None):
     """Interrupt an already compiled session, never an arbitrary host process."""
     fixture = next(item for item in fault_fixtures() if item["name"] == "kernel-timeout")
     session.compile(fixture["source"], fixture["operation"])
@@ -212,6 +224,11 @@ def interrupt_session(runtime, session, name):
         runtime.tick()
         if not triggered and time.monotonic() >= armed + 0.5:
             require(session.process.poll() is None, "CUDA attach client exited before interruption")
+            if before_interrupt is not None:
+                before_interrupt()
+                require(
+                    session.process.poll() is None, "CUDA attach client exited during observation"
+                )
             if name == "cancel":
                 triggered = True
                 raise _Cancelled

@@ -41,6 +41,7 @@ def main():
         "runtime-error",
         "recovery-fail",
         "hang",
+        "check-hang",
     }:
         raise ValueError("Unexpected fixed CPU kernel scenario")
     listener = ContainerListener(on_tick=lambda: None)
@@ -65,6 +66,10 @@ def main():
         finally:
             if runtime is not None:
                 report["cleanup"] = runtime.kernel_cleanup
+                report["guest_cleanup_evidence"] = {
+                    label: value.get("cleanup_evidence")
+                    for label, value in runtime.containers.items()
+                }
             if channel is not None:
                 channel.close()
             listener.close()

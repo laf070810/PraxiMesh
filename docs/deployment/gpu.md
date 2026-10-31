@@ -40,7 +40,7 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 控制容器辨认宿主 PID、任务归属与失效记录 | [进程归属检查](#container-process-observer)；只读 CPU 进程观察，不查询 GPU |
 | 控制容器的 NVIDIA 身份、完整进程来源与占用拒绝 | [只读管理检查](#container-device-observer)；读取明确选定卡的管理元数据，不创建 CUDA 上下文或运行内核 |
 | 单卡设备传入任务/guest、新版记录与控制器中断恢复 | [设备节点检查](#container-device-nodes)；需要明确授权映射真实设备；固定 CPU guest 只读节点元信息，修复后实测待重放 |
-| 容器内核协议、答案比较、结果扣留与独立恢复 | [无设备调用链检查](#container-kernel-flow)；固定 CPU 夹具，不编译学员源码，不接入 GPU |
+| 容器内核协议、固定启动检查、结果扣留与独立恢复 | [无设备调用链检查](#container-kernel-flow)；固定 CPU 夹具，不编译学员源码，不接入 GPU |
 
 <a id="container-kernel-flow"></a>
 
@@ -56,9 +56,11 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 
 此入口构建独立无设备镜像，在真实 runsc 中运行固定 CPU 程序；输入源码仅作为协议数据，不编译或执行。它复用实际可信任务流程和结果校验，检查保护答案不进入 guest、Run/Submit 差异、错解及错误分类、恢复失败与取消后的结果扣留、维护调用和后续新调用。CPU 产生的计时字段只用于检查协议，不能公开为 GPU 性能或写正式成绩。
 
+固定启动检查也经该入口重放：命名维护请求、编译后取消与附着进程退出、非预期结果和恢复失败。核对报告挑战、中断前原 guest/附着进程活跃观察、实际清理状态与退出码，以及新正确 guest 的独立恢复。CPU 固定向量程序不执行对应 CUDA 源码，不能据此宣称十九项 CUDA 检查通过；报告格式与语义见 [ADR-053](../adr/053-container-kernel-startup-checks.md)。
+
 每个场景按原 journal 恢复并核对进程退出；临时数据保存在自有目录，待恢复记录存在时保留现场。原报告在 `test-results/px-container-kernel-*/result.json`。这里不执行 [G34 设备节点检查](#container-device-nodes)，也不替代真实 CUDA、完整启动凭证或 GPU Compose 验收。
 
-容器调用现在也有独立环境身份，并接入原有任务结算和历史成绩校验，设计见 [ADR-052](../adr/052-container-gpu-environment.md)。完整控制镜像包含 GPU 策略所需的全部源码，[控制端映射检查](#container-controller)会在镜像内计算策略并核对实际 Docker 引擎身份。当前 `gpu_worker` 命令仍使用宿主适配器；容器完整启动与资源/故障探针尚未接通，因此这些组件不能通过现有命令、环境变量或旧 receipt 开放 GPU 提交。
+容器调用现在也有独立环境身份，并接入原有任务结算和历史成绩校验，设计见 [ADR-052](../adr/052-container-gpu-environment.md)。完整控制镜像包含 GPU 策略所需的全部源码，[控制端映射检查](#container-controller)会在镜像内计算策略并核对实际 Docker 引擎身份。当前 `gpu_worker` 命令仍使用宿主适配器；容器固定内核检查已连接，完整启动、资源与整控制器故障检查尚未接通，因此这些组件不能通过现有命令、环境变量或旧 receipt 开放 GPU 提交。
 
 <a id="container-device-nodes"></a>
 

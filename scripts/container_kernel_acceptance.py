@@ -19,6 +19,7 @@ from judge.container_kernel_protocol import checked_completion  # noqa: E402
 from judge.container_runtime_service import SOURCES, contract_digest  # noqa: E402
 from judge.container_service import LocalEngine  # noqa: E402
 from judge.gpu_device_lock import DeviceLock  # noqa: E402
+from judge.gpu_kernel_checks import check_request  # noqa: E402
 from judge.gpu_task_protocol import task_request  # noqa: E402
 from judge.sandbox import SandboxUnavailable  # noqa: E402
 from scripts.container_journal_acceptance import save  # noqa: E402
@@ -51,14 +52,40 @@ def problem():
     }
 
 
+def request_for(test_mode):
+    if test_mode == "recover":
+        return {"event": "recover"}
+    if test_mode.startswith("check-"):
+        name = test_mode.removeprefix("check-")
+        if name == "unexpected":
+            name = "vector-subtraction"
+        return check_request(name, uuid.uuid4().hex)
+    request = task_request(
+        problem(),
+        "Opaque CPU fixture data, never compiled",
+        "run" if test_mode == "invalid" else test_mode,
+    )
+    if test_mode == "invalid":
+        request["untrusted_extra"] = True
+    return request
+
+
 def scenario(engine, image, path, mode, test_mode):
+    request = request_for(test_mode)
     path.mkdir(mode=0o700)
     row = {"mode": mode, "test_mode": test_mode, "passed": False, "fixture_only": True}
     connection = None
     with DeviceLock(path / "locks", "GPU-" + str(uuid.uuid4())) as guard:
         with ContainerJournal(path / "journal", guard, engine) as journal:
             service = PersistentRuntimeService(
-                journal, uuid.uuid4(), uuid.uuid4(), image=image, resource_profile=WORKLOAD_PROFILE
+                journal,
+                uuid.uuid4(),
+                uuid.uuid4(),
+                image=image,
+                resource_profile=WORKLOAD_PROFILE,
+                purpose="maintenance"
+                if test_mode == "recover" or test_mode.startswith("check-")
+                else "task",
             )
             try:
                 status = service.start(
@@ -78,21 +105,13 @@ def scenario(engine, image, path, mode, test_mode):
                 channel.send({"event": "prepare-cpu-fixture"})
                 assert channel.receive() == IDENTITY
                 row["processes"] = tree(engine, service)
-                request = (
-                    {"event": "recover"}
-                    if test_mode == "recover"
-                    else task_request(
-                        problem(),
-                        "Opaque CPU fixture data, never compiled",
-                        test_mode if test_mode != "invalid" else "run",
-                    )
-                )
-                if test_mode == "invalid":
-                    request["untrusted_extra"] = True
                 channel.send(request)
                 if mode == "hang":
                     cancel_at = time.monotonic() + 1
-                if mode in {"recovery-fail", "hang"} or test_mode == "invalid":
+                if mode in {"recovery-fail", "hang"} or test_mode in {
+                    "invalid",
+                    "check-unexpected",
+                }:
                     try:
                         channel.receive()
                     except SandboxUnavailable as error:
@@ -105,7 +124,9 @@ def scenario(engine, image, path, mode, test_mode):
                     row["result_withheld"] = True
                 else:
                     value = checked_completion(channel.receive(), request)
-                    if test_mode != "recover":
+                    if test_mode.startswith("check-"):
+                        row["startup_check"] = value["report"]
+                    elif test_mode != "recover":
                         expected = {
                             "normal": "accepted",
                             "wrong-answer": "wrong_answer",
@@ -193,6 +214,12 @@ def main():
             ("hang", "run"),
             ("normal", "invalid"),
             ("normal", "recover"),
+            ("normal", "check-public-run"),
+            ("wrong-answer", "check-vector-subtraction"),
+            ("check-hang", "check-cancel"),
+            ("check-hang", "check-attach-death"),
+            ("normal", "check-unexpected"),
+            ("recovery-fail", "check-public-run"),
             ("normal", "run"),
         ):
             row = scenario(engine, image, base / str(len(report["checks"])), mode, test_mode)

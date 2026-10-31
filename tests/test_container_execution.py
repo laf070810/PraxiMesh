@@ -268,6 +268,26 @@ def test_recovery_requires_maintenance_purpose(flow):
     assert "start" not in flow.events
 
 
+@pytest.mark.parametrize("maintenance", [False, True])
+def test_named_check_requires_maintenance_and_original_cleanup(flow, maintenance):
+    from tests.test_container_kernel_checks import REQUEST, check_report
+
+    flow.message.clear()
+    flow.message.update(REQUEST)
+    if not maintenance:
+        with pytest.raises(ValueError, match="purpose"):
+            flow.run()
+        assert "start" not in flow.events
+        return
+    flow.task.service.purpose = "maintenance"
+    reply = flow.incoming[1]
+    reply.pop("result")
+    reply.update(report=check_report(), cleanup=expected_cleanup(REQUEST))
+    value = flow.run()
+    assert value["report"] == check_report() and "result" not in value
+    assert "outer-recovered" in flow.events and flow.events[-1] == "idle-observed"
+
+
 def test_controller_snapshot_imports_kernel_api_without_host_checkout(tmp_path):
     for name in container_controller.CONTROLLER_SOURCES:
         target = tmp_path / name
@@ -295,6 +315,32 @@ def test_controller_snapshot_imports_kernel_api_without_host_checkout(tmp_path):
     from judge.gpu_policy import execution_digest
 
     assert result.stdout.decode().splitlines() == [module.gpu_task_digest(), execution_digest()]
+
+
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "run",
+        "submit",
+        "recover",
+        "check-public-run",
+        "check-vector-subtraction",
+        "check-cancel",
+        "check-attach-death",
+        "check-unexpected",
+    ],
+)
+def test_actual_cpu_entry_constructs_each_protocol_before_starting_a_container(mode):
+    from judge.container_kernel_protocol import validate_request
+    from scripts.container_kernel_acceptance import request_for
+
+    request = request_for(mode)
+    assert validate_request(request) == request
+    if mode.startswith("check-"):
+        assert set(request) == {"event", "name", "challenge"}
+        assert request["event"] == "check-kernel"
+    with pytest.raises(ValueError):
+        request_for("invalid-task-mode")
 
 
 def test_cpu_acceptance_problem_uses_the_real_task_data_contract():

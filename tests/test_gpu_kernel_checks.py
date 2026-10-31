@@ -224,7 +224,8 @@ time.sleep(30)
 
 
 @pytest.mark.parametrize("name", sorted(checks.INTERRUPTIONS))
-def test_interruption_uses_real_owned_cpu_pipe_and_finds_driver_exit(name):
+@pytest.mark.parametrize("observe", [False, True])
+def test_interruption_uses_real_owned_cpu_pipe_and_finds_driver_exit(name, observe):
     process = subprocess.Popen(
         [sys.executable, "-u", "-c", PIPE_HELPER],
         stdin=subprocess.PIPE,
@@ -232,6 +233,7 @@ def test_interruption_uses_real_owned_cpu_pipe_and_finds_driver_exit(name):
         stderr=subprocess.PIPE,
     )
     cleaned = []
+    observations = []
     try:
         with GPUSession(
             process,
@@ -241,8 +243,19 @@ def test_interruption_uses_real_owned_cpu_pipe_and_finds_driver_exit(name):
             on_tick=lambda: None,
         ) as session:
             started = time.monotonic()
+
+            def before_interrupt():
+                assert session.compiled and process.poll() is None
+                observations.append(True)
+
             assert (
-                checks.interrupt_session(SimpleNamespace(tick=lambda: None), session, name) == name
+                checks.interrupt_session(
+                    SimpleNamespace(tick=lambda: None),
+                    session,
+                    name,
+                    before_interrupt=before_interrupt if observe else None,
+                )
+                == name
             )
             assert session.compiled and time.monotonic() - started >= 0.5
     finally:
@@ -250,6 +263,7 @@ def test_interruption_uses_real_owned_cpu_pipe_and_finds_driver_exit(name):
             process.kill()
         process.wait(timeout=5)
     assert process.returncode < 0 and cleaned == [True]
+    assert observations == ([True] if observe else [])
 
 
 @pytest.mark.parametrize("name", sorted(checks.INTERRUPTIONS))

@@ -242,14 +242,16 @@ class ContainerRuntime:
     def session(self, label, *, mode, on_tick, on_cleanup=None, architecture=()):
         initial_memory = counters("memory.events")
         cleaned = False
+        result = None
 
         def cleanup():
-            nonlocal cleaned
+            nonlocal cleaned, result
             if not cleaned:
                 result = self.stop_container(label)
                 cleaned = True
                 if on_cleanup is not None:
                     on_cleanup(result)
+            return result
 
         def exit_verdict(_code):
             if process.poll() is not None and exceeded_memory():
@@ -306,8 +308,9 @@ class ContainerRuntime:
     def stop_container(self, label):
         record = self.containers[label]
         states = self.list_containers(cleanup=True)
+        running = False
         if any(item["id"] == label for item in states):
-            self.inspect(label, cleanup=True)
+            running = self.inspect(label, cleanup=True)["status"] == "running"
             self.command("delete", "--force", label, cleanup=True)
         states = self.list_containers(cleanup=True)
         if any(item["id"] == label for item in states):
@@ -336,4 +339,16 @@ class ContainerRuntime:
                     raise SandboxUnavailable("Runtime processes remain; outer recovery required")
                 time.sleep(0.05)
         record["closed"] = True
+        # Keep the first verified cleanup, including the original attach exit.
+        # Later idempotent close() calls must not replace a live observation
+        # with the now-empty state. This is evidence, never a readiness receipt.
+        if "cleanup_evidence" not in record:
+            record["cleanup_evidence"] = {
+                "scope": "runsc-guest-v1",
+                "id": label,
+                "running_before_cleanup": running,
+                "exit_code": process.returncode if process is not None else None,
+                "stopped": True,
+                "removed": True,
+            }
         return {"id": label, "stopped": True, "removed": True}

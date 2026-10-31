@@ -28,21 +28,24 @@ def main():
     if label == "task" and mode == "hang":
         time.sleep(60)
         return 70
-    if label == "task" and mode == "syntax-error":
+    if label in {"task", "startup-check"} and mode == "syntax-error":
         return 3
     print(json.dumps({"event": "compiled", "architecture": [8, 6]}), flush=True)
     for line in sys.stdin:
         request = json.loads(line)
         if set(request) not in ({"protocol", "inputs"}, {"protocol", "inputs", "repetitions"}):
             raise ValueError("Protected expected values reached the CPU guest")
-        if label == "task" and mode == "runtime-error":
+        if label == "startup-check" and mode == "check-hang":
+            time.sleep(60)
+            return 70
+        if label in {"task", "startup-check"} and mode == "runtime-error":
             return 2
         values = [
             f32(f32(a) + f32(b))
             for a, b in zip(request["inputs"]["a"], request["inputs"]["b"], strict=True)
         ]
         if (
-            label == "task"
+            label in {"task", "startup-check"}
             and mode == "wrong-answer"
             or label == "device-recovery"
             and mode == "recovery-fail"

@@ -94,6 +94,8 @@
 - [G35 容器内核调用与取消清理](acceptance-g35.md) — 真实 CPU 协议、独立恢复与结果扣留；GPU 专用路径仍待硬件验收
 - [ADR-052：容器 GPU 环境与任务结算](adr/052-container-gpu-environment.md)
 - [G36 容器环境身份与任务结算](acceptance-g36.md) — 私有历史与数据库边界、镜像内完整策略；完整启动及硬件路径仍待验收
+- [ADR-053：容器内固定内核启动检查](adr/053-container-kernel-startup-checks.md)
+- [G37 容器内固定内核启动检查](acceptance-g37.md) — 命名维护协议与原 guest 清理；CUDA 和完整启动仍待验收
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

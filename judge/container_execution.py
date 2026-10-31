@@ -82,7 +82,7 @@ class KernelTask:
             raise ValueError("A kernel task can only be invoked once")
         self.used = True
         request = deepcopy(validate_request(request))
-        maintenance = request["event"] == "recover"
+        maintenance = request["event"] in {"recover", "check-kernel"}
         if self.service.purpose != ("maintenance" if maintenance else "task"):
             raise ValueError("Kernel request does not match its original purpose")
         connection = None

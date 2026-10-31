@@ -33,6 +33,8 @@ SOURCES = (
     "judge/gpu_session.py",
     "judge/gpu.py",
     "judge/gpu_probes.py",
+    "judge/gpu_kernel_checks.py",
+    "judge/container_kernel_checks.py",
     "judge/gpu_task_protocol.py",
     "judge/gpu_recovery_kernel.py",
     "judge/container_kernel_protocol.py",

@@ -82,6 +82,7 @@ EXECUTION_SOURCES = (
     "judge/container_adapter.py",
     "judge/container_kernel_protocol.py",
     "judge/container_kernel_flow.py",
+    "judge/container_kernel_checks.py",
     "judge/container_kernel_entry.py",
     "judge/container_kernel_guest.py",
     "judge/nvml_artifacts.py",

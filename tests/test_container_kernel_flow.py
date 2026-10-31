@@ -126,3 +126,38 @@ def test_exhausted_budget_preserves_recovery_margin_and_starts_no_guest(flow):
     with pytest.raises(SandboxUnavailable, match="budget"):
         flow.run()
     assert "task-started" not in flow.events and flow.events[-1] == "runtime-closed"
+
+
+def test_fixed_check_finishes_before_new_recovery_and_never_returns_submission(flow, monkeypatch):
+    from tests.test_container_kernel_checks import REQUEST, check_report
+
+    deadline = flow.runtime.deadline
+    flow.incoming[0] = copy.deepcopy(REQUEST)
+
+    def check(runtime, request):
+        assert request == REQUEST and runtime.deadline == deadline - 45
+        flow.events.append("check")
+        runtime.kernel_cleanup.append({"id": "startup-check", "stopped": True, "removed": True})
+        return check_report()
+
+    monkeypatch.setattr(module, "check_kernel", check)
+    flow.run()
+    assert flow.events.index("check") < flow.events.index("recovered")
+    assert flow.events.index("runtime-closed") < flow.events.index("send:kernel-completed")
+    assert "result" not in flow.sent[-1] and flow.sent[-1]["report"] == check_report()
+    assert "task-started" not in flow.events and flow.runtime.deadline == deadline
+
+
+def test_failed_named_check_withholds_report_and_closes_original_runtime(flow, monkeypatch):
+    from tests.test_container_kernel_checks import REQUEST
+
+    flow.incoming[0] = copy.deepcopy(REQUEST)
+
+    def fail(*_args):
+        raise SandboxUnavailable("fixed startup failure")
+
+    monkeypatch.setattr(module, "check_kernel", fail)
+    with pytest.raises(SandboxUnavailable, match="startup failure"):
+        flow.run()
+    assert "recovered" not in flow.events and flow.events[-1] == "runtime-closed"
+    assert not any(item["event"] == "kernel-completed" for item in flow.sent)
