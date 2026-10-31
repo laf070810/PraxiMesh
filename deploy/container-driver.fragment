@@ -1,0 +1,11 @@
+# Local driver snapshot for future CUDA tasks; acceptance exposes no devices.
+COPY driver /opt/guest-root/opt/driver/
+COPY driver/manifest.json /opt/praximesh/driver-manifest.json
+COPY compiler/nvrtc/ /opt/guest-root/opt/nvrtc/
+COPY compiler/harness/ /opt/guest-root/opt/praximesh/
+COPY driver_artifacts.py container_driver_guest.py /opt/guest-root/opt/praximesh/judge/
+COPY driver_artifacts.py /opt/praximesh/judge/
+COPY container_driver_fixture.py driver-cases.json /opt/praximesh/
+USER 0:0
+RUN printf '%s\n' /opt/driver /opt/nvrtc > /opt/guest-root/etc/ld.so.conf.d/praximesh-cuda.conf && /sbin/ldconfig -r /opt/guest-root
+USER 65532:65532

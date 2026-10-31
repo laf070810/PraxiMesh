@@ -36,6 +36,27 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 固定 CUDA 编译器、候选语法和编译后清理 | [无设备编译检查](#container-compiler)；真实 NVRTC 在 gVisor guest 中运行，不占 GPU、不判题 |
 | 任务总预算、CPU/内存/PID/存储上限和故障恢复 | [任务预算检查](#container-workload)；整个任务容器含运行时开销，不等同于 guest 独占资源或 GPU 显存 |
 | 控制容器内发起编译、取消和退出接管 | [容器编译控制检查](#container-compilation-control)；同一安装身份下的新任务恢复，不是 GPU 部署入口 |
+| 本机驱动快照、库依赖、精确 runsc 版本匹配 | [驱动制品检查](#container-driver)；无设备加载与编译，不初始化 CUDA 或证明硬件可用 |
+
+<a id="container-driver"></a>
+
+## 不占 GPU 的本地驱动制品检查
+
+适用于为容器 GPU 任务准备本机驱动库，或核对驱动升级后是否需要重建。需要 Linux x86_64 的 NVIDIA open 驱动、`/usr/bin/readelf`、前述私有 rootless Docker，以及[固定 runsc/NVRTC 归档](#提前保存固定镜像减少下载依赖)。初始 CUDA/PTX 配置要求同版本的 `libcuda`、`libnvidia-ptxjitcompiler`、`libnvidia-nvvm`、`libnvidia-gpucomp`；当前本机目录为 `/usr/lib64`，其他发行版应选择实际的系统库目录。
+
+```sh
+.venv/bin/python scripts/container_driver_acceptance.py \
+  --docker-socket /run/user/$(id -u)/docker.sock \
+  --runtime-archive var/gpu-preflight/gvisor.tar.bz2 \
+  --nvrtc-archive var/gpu-preflight/nvrtc-13.1.115.tar.xz \
+  --driver-library-dir /usr/lib64
+```
+
+命令只读取宿主驱动版本和库文件，检查 ELF/SONAME 后生成带 SHA-256 清单的独立镜像。普通用户可写的源文件、缺少依赖、架构不符或构建期间发生驱动升级会导致失败。镜像身份同时包含源码和驱动清单；它不能用于要求“无驱动”的编译接口，也不从浮动标签启动任务。
+
+实际检查在 0.5 CPU、512 MiB、无 swap、256 个宿主任务的总预算中运行：固定 runsc 精确版本支持列表、gVisor guest 中的库加载、两道候选的 NVRTC 编译、语法错误后新会话，以及整任务终止后原记录清理和新调用。测试没有任何 NVIDIA 设备，不调用 `cuInit`、不执行 PTX 或测量 GPU 性能；它不需要空闲卡，也不会修改主机驱动或 daemon。
+
+结果、构建日志和本地驱动快照保存在忽略目录 `test-results/px-container-driver-*/`；工具清理自有容器、镜像标签和临时运行目录。快照包含本机安装的 NVIDIA 库，只用于本机自部署准备，不提交到 Git 或随源码发布。源目录和内核驱动变化后必须重新构建；完整设备接入与 GPU 启动检查通过前，不能据此开放提交。
 
 <a id="container-compiler"></a>
 <a id="container-workload"></a>

@@ -80,6 +80,8 @@
 - [G28 容器任务预算与内存超限恢复](acceptance-g28.md) — 实际限额、OOM 分类和新容器编译；不证明 GPU 运行或显存限制
 - [ADR-045：在可信控制容器内发起隔离编译](adr/045-containerized-compilation-control.md)
 - [G29 容器内编译控制与故障恢复](acceptance-g29.md) — 完整控制镜像、源码发送门槛与原记录清理；不表示 GPU 运行就绪
+- [ADR-046：本地 CUDA 驱动制品与无设备检查](adr/046-local-cuda-driver-artifacts.md)
+- [G30 本地驱动制品与无设备验证](acceptance-g30.md) — 驱动版本/文件身份、guest 库加载与原任务恢复；不证明 CUDA 硬件就绪
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)
