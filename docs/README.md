@@ -76,6 +76,8 @@
 - [G26 数据库预约与持久容器恢复](acceptance-g26.md) — 真实 PostgreSQL 与固定 CPU guest；保留隔离、预约及预算
 - [ADR-043：容器内无设备 CUDA 编译](adr/043-device-free-container-compilation.md)
 - [G27 容器内 CUDA 编译与无设备验证](acceptance-g27.md) — 真实 NVRTC 编译、错误分类及清理；不证明 GPU 正确性或性能
+- [ADR-044：容器任务的版本化总预算](adr/044-container-workload-budget.md)
+- [G28 容器任务预算与内存超限恢复](acceptance-g28.md) — 实际限额、OOM 分类和新容器编译；不证明 GPU 运行或显存限制
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

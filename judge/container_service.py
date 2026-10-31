@@ -13,20 +13,20 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from judge.container_contract import (
-    CPU_PERIOD,
-    CPU_QUOTA,
     ENTRY,
     MAX_SECONDS,
-    MEMORY_BYTES,
-    PIDS,
     PROTOCOL,
     PYTHON,
     START_SECONDS,
     STATE,
     STATUS_BYTES,
     STOP_SECONDS,
+    SUPERVISION_PROFILE,
     TMP_BYTES,
     USER,
+    docker_resources,
+    resource_limits,
+    resource_marker,
     source_digest,
 )
 from judge.gpu_command import run_command
@@ -124,10 +124,22 @@ class ContainerService:
     def record_started(self, status):
         pass
 
-    def __init__(self, guard, job_id, reservation_token, *, engine, image, purpose="task"):
+    def __init__(
+        self,
+        guard,
+        job_id,
+        reservation_token,
+        *,
+        engine,
+        image,
+        purpose="task",
+        resource_profile=SUPERVISION_PROFILE,
+    ):
         if type(guard) is not DeviceLock:
             raise ValueError("An owned device lock is required")
         guard.assert_held()
+        resource_limits(resource_profile)
+        self.resource_profile = resource_profile
         if (
             type(image) is not str
             or not IMAGE_ID.fullmatch(image)
@@ -230,7 +242,7 @@ class ContainerService:
                     PREFIX + "command": digest(arguments),
                 }
                 or len(arguments) < 5
-                or arguments[3] != "--"
+                or arguments[3] != resource_marker(self.resource_profile)
                 or not re.fullmatch("[a-f0-9]{32}", arguments[2])
                 or not Path(arguments[4]).is_absolute()
                 or not math.isfinite(before)
@@ -248,6 +260,7 @@ class ContainerService:
                 or state["Restarting"]
                 or state["Dead"]
                 or type(state["Running"]) is not bool
+                or type(state["OOMKilled"]) is not bool
                 or state["Running"] != (state["Status"] == "running")
                 or type(state["Pid"]) is not int
                 or (state["Pid"] <= 0 if state["Running"] else state["Pid"] != 0)
@@ -263,12 +276,8 @@ class ContainerService:
                 "Privileged": False,
                 "ReadonlyRootfs": True,
                 "CapDrop": ["ALL"],
-                "Memory": MEMORY_BYTES,
-                "MemorySwap": MEMORY_BYTES,
-                "CpuQuota": CPU_QUOTA,
-                "CpuPeriod": CPU_PERIOD,
+                **docker_resources(self.resource_profile),
                 "NanoCpus": 0,
-                "PidsLimit": PIDS,
                 "AutoRemove": False,
                 "RestartPolicy": {"Name": "no", "MaximumRetryCount": 0},
                 "LogConfig": {"Type": "none", "Config": {}},
@@ -306,6 +315,7 @@ class ContainerService:
                 "running": state["Running"],
                 "status": state["Status"],
                 "exit_code": state["ExitCode"],
+                "oom_killed": state["OOMKilled"],
                 "arguments": arguments,
             }
         except (KeyError, IndexError, TypeError, ValueError):
@@ -333,7 +343,14 @@ class ContainerService:
         before, until = time.monotonic() + START_SECONDS, deadline - STOP_SECONDS
         if before >= until:
             raise SandboxUnavailable("Reservation expired before creation")
-        arguments = [str(before), str(until), uuid.uuid4().hex, "--", *command]
+        arguments = [
+            str(before),
+            str(until),
+            uuid.uuid4().hex,
+            resource_marker(self.resource_profile),
+            *command,
+        ]
+        limits = docker_resources(self.resource_profile)
         self.record_intent(arguments)
         with self.creation_options() as extra_options:
             created = (
@@ -362,15 +379,15 @@ class ContainerService:
                     "--security-opt=no-new-privileges",
                     *extra_options,
                     "--memory",
-                    str(MEMORY_BYTES),
+                    str(limits["Memory"]),
                     "--memory-swap",
-                    str(MEMORY_BYTES),
+                    str(limits["MemorySwap"]),
                     "--cpu-period",
-                    str(CPU_PERIOD),
+                    str(limits["CpuPeriod"]),
                     "--cpu-quota",
-                    str(CPU_QUOTA),
+                    str(limits["CpuQuota"]),
                     "--pids-limit",
-                    str(PIDS),
+                    str(limits["PidsLimit"]),
                     "--restart=no",
                     "--stop-signal=SIGKILL",
                     "--stop-timeout",
@@ -421,13 +438,7 @@ class ContainerService:
                         or status["deadline"] != until
                         or type(status["child"]) is not int
                         or status["child"] <= 1
-                        or status["limits"]
-                        != {
-                            "cpu.max": f"{CPU_QUOTA} {CPU_PERIOD}",
-                            "memory.max": str(MEMORY_BYTES),
-                            "memory.swap.max": "0",
-                            "pids.max": str(PIDS),
-                        }
+                        or status["limits"] != resource_limits(self.resource_profile)
                     ):
                         raise ValueError
                 except (TypeError, KeyError, ValueError):

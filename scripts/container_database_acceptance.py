@@ -12,6 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+from judge.container_contract import SUPERVISION_PROFILE, WORKLOAD_PROFILE  # noqa: E402
 from judge.container_runtime_service import SOURCES, contract_digest  # noqa: E402
 from judge.container_service import LocalEngine  # noqa: E402
 from judge.gpu_policy import execution_digest  # noqa: E402
@@ -113,7 +114,11 @@ def main():
             for key in ("tests", "failures", "errors", "skipped")
         }
         assert result.returncode == 0 and report["postgres_resources_removed"]
-        assert len(records) == 9 and all(
+        assert {
+            profile: sum(item["resource_profile"] == profile for item in records)
+            for profile in (SUPERVISION_PROFILE, WORKLOAD_PROFILE)
+        } == {SUPERVISION_PROFILE: 9, WORKLOAD_PROFILE: 9}
+        assert len(records) == 18 and all(
             item["passed"]
             and item["container_removed"]
             and item["process_tree_gone"]

@@ -14,9 +14,11 @@ import subprocess
 import time
 from pathlib import Path
 
-from judge.container_contract import CPU_PERIOD, CPU_QUOTA, MEMORY_BYTES, PIDS, STATE
+from judge.container_contract import RESOURCE_PROFILES, STATE, resource_limits
+from judge.container_resources import counters
 from judge.gpu_artifacts import RUNSC_SHA256
 from judge.gpu_command import run_command
+from judge.gpu_session import GPUExecutionError, GPUSession
 from judge.sandbox import SandboxUnavailable
 
 RUNSC = "/opt/runsc/runsc"
@@ -104,18 +106,21 @@ class ContainerRuntime:
             or not os.statvfs("/").f_flag & os.ST_RDONLY
         ):
             raise SandboxUnavailable("Expected the supervised private runtime container")
-        expected = {
-            "cpu.max": f"{CPU_QUOTA} {CPU_PERIOD}",
-            "memory.max": str(MEMORY_BYTES),
-            "memory.swap.max": "0",
-            "pids.max": str(PIDS),
-        }
+        supervision = json.loads((Path(STATE) / "status.json").read_text())
+        profiles = [
+            profile
+            for profile in RESOURCE_PROFILES
+            if supervision.get("limits") == resource_limits(profile)
+        ]
+        if len(profiles) != 1:
+            raise SandboxUnavailable("Unknown supervised resource profile")
+        self.resource_profile = profiles[0]
+        expected = resource_limits(self.resource_profile)
         if any(
             (Path("/sys/fs/cgroup") / name).read_text().strip() != value
             for name, value in expected.items()
         ):
             raise SandboxUnavailable("Outer runtime limits changed")
-        supervision = json.loads((Path(STATE) / "status.json").read_text())
         if (
             type(deadline) not in {int, float}
             or not math.isfinite(deadline)
@@ -215,6 +220,51 @@ class ContainerRuntime:
         ):
             raise SandboxUnavailable("Owned OCI runtime identity changed")
         return state
+
+    def session(self, label, *, mode, on_tick, on_cleanup=None, architecture=()):
+        initial_memory = counters("memory.events")
+        cleaned = False
+
+        def cleanup():
+            nonlocal cleaned
+            if not cleaned:
+                result = self.stop_container(label)
+                cleaned = True
+                if on_cleanup is not None:
+                    on_cleanup(result)
+
+        def exit_verdict(_code):
+            if process.poll() is not None and exceeded_memory():
+                # runsc can remove its state when the sandbox is OOM-killed.
+                # Confirm owned runtime/guest termination instead of querying a
+                # possibly absent state, and never classify an uncleaned OOM.
+                cleanup()
+                return "memory_limit"
+            return None
+
+        def exceeded_memory():
+            current = counters("memory.events")
+            # oom_kill includes global OOMs too. Require this cgroup's own
+            # limit/allocation events rather than blaming unrelated pressure.
+            return all(current[key] > initial_memory[key] for key in ("max", "oom", "oom_kill"))
+
+        def tick():
+            on_tick()
+            if exceeded_memory():
+                # An OOM-killed sandbox need not promptly terminate its attach
+                # client. Observe the kernel throughout the live session.
+                cleanup()
+                raise GPUExecutionError("memory_limit")
+
+        process = self.attach(label)
+        return GPUSession(
+            process,
+            cleanup,
+            architecture=architecture,
+            mode=mode,
+            on_tick=tick,
+            exit_verdict=exit_verdict,
+        )
 
     def list_containers(self):
         states = json.loads(self.command("list", "--format=json").stdout)

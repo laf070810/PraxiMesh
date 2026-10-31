@@ -67,6 +67,8 @@ def execution_digest(root=None):
         "judge/container_contract.py",
         "judge/container_service.py",
         "judge/container_runtime_service.py",
+        "judge/container_oci.py",
+        "judge/container_resources.py",
         "judge/container_journal.py",
         "judge/results.py",
         "core/gpu_resources.py",

@@ -46,6 +46,7 @@ def snapshot(service):
         "State": {
             "Status": "running",
             "Running": True,
+            "OOMKilled": False,
             "Paused": False,
             "Restarting": False,
             "Dead": False,

@@ -49,6 +49,7 @@ def stage_context(archive, out):
     for name in (
         "container_runtime_fixture.py",
         "container_transport_fixture.py",
+        "container_workload_fixture.py",
         "gpu_runtime_cpu_guest.py",
     ):
         shutil.copyfile(ROOT / "scripts" / name, context / name)

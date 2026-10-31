@@ -1,4 +1,4 @@
-"""Private durable container ownership; recovery only stops existing v1 tasks."""
+"""Private durable ownership with frozen legacy and explicit task budgets."""
 
 import fcntl
 import json
@@ -12,7 +12,13 @@ import uuid
 from contextlib import contextmanager
 from pathlib import Path
 
-from judge.container_contract import MAX_SECONDS, PROTOCOL
+from judge.container_contract import (
+    MAX_SECONDS,
+    PROTOCOL,
+    SUPERVISION_PROFILE,
+    WORKLOAD_PROFILE,
+    resource_marker,
+)
 from judge.container_runtime_service import RuntimeContainerService, seccomp_profile
 from judge.container_service import HEX_ID, IMAGE_ID, PREFIX, ContainerService, digest
 from judge.gpu_device_lock import DeviceLock
@@ -246,10 +252,14 @@ class ContainerJournal:
                 self.identity, self.guard.device_uuid, job, reservation, record["purpose"]
             )
             labels, security = record["labels"], record["security"]
+            version = record["version"]
+            if type(version) is not int or version not in {1, 2}:
+                raise ValueError
+            profile = SUPERVISION_PROFILE if version == 1 else record["resource_profile"]
+            if version == 2 and profile != WORKLOAD_PROFILE:
+                raise ValueError
             if (
-                set(record) != KEYS
-                or type(record["version"]) is not int
-                or record["version"] != 1
+                set(record) != (KEYS if version == 1 else KEYS | {"resource_profile"})
                 or any(
                     record[key] != self.identity[key]
                     for key in ("installation", "engine", "lock_namespace")
@@ -271,7 +281,7 @@ class ContainerJournal:
                 or type(args) is not list
                 or len(args) < 5
                 or any(type(item) is not str or not item or "\0" in item for item in args)
-                or args[3] != "--"
+                or args[3] != resource_marker(profile)
                 or not NONCE.fullmatch(args[2])
                 or not Path(args[4]).is_absolute()
                 or not all(math.isfinite(float(x)) for x in args[:2])
@@ -323,6 +333,8 @@ class ContainerJournal:
             "started_at": None,
             "phase": "intent",
         }
+        if service.resource_profile != SUPERVISION_PROFILE:
+            record.update(version=2, resource_profile=service.resource_profile)
         self.write(self.filename, record, create=True)
 
     def update(self, service, phase):
@@ -410,7 +422,16 @@ class ContainerJournal:
 class PersistentRuntimeService(RuntimeContainerService):
     SCOPE = SCOPE
 
-    def __init__(self, journal, job_id, reservation_token, *, image, purpose="task"):
+    def __init__(
+        self,
+        journal,
+        job_id,
+        reservation_token,
+        *,
+        image,
+        purpose="task",
+        resource_profile=SUPERVISION_PROFILE,
+    ):
         self.journal, self.purpose = journal, purpose
         journal.check_engine()
         super().__init__(
@@ -420,6 +441,7 @@ class PersistentRuntimeService(RuntimeContainerService):
             engine=journal.engine,
             image=image,
             purpose=purpose,
+            resource_profile=resource_profile,
         )
         self.owner = owner(
             journal.identity, self.guard.device_uuid, self.job_id, self.reservation_token, purpose
@@ -437,7 +459,7 @@ class PersistentRuntimeService(RuntimeContainerService):
 
 
 class RecoveryContainer(ContainerService):
-    """Only v1 stop/remove, using saved configuration; never starts or attaches."""
+    """Stop/remove with the saved version's budget; never starts or attaches."""
 
     def __init__(self, journal, record):
         self.journal, self.record = journal, record
@@ -448,6 +470,7 @@ class RecoveryContainer(ContainerService):
             engine=journal.engine,
             image=record["image"],
             purpose=record["purpose"],
+            resource_profile=record.get("resource_profile", SUPERVISION_PROFILE),
         )
         self.owner, self.name = record["owner"], record["name"]
         self.container_id, self.started_at = record["container_id"], record["started_at"]

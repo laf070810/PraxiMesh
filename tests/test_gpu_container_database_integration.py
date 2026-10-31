@@ -18,7 +18,12 @@ from core.gpu_container_recovery import BoundContainerRecovery
 from core.gpu_startup import recover_controller
 from core.models import GPUDevice, Submission
 from judge.container_connection import ContainerConnection
-from judge.container_contract import PYTHON
+from judge.container_contract import (
+    PYTHON,
+    SUPERVISION_PROFILE,
+    WORKLOAD_PROFILE,
+    resource_limits,
+)
 from judge.container_journal import ContainerJournal, PersistentRuntimeService
 from judge.container_service import LocalEngine
 from judge.gpu_adapter import GPUExecutionAdapter
@@ -42,9 +47,10 @@ class Cutoff(Exception):
 
 
 class Live:
-    def __init__(self, root, user, version, case):
+    def __init__(self, root, user, version, case, resource_profile):
         assert connection.vendor == "postgresql", "Real PostgreSQL is required"
         self.root, self.case = root, case
+        self.resource_profile = resource_profile
         self.engine = LocalEngine(os.environ["PX_CONTAINER_DB_SOCKET"])
         self.image = os.environ["PX_CONTAINER_DB_IMAGE"]
         self.device = "GPU-" + str(uuid.uuid4())
@@ -70,12 +76,17 @@ class Live:
             "passed": False,
             "gpu_executed": False,
             "synthetic_reservation": True,
+            "resource_profile": resource_profile,
             "cleanup": [],
         }
 
     def start(self, phase="running"):
         service = self.service = PersistentRuntimeService(
-            self.journal, self.job.id, self.job.lease_token, image=self.image
+            self.journal,
+            self.job.id,
+            self.job.lease_token,
+            image=self.image,
+            resource_profile=self.resource_profile,
         )
         if phase == "unrecorded-create":
 
@@ -96,6 +107,10 @@ class Live:
             on_tick=lambda: None,
         )
         self.connection = ContainerConnection(service, status, on_tick=lambda: None)
+        assert status["limits"] == resource_limits(self.resource_profile)
+        assert self.journal.load()["version"] == (
+            1 if self.resource_profile == SUPERVISION_PROFILE else 2
+        )
         canary = os.urandom(32).hex()
         self.connection.channel.send({"event": "probe", "canary": canary, "padding": "x" * 1024**2})
         value = self.connection.channel.receive()
@@ -153,12 +168,12 @@ class Live:
         self.record.update(passed=True, **details)
 
 
-@pytest.fixture
+@pytest.fixture(params=[SUPERVISION_PROFILE, WORKLOAD_PROFILE])
 def live(user, gpu_version, request):
     output = Path(os.environ["PX_CONTAINER_DB_REPORTS"]) / uuid.uuid4().hex
     output.mkdir(mode=0o700)
     storage = tempfile.TemporaryDirectory(prefix="px-container-db-")
-    value = Live(Path(storage.name), user, gpu_version, request.node.name)
+    value = Live(Path(storage.name), user, gpu_version, request.node.name, request.param)
     save(output / "result.json", value.record)
     try:
         yield value

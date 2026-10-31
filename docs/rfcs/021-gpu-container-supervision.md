@@ -85,3 +85,13 @@ NVRTC 官方说明其可在无 GPU 的系统运行，见 [NVRTC 文档](https://
 实际验证包括两道 CUDA 候选的参考实现、六份可编译但语义错误的变体、编译错误、非法输入及平台配置错误。编译成功仅证明能生成 PTX，不能证明入口可加载、答案正确、设备恢复或性能，不能生成 GPU receipt、开放网站提交或发布候选题目。正式 GPU 策略覆盖共用编译逻辑变化，旧 receipt 失效；CPU/WASI 策略保持不变。
 
 设备允许列表、默认题库和现有服务继续保留；不占用 GPU，不设置 privileged，不以普通容器运行学员代码。后续任何需要放宽监督容器权限的方案必须重新记录取舍和验证，不能悄悄扩大此契约。
+
+### 容器任务的版本化总预算
+
+G27 已在现有开发总上限内验证实际 NVRTC 编译，但没有交付正式资源契约。下一步增加明确的 `container-workload-v1`：一个任务容器内的监督器、可信通信、runsc 和 guest 共同使用 0.5 CPU、512 MiB、无 swap、256 个宿主任务的总预算。它不宣称存在独立 guest 子 cgroup，也不与原宿主路径的子组计量混同；后续执行环境必须记录新的预算标识与计量范围。原 2 CPU/2 GiB/512 PID 开发配置保留为 `container-supervision-v1`，不改写旧记录的含义。
+
+由可信服务显式选择两个固定配置之一，不接收学员提供的资源数值。Docker 元数据、PID 1 实读 cgroup 和运行时必须一致；私有只读 cgroup 继续由外层 daemon 设置，不授予写宿主 cgroup、privileged 或新的设备权限。监督启动参数绑定预算标识，journal 新记录使用 v2 保存该标识；v1 仍按原固定上限核对并清理，新控制器不能用当前预算重新解释旧对象。
+
+实际 CPU 探针须验证节流、受控内存超限、固定可信宿主 fork 的 PID 上限、guest 临时存储上限和原进程树清理，并在故障后以新的容器重新编译。内存结果须有内核 OOM 计数或 Docker 原实例 OOM 状态支持，单独的退出码不能作为内存超限证据。任务总上限含运行时开销；若所需固定编译在此预算内不可行，应保留失败证据并重新审议版本化预算，不能悄悄放宽限制或延长期限。
+
+机制依据为 [Docker 资源限制](https://docs.docker.com/engine/containers/resource_constraints/)和 [Linux cgroup v2](https://docs.kernel.org/admin-guide/cgroup-v2.html)，以本机真实探针为验收依据。此阶段不占 GPU、不更新历史成绩或签发新凭证；设备注入与监测、容器 worker、正式环境身份和 Compose 发布仍须继续接通和验收。

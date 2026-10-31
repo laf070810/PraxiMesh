@@ -13,21 +13,21 @@ from pathlib import Path
 # -I deliberately omits cwd/PYTHONPATH. Only the immutable sibling module is used.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from container_contract import (  # noqa: E402
-    CPU_PERIOD,
-    CPU_QUOTA,
     MAX_SECONDS,
-    MEMORY_BYTES,
-    PIDS,
     PROTOCOL,
     START_SECONDS,
     STATE,
+    SUPERVISION_PROFILE,
+    marker_profile,
+    resource_limits,
     source_digest,
 )
 
 
 def arguments(values, now):
-    if len(values) < 5 or values[3] != "--":
+    if len(values) < 5:
         raise ValueError("Invalid supervisor arguments")
+    marker_profile(values[3])
     start_before, deadline = float(values[0]), float(values[1])
     nonce, command = values[2], values[4:]
     if (
@@ -43,7 +43,7 @@ def arguments(values, now):
     return start_before, deadline, nonce, command
 
 
-def containment():
+def containment(profile=SUPERVISION_PROFILE):
     """Read enforced limits, not requested Docker metadata."""
     if os.getpid() != 1 or os.getuid() != 65532 or os.getgid() != 65532:
         raise ValueError("Expected the private non-root PID-1 supervisor")
@@ -52,12 +52,7 @@ def containment():
     status = dict(line.split(":", 1) for line in Path("/proc/self/status").read_text().splitlines())
     if status["NoNewPrivs"].strip() != "1" or int(status["CapEff"].strip(), 16) != 0:
         raise ValueError("Expected no privileges or capabilities")
-    expected = {
-        "cpu.max": f"{CPU_QUOTA} {CPU_PERIOD}",
-        "memory.max": str(MEMORY_BYTES),
-        "memory.swap.max": "0",
-        "pids.max": str(PIDS),
-    }
+    expected = resource_limits(profile)
     actual = {name: (Path("/sys/fs/cgroup") / name).read_text().strip() for name in expected}
     if actual != expected:
         raise ValueError("Container limits were not applied")
@@ -81,7 +76,7 @@ def main(values=None):
     values = sys.argv[1:] if values is None else values
     try:
         before, deadline, nonce, command = arguments(values, time.monotonic())
-        limits = containment()
+        limits = containment(marker_profile(values[3]))
         if time.monotonic() >= before:
             return 70
         stopping = False

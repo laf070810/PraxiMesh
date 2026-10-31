@@ -19,7 +19,13 @@ from judge.container_compile_protocol import (  # noqa: E402
 )
 from judge.container_compiler import SOURCES, CompilerContainerService, compiler_digest  # noqa: E402
 from judge.container_connection import ContainerConnection  # noqa: E402
-from judge.container_contract import PYTHON  # noqa: E402
+from judge.container_contract import (  # noqa: E402
+    PYTHON,
+    RESOURCE_PROFILES,
+    SUPERVISION_PROFILE,
+    WORKLOAD_PROFILE,
+    resource_limits,
+)
 from judge.container_journal import ContainerJournal  # noqa: E402
 from judge.container_service import LocalEngine  # noqa: E402
 from judge.gpu_device_lock import DeviceLock  # noqa: E402
@@ -28,9 +34,11 @@ from judge.sandbox import policy_digest  # noqa: E402
 from scripts.build_container_compiler import build_image  # noqa: E402
 from scripts.container_journal_acceptance import save  # noqa: E402
 from scripts.container_supervision_acceptance import gone, tree, wait_exit  # noqa: E402
+from scripts.container_workload_checks import run_resource  # noqa: E402
 
 EXTRA = (
     "scripts/container_compiler_acceptance.py",
+    "scripts/container_workload_checks.py",
     "content/candidates/cuda.json",
     "tests/cuda_incorrect_solutions.json",
 )
@@ -78,14 +86,32 @@ def cases():
     return rows
 
 
-def run_case(engine, image, journal, name, message, expected, report, output):
-    service = CompilerContainerService(journal, uuid.uuid4(), uuid.uuid4(), image=image)
+def run_case(
+    engine,
+    image,
+    journal,
+    name,
+    message,
+    expected,
+    report,
+    output,
+    *,
+    resource_profile=SUPERVISION_PROFILE,
+):
+    service = CompilerContainerService(
+        journal,
+        uuid.uuid4(),
+        uuid.uuid4(),
+        image=image,
+        resource_profile=resource_profile,
+    )
     connection = None
     processes = {}
     record = {
         "name": name,
         "expected": expected,
         "passed": False,
+        "resource_profile": resource_profile,
         "source_sha256": hashlib.sha256(message["source"].encode()).hexdigest(),
     }
     report["checks"].append(record)
@@ -103,6 +129,8 @@ def run_case(engine, image, journal, name, message, expected, report, output):
             on_tick=lambda: None,
         )
         record["container"] = service.container_id
+        assert status["limits"] == resource_limits(resource_profile)
+        record["supervision"] = status
         connection = ContainerConnection(service, status, on_tick=lambda: None)
         channel = connection.channel
         channel.send(message)
@@ -119,6 +147,7 @@ def run_case(engine, image, journal, name, message, expected, report, output):
             validate_identity(initial)
             record["identity"] = initial
             processes = tree(engine, service)
+            record["processes"] = processes
             channel.send({"event": "begin"})
             value = channel.receive()
             if expected in {"compiled", "disconnect", "deadline"}:
@@ -183,7 +212,17 @@ def main():
     parser.add_argument("--docker-socket", required=True)
     parser.add_argument("--runtime-archive", required=True, type=Path)
     parser.add_argument("--nvrtc-archive", required=True, type=Path)
+    parser.add_argument(
+        "--resource-profile", choices=tuple(RESOURCE_PROFILES), default=SUPERVISION_PROFILE
+    )
+    parser.add_argument(
+        "--resource-probes",
+        action="store_true",
+        help="Run fixed CPU resource checks and fresh compilation recovery",
+    )
     options = parser.parse_args()
+    if options.resource_probes and options.resource_profile != WORKLOAD_PROFILE:
+        parser.error("--resource-probes requires --resource-profile=" + WORKLOAD_PROFILE)
     engine = LocalEngine(options.docker_socket)
     engine.verify()
     output = ROOT / "test-results" / ("px-container-compiler-" + uuid.uuid4().hex[:12])
@@ -191,6 +230,8 @@ def main():
     report = {
         "passed": False,
         "gpu_executed": False,
+        "resource_profile": options.resource_profile,
+        "resource_probes": options.resource_probes,
         "checks": [],
         "cleanup": [],
         "compiler_contract": compiler_digest(),
@@ -215,12 +256,40 @@ def main():
         with DeviceLock(base / "locks", "GPU-" + str(uuid.uuid4())) as guard:
             with ContainerJournal(base / "journal", guard, engine) as journal:
                 try:
-                    for name, message, expected in cases():
-                        run_case(engine, image, journal, name, message, expected, report, output)
+                    for index, (name, message, expected) in enumerate(cases()):
+                        run_case(
+                            engine,
+                            image,
+                            journal,
+                            name,
+                            message,
+                            expected,
+                            report,
+                            output,
+                            resource_profile=options.resource_profile,
+                        )
                         print("PASS " + name, flush=True)
+                        if index == 0 and options.resource_probes:
+                            for resource in ("memory", "cpu", "storage", "pids"):
+                                run_resource(engine, image, journal, resource, report, output)
+                                print("PASS resource-" + resource, flush=True)
+                                recovery = "recover-resource-" + resource
+                                run_case(
+                                    engine,
+                                    image,
+                                    journal,
+                                    recovery,
+                                    message,
+                                    expected,
+                                    report,
+                                    output,
+                                    resource_profile=options.resource_profile,
+                                )
+                                print("PASS " + recovery, flush=True)
                 finally:
                     shutil.copytree(base / "journal", output / "journal")
-        assert len(report["checks"]) == len(cases()) and all(r["passed"] for r in report["checks"])
+        assert len(report["checks"]) == len(cases()) + (8 if options.resource_probes else 0)
+        assert all(r["passed"] for r in report["checks"])
         assert all(
             hashlib.sha256((ROOT / name).read_bytes()).hexdigest() == digest
             for name, digest in report["sources"].items()

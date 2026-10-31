@@ -10,6 +10,7 @@ COPY runtime /opt/runsc/
 COPY gvisor-LICENSE /opt/licenses/gvisor-LICENSE
 COPY judge /opt/praximesh/judge/
 COPY container_entry.py container_contract.py container_runtime_fixture.py container_transport_fixture.py /opt/praximesh/
+COPY container_workload_fixture.py /opt/praximesh/
 RUN chmod -R a+rX /opt/runsc && mkdir -p /run/praximesh && chown 65532:65532 /run/praximesh && chmod 700 /run/praximesh
 USER 65532:65532
 WORKDIR /run/praximesh

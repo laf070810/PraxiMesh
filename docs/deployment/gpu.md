@@ -34,23 +34,29 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 容器化控制端的 UID、共用锁与重启接管 | [控制端映射检查](#container-controller)；固定 CPU，不连接应用数据库或 GPU |
 | 持久容器记录与数据库预约、锁超时和重试 | [数据库/容器联合检查](#container-database)；一次性 PostgreSQL 与固定 CPU guest，不开放 GPU |
 | 固定 CUDA 编译器、候选语法和编译后清理 | [无设备编译检查](#container-compiler)；真实 NVRTC 在 gVisor guest 中运行，不占 GPU、不判题 |
+| 任务总预算、CPU/内存/PID/存储上限和故障恢复 | [任务预算检查](#container-workload)；整个任务容器含运行时开销，不等同于 guest 独占资源或 GPU 显存 |
 
 <a id="container-compiler"></a>
+<a id="container-workload"></a>
 
-## 不占 GPU 的 CUDA 编译检查
+## 不占 GPU 的 CUDA 编译与任务预算检查
 
-适用于准备容器执行镜像、修改 NVRTC 编译逻辑或检查两道 CUDA 候选能否编译。需要同一私有 rootless Docker、固定 runsc 及 NVRTC 离线归档；归档来源见[固定离线制品](#提前保存固定镜像减少下载依赖)。在仓库根目录执行：
+适用于准备容器执行镜像、修改 NVRTC 编译逻辑、检查两道 CUDA 候选能否编译或验证任务资源上限。需要同一私有 rootless Docker、固定 runsc 及 NVRTC 离线归档；归档来源见[固定离线制品](#提前保存固定镜像减少下载依赖)。在仓库根目录执行：
 
 ```sh
 .venv/bin/python scripts/container_compiler_acceptance.py \
   --docker-socket /run/user/$(id -u)/docker.sock \
   --runtime-archive var/gpu-preflight/gvisor.tar.bz2 \
-  --nvrtc-archive var/gpu-preflight/nvrtc-13.1.115.tar.xz
+  --nvrtc-archive var/gpu-preflight/nvrtc-13.1.115.tar.xz \
+  --resource-profile container-workload-v1 \
+  --resource-probes
 ```
 
 工具构建独立的固定编译镜像，使用真实 gVisor guest 与 NVRTC 13.1.115；不挂载 GPU 或 CUDA 驱动，不连接数据库。编译目标固定为 compute 8.6，这是编译参数，不是硬件检测结果。它检查候选参考实现、六份语义错解、编译错误、非法请求和平台配置错误，并在编译后断连、独立期限及清理之后重新编译正确语法的代码。源码不在宿主或可信外层执行。
 
-报告为 `test-results/px-container-compiler-*/result.json`，构建输出为同目录 `build.log`。须检查总 `passed`、逐场景状态、原进程树清理、镜像标签和临时目录清理；清理失败时保留 `retained_storage` 指定的原 journal，排查后按同一身份恢复，不能删除未知对象。编译状态 `compiled` 只表示生成 PTX，语义错解也应能编译；本检查不证明入口加载、CUDA 正确性、性能或 GPU 就绪，不发布候选题目。设计见 [ADR-043](../adr/043-device-free-container-compilation.md)。
+上面的模式在 0.5 CPU、512 MiB 宿主内存、无 swap、256 个宿主任务的固定总预算中执行全部编译场景，并增加四项真实资源探针及各自的新容器编译恢复，预期共 26 项。预算包括监督器、runsc 和 guest，不代表 guest 独占这些资源；guest `/tmp` 上限为 32 MiB。内存检查须有内核 OOM 或原容器 OOM 状态证据，PID 检查只运行固定可信的 fork 探针。原开发预算为 `container-supervision-v1`（2 CPU、2 GiB、512 个宿主任务）；去掉最后两个参数可单独重放该预算下的 18 项编译检查。
+
+报告为 `test-results/px-container-compiler-*/result.json`，构建输出为同目录 `build.log`。须检查总 `passed`、逐场景状态、预算标识、原进程树清理、镜像标签和临时目录清理；清理失败时保留 `retained_storage` 指定的原 journal，排查后按同一身份恢复，不能删除未知对象。编译状态 `compiled` 只表示生成 PTX，语义错解也应能编译；本检查不证明入口加载、CUDA 正确性、性能或 GPU 就绪，不发布候选题目。设计见 [ADR-043](../adr/043-device-free-container-compilation.md)和 [ADR-044](../adr/044-container-workload-budget.md)。
 
 <a id="container-database"></a>
 
@@ -64,7 +70,7 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
   --runtime-archive var/gpu-preflight/gvisor.tar.bz2
 ```
 
-工具构建固定任务镜像，再调用现有 PostgreSQL 测试入口创建自有数据库和卷。它只使用合成的隔离预约及固定 CPU guest，实际检查运行/创建中断、保留已消费或未消费额度、删除账号、预约错配、数据库锁超时、归档失败重试、换锁拥有者及归档后的数据库变化；同时检查已有宿主 worker 生命周期。
+工具构建固定任务镜像，再调用现有 PostgreSQL 测试入口创建自有数据库和卷。它只使用合成的隔离预约及固定 CPU guest，在原 v1 开发预算与新 v2 任务预算下分别检查运行/创建中断、保留已消费或未消费额度、删除账号、预约错配、数据库锁超时、归档失败重试、换锁拥有者及归档后的数据库变化；同时检查已有宿主 worker 生命周期。
 
 报告在 `test-results/px-container-database-*/result.json`，SQL 及组件输出在同目录 `postgres.log`/`postgres.xml`。逐场景报告区分正式恢复动作与测试结束时清理自有对象；错配时不能因为测试清理成功就声称生产预约已释放。只有场景、组件、原进程树和测试资源清理全部完成才有 `passed: true`。检查不连接已有站点数据库，不生成 GPU receipt，也不授予设备就绪状态。
 

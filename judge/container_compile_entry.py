@@ -15,7 +15,7 @@ from judge.container_oci import ContainerRuntime  # noqa: E402
 from judge.container_transport import ContainerListener  # noqa: E402
 from judge.gpu_contract import compile_request  # noqa: E402
 from judge.gpu_policy import PROFILE  # noqa: E402
-from judge.gpu_session import GPUExecutionError, GPUSession  # noqa: E402
+from judge.gpu_session import GPUExecutionError  # noqa: E402
 
 
 def main():
@@ -51,13 +51,10 @@ def main():
             runtime.tick()
             channel.connected()
 
-        def stop():
-            cleanup.append(runtime.stop_container("compiler"))
-
         report = {"event": "compile-checked", "ready": False, "executed": False}
         try:
-            with GPUSession(
-                runtime.attach("compiler"), stop, architecture=[], mode="submit", on_tick=tick
+            with runtime.session(
+                "compiler", on_cleanup=cleanup.append, mode="submit", on_tick=tick
             ) as session:
                 identity, _ = session.exchange(
                     {"protocol": 1, "operation": "prepare-compiler"},

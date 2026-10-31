@@ -63,6 +63,9 @@ def main():
             while time.monotonic() < end:
                 pass
             result = {"event": "busy-finished"}
+        elif operation == "memory":
+            blocks = [bytearray(b"x" * (8 * 1024 * 1024)) for _index in range(80)]
+            result = {"event": "memory-unlimited", "bytes": sum(map(len, blocks))}
         elif operation == "temporary-storage":
             filename = Path("/tmp/fixed-storage-check")
             count = 0
