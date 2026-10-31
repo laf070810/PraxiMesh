@@ -339,7 +339,7 @@ class ContainerJournal:
         )
         self.write(self.filename, record)
 
-    def recover(self):
+    def _stop_original(self):
         record = self.load()
         if record is None:
             return None
@@ -355,6 +355,21 @@ class ContainerJournal:
             }
             self.write(self.filename, record)
         service.stop()
+        return record, service
+
+    def stop(self):
+        """Stop the original instance but retain its active record for DB fencing."""
+        stopped = self._stop_original()
+        if stopped is None:
+            return None
+        _record, service = stopped
+        return {"container": service.container_id, "stopped": True, "ready": False}
+
+    def recover(self):
+        stopped = self._stop_original()
+        if stopped is None:
+            return None
+        record, service = stopped
         service.remove()
         # No new execution or claimed device recovery: only this container is gone.
         removed = {**record, "phase": "removed"}

@@ -67,6 +67,39 @@ def _stage_report(name, report, adapter):
             len({row["unit"] for row in stopped}) == len(stopped),
             "Initial GPU recovery duplicated a service",
         )
+        if "container_recovery" in report:
+            container = report["container_recovery"]
+            require(
+                type(container) is dict
+                and set(container) == {"had_record", "cleanup", "ready"}
+                and type(container["had_record"]) is bool
+                and container["ready"] is False,
+                "Invalid database-bound container recovery report",
+            )
+            cleanup = container["cleanup"]
+            require(
+                (not container["had_record"] and cleanup is None)
+                or (
+                    container["had_record"]
+                    and type(cleanup) is dict
+                    and set(cleanup) == {"container", "removed", "ready", "history"}
+                    and cleanup["removed"] is True
+                    and cleanup["ready"] is False
+                    and (
+                        cleanup["container"] is None
+                        or (
+                            type(cleanup["container"]) is str
+                            and re.fullmatch(r"[a-f0-9]{64}", cleanup["container"])
+                        )
+                    )
+                    and type(cleanup["history"]) is str
+                    and re.fullmatch(
+                        re.escape(adapter.target["uuid"]) + r"\.[a-f0-9]{32}\.done\.json",
+                        cleanup["history"],
+                    )
+                ),
+                "Initial GPU recovery did not finish its original container cleanup",
+            )
     elif name == "resources":
         validate_structure(report, adapter.target)
     else:
@@ -125,7 +158,15 @@ def _fail_closed(error, guard, directory):
 
 
 def initialize_controller(
-    guard, worker_id, adapter, *, receipt_directory, deadline=None, on_progress=None, on_tick=None
+    guard,
+    worker_id,
+    adapter,
+    *,
+    receipt_directory,
+    deadline=None,
+    on_progress=None,
+    on_tick=None,
+    container_journal=None,
 ):
     """Every invocation performs all real checks; never resume from a file/report.
 
@@ -158,6 +199,7 @@ def initialize_controller(
             adapter,
             deadline=min(deadline, time.monotonic() + CHECK_SECONDS),
             on_tick=on_tick,
+            container_journal=container_journal,
         )
         require(
             recovery["recovered"] is True
@@ -278,10 +320,17 @@ def claim_ready(guard, worker_id, adapter, *, receipt_directory, on_check=None):
     return _idle(guard, worker_id, adapter, receipt_directory, claim=True, on_check=on_check)
 
 
-def recover_cancelled(guard, worker_id, adapter, job, *, receipt_directory, on_tick):
+def recover_cancelled(
+    guard, worker_id, adapter, job, *, receipt_directory, on_tick, container_journal=None
+):
     """The original execution service has stopped; now recover the exact slot."""
     report = recover_controller(
-        guard, worker_id, adapter, on_tick=on_tick, expected_slot=(job.id, job.lease_token)
+        guard,
+        worker_id,
+        adapter,
+        on_tick=on_tick,
+        expected_slot=(job.id, job.lease_token),
+        container_journal=container_journal,
     )
     _stage_report("initial-recovery", report, adapter)
     require(

@@ -61,7 +61,9 @@ def stop_signals(stop):
             signal.signal(signum, handler)
 
 
-def run_worker(guard, worker_id, adapter, *, receipt_directory, stop, once=False):
+def run_worker(
+    guard, worker_id, adapter, *, receipt_directory, stop, once=False, container_journal=None
+):
     """Caller retains the host lock until this function's shutdown completes."""
 
     def stopping():
@@ -86,6 +88,7 @@ def run_worker(guard, worker_id, adapter, *, receipt_directory, stop, once=False
             receipt_directory=receipt_directory,
             on_tick=stopping,
             on_progress=lambda stage: logger.info("gpu_startup_passed stage=%s", stage),
+            container_journal=container_journal,
         )
         logger.info("gpu_worker_ready")
 
@@ -119,6 +122,7 @@ def run_worker(guard, worker_id, adapter, *, receipt_directory, stop, once=False
                             job,
                             receipt_directory=receipt_directory,
                             on_tick=current,
+                            container_journal=container_journal,
                         )
                     except GPUReceiptExpired:
                         initialize()

@@ -32,6 +32,25 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 容器控制连接、启动身份与断连恢复 | [受信通信检查](#container-transport)；真实 CPU guest，不生成 GPU 凭证 |
 | 持久容器身份、创建中断及旧制品清理 | [持久恢复检查](#container-journal)；固定 CPU，不释放数据库 GPU 预约 |
 | 容器化控制端的 UID、共用锁与重启接管 | [控制端映射检查](#container-controller)；固定 CPU，不连接应用数据库或 GPU |
+| 持久容器记录与数据库预约、锁超时和重试 | [数据库/容器联合检查](#container-database)；一次性 PostgreSQL 与固定 CPU guest，不开放 GPU |
+
+<a id="container-database"></a>
+
+## 不占 GPU 的数据库与容器恢复联合检查
+
+适用于修改 worker 的启动、续检、取消和崩溃恢复，以及排查数据库预约与 journal 不一致。使用下方相同的私有 rootless Docker 和固定 runsc 归档：
+
+```sh
+.venv/bin/python scripts/container_database_acceptance.py \
+  --docker-socket /run/user/$(id -u)/docker.sock \
+  --runtime-archive var/gpu-preflight/gvisor.tar.bz2
+```
+
+工具构建固定任务镜像，再调用现有 PostgreSQL 测试入口创建自有数据库和卷。它只使用合成的隔离预约及固定 CPU guest，实际检查运行/创建中断、保留已消费或未消费额度、删除账号、预约错配、数据库锁超时、归档失败重试、换锁拥有者及归档后的数据库变化；同时检查已有宿主 worker 生命周期。
+
+报告在 `test-results/px-container-database-*/result.json`，SQL 及组件输出在同目录 `postgres.log`/`postgres.xml`。逐场景报告区分正式恢复动作与测试结束时清理自有对象；错配时不能因为测试清理成功就声称生产预约已释放。只有场景、组件、原进程树和测试资源清理全部完成才有 `passed: true`。检查不连接已有站点数据库，不生成 GPU receipt，也不授予设备就绪状态。
+
+恢复设计见 [ADR-042](../adr/042-container-recovery-database-fence.md)。需要宿主 worker 同时处理已记录容器时，按下方[可选恢复配置](#worker-container-recovery)接入；这仍不构成完整 GPU Compose。
 
 <a id="container-controller"></a>
 
@@ -181,6 +200,23 @@ JUDGE_ENABLED=1 .venv/bin/python manage.py gpu_worker \
 凭证最长有效 24 小时，空闲时不足完整任务余量会停用并重跑全部检查。文件缺失、时钟回拨、代码/主机/所有者变化会退出；运行中凭证失效丢弃结果并保留预约。取消、删除或租约丢失时，先核对原服务已停止，再独立恢复并核对相同预约，成功后才可领取下一任务。发现外部 GPU 进程只停止自有执行，不终止其他账号的工作。
 
 用前台 Ctrl-C 或向该 worker 进程发送 SIGTERM 停止。处理器只设置标志，常规回调负责清理、撤销本次凭证和停用设备；中断任务的预约保留到下一次完整启动恢复。数据库网络失联时不能保证 Python 立即返回，实际任务服务仍有独立硬期限。不要删除锁文件、手动释放预约或换工作根绕过故障。日志只包含固定阶段、任务 ID 和错误类别，保留最后成功阶段用于定位。
+
+<a id="worker-container-recovery"></a>
+
+### 可选：启动时恢复原容器记录
+
+仅在这张卡已有持久容器 journal、需要由宿主 worker 接管清理时使用。在上方 `gpu_worker` 命令保留所有原参数，并同时追加：
+
+```sh
+  --container-journal "$PRAXIMESH_CONTAINER_JOURNAL" \
+  --docker-socket /run/user/$(id -u)/docker.sock
+```
+
+`PRAXIMESH_CONTAINER_JOURNAL` 必须指向原先初始化的私有目录绝对路径，其中含 `installation.json`；继续使用创建该记录时的设备锁目录和同一私有 daemon。不要新建空目录或使用验收报告副本替代原状态。命令检查这两个参数成对出现，并核对安装身份、持锁设备与原实例。未配置时，宿主 worker 不连接 Docker。
+
+恢复先停止原容器，归档前后再核对数据库的隔离状态、拥有者和原预约。行锁超时也尝试停止已记录实例，但保留活动记录与预约；错配时先查原 journal 和数据库状态，不手工释放或换目录重试。归档失败可在故障排除后通过同一入口重试。清理只返回 `ready: false`，后续独立 GPU 恢复、全部二十四阶段和就绪事务仍必须通过。
+
+这两个参数只接入旧容器清理，当前任务仍由原宿主执行路径处理。它们不把 worker 转为容器执行后端，也不替代完整 GPU Compose。数据库与固定 CPU 容器的验证入口见[联合检查](#container-database)。
 
 <a id="cuda-content"></a>
 

@@ -54,8 +54,14 @@ def journal(tmp_path):
             yield value
 
 
-def intent(journal):
-    service = PersistentRuntimeService(journal, uuid.uuid4(), uuid.uuid4(), image=IMAGE)
+def intent(journal, job_id=None, reservation_token=None, *, purpose="task"):
+    service = PersistentRuntimeService(
+        journal,
+        job_id or uuid.uuid4(),
+        reservation_token or uuid.uuid4(),
+        image=IMAGE,
+        purpose=purpose,
+    )
     service.image_env = []
     state = snapshot(service)
     state["Config"]["Labels"].update(service.required_image_labels())

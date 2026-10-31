@@ -3,10 +3,11 @@
 import math
 import os
 import time
-import uuid
 
 from core import gpu_resources
+from core.gpu_container_recovery import BoundContainerRecovery, validate_journal
 from core.gpu_control import bounded_database
+from core.gpu_identity import startup_identity
 from judge.gpu_adapter import GPUExecutionAdapter
 from judge.gpu_device_lock import DeviceLock
 from judge.gpu_namespace import JobWorkspace
@@ -16,14 +17,6 @@ from judge.sandbox import SandboxUnavailable
 
 STARTUP_SECONDS = 180
 MAINTENANCE_SECONDS = 90
-
-
-def startup_identity(device_uuid):
-    """Stable across worker ownership changes, including crashes without a job."""
-    prefix = "praximesh:gpu:startup:v1:" + device_uuid
-    return uuid.uuid5(uuid.NAMESPACE_URL, prefix + ":job"), uuid.uuid5(
-        uuid.NAMESPACE_URL, prefix + ":reservation"
-    )
 
 
 def clear_workspace(directory, service, *, deadline, on_tick):
@@ -41,7 +34,14 @@ def clear_workspace(directory, service, *, deadline, on_tick):
 
 
 def recover_controller(
-    guard, worker_id, adapter, *, deadline=None, on_tick=None, expected_slot=None
+    guard,
+    worker_id,
+    adapter,
+    *,
+    deadline=None,
+    on_tick=None,
+    expected_slot=None,
+    container_journal=None,
 ):
     """Adopt, stop old owned work and run fixed maintenance, retaining quarantine.
 
@@ -51,6 +51,8 @@ def recover_controller(
     if type(guard) is not DeviceLock or type(adapter) is not GPUExecutionAdapter:
         raise ValueError("A held device lock and supervised adapter are required")
     guard.assert_held()
+    if container_journal is not None:
+        validate_journal(container_journal, guard)
     if adapter.target["uuid"] != guard.device_uuid:
         raise ValueError("Startup recovery must use the locked device")
     if deadline is None:
@@ -61,12 +63,22 @@ def recover_controller(
         or not 0 < deadline - time.monotonic() <= STARTUP_SECONDS
     ):
         raise ValueError("Startup recovery requires a finite bounded deadline")
-    with bounded_database():
-        device = gpu_resources.adopt(guard, worker_id, adapter.fingerprint)
-        if expected_slot is not None and (device.job_id, device.reservation_token) != expected_slot:
-            raise gpu_resources.DeviceOwnershipError("GPU reservation changed before recovery")
-        gpu_resources.quarantine(guard)
-        job_id, reservation_token = device.job_id, device.reservation_token
+    try:
+        with bounded_database():
+            device = gpu_resources.adopt(guard, worker_id, adapter.fingerprint)
+            if (
+                expected_slot is not None
+                and (device.job_id, device.reservation_token) != expected_slot
+            ):
+                raise gpu_resources.DeviceOwnershipError("GPU reservation changed before recovery")
+            gpu_resources.quarantine(guard)
+            job_id, reservation_token = device.job_id, device.reservation_token
+    except BaseException:
+        # The journal independently identifies an owned original invocation.
+        # Stop it on DB failure, retaining the record and every DB reservation.
+        if container_journal is not None:
+            container_journal.stop()
+        raise
 
     def tick():
         guard.assert_held()
@@ -104,9 +116,22 @@ def recover_controller(
             record["stopped"].append(service.stop())
         except Exception as error:
             failures.append(error)
+    container_recovery = None
+    if container_journal is not None:
+        try:
+            container_recovery = BoundContainerRecovery(container_journal)
+            container_recovery.stop()
+        except Exception as error:
+            failures.append(error)
     if failures:
         raise SandboxUnavailable("An owned startup service could not be stopped") from failures[0]
     tick()
+    if container_recovery is not None:
+        record["container_recovery"] = container_recovery.finish(
+            job_id=job_id,
+            reservation_token=reservation_token,
+            on_tick=tick,
+        )
     # Remove old filesystem helpers first, so a mapped-store recovery can create
     # a fresh helper with that reservation's deterministic identity.
     for service in sorted(services, key=lambda item: item.purpose != "recovery"):

@@ -19,11 +19,13 @@ from core.gpu_resources import DeviceOwnershipError
 from core.gpu_worker import StopFlag, run_worker, stop_signals
 from core.models import GPUDevice, Submission, WorkerHealth
 from judge import gpu_receipt
+from judge.container_journal import ContainerJournal
 from judge.gpu_device_lock import DeviceLock
 from judge.gpu_kernel_checks import check_request
 from judge.gpu_receipt import CHECKS, GPUReceiptExpired, ReceiptStore, binding
 from judge.gpu_service import OwnedJobService
 from judge.sandbox import SandboxUnavailable
+from tests.test_container_journal import Engine, intent
 from tests.test_gpu_isolation import REQUEST, resource_report
 from tests.test_gpu_kernel_checks import check_report
 from tests.test_gpu_receipt import adapter_for
@@ -413,7 +415,20 @@ def test_signal_handler_rejects_lock_based_thread_events():
             pytest.fail("A signal handler must not reenter a thread event lock")
 
 
-@pytest.mark.parametrize("defect", ["disabled", "gpu", "worker", "podman", "directory", "archive"])
+@pytest.mark.parametrize(
+    "defect",
+    [
+        "disabled",
+        "gpu",
+        "worker",
+        "podman",
+        "directory",
+        "archive",
+        "container-pair",
+        "socket-pair",
+        "container-new",
+    ],
+)
 def test_command_rejects_invalid_config_before_device_access(
     tmp_path, settings, monkeypatch, defect
 ):
@@ -443,6 +458,14 @@ def test_command_rejects_invalid_config_before_device_access(
         options["directory"] = "relative"
     elif defect == "archive":
         options["nvrtc_archive"] += "-missing"
+    elif defect == "container-pair":
+        options["container_journal"] = str(tmp_path / "journal")
+    elif defect == "socket-pair":
+        options["docker_socket"] = str(tmp_path / "docker.sock")
+    elif defect == "container-new":
+        options.update(
+            container_journal=str(tmp_path / "journal"), docker_socket=str(tmp_path / "docker.sock")
+        )
     monkeypatch.setattr(command, "identify", lambda *_args: pytest.fail("Must not access device"))
     with pytest.raises(CommandError):
         call_command("gpu_worker", **options)
@@ -462,14 +485,20 @@ def test_clock_corruption_is_fatal_even_when_other_clock_expired(worker):
 
 
 @pytest.mark.parametrize("failing", [False, True])
+@pytest.mark.parametrize("with_journal", [False, True])
 def test_command_owns_lock_through_shutdown_and_sanitizes_failures(
-    worker, tmp_path, settings, monkeypatch, caplog, failing
+    worker, tmp_path, settings, monkeypatch, caplog, failing, with_journal
 ):
     from core.management.commands import gpu_worker as command
 
     settings.JUDGE_ENABLED = True
     archive = tmp_path / "synthetic-archive"
     archive.touch()
+    if with_journal:
+        engine = Engine()
+        with ContainerJournal(tmp_path / "journal", worker.guard, engine):
+            pass
+        monkeypatch.setattr(command, "LocalEngine", lambda _path: engine)
     worker.guard.close()
     monkeypatch.setattr(command, "identify", lambda _uuid: copy.deepcopy(worker.adapter.target))
     monkeypatch.setattr(command, "GPUExecutionAdapter", lambda **_kwargs: worker.adapter)
@@ -477,6 +506,9 @@ def test_command_owns_lock_through_shutdown_and_sanitizes_failures(
 
     def run(guard, *args, **kwargs):
         guard.assert_held()
+        if with_journal:
+            assert kwargs["container_journal"].guard is guard
+            kwargs["container_journal"].check()
         try:
             return original(guard, *args, **kwargs)
         finally:
@@ -501,6 +533,11 @@ def test_command_owns_lock_through_shutdown_and_sanitizes_failures(
         nvrtc_archive=str(archive),
         once=True,
     )
+    if with_journal:
+        options.update(
+            container_journal=str(tmp_path / "journal"),
+            docker_socket=str(tmp_path / "modeled.sock"),
+        )
     if failing:
         with pytest.raises(CommandError) as error:
             call_command("gpu_worker", **options)
@@ -511,3 +548,21 @@ def test_command_owns_lock_through_shutdown_and_sanitizes_failures(
     inactive(worker)
     with DeviceLock(worker.guard.directory, worker.guard.device_uuid) as replacement:
         replacement.assert_held()
+
+
+def test_worker_keeps_optional_journal_through_startup_and_cancel_recovery(worker, tmp_path):
+    job = worker.enqueue()
+    with ContainerJournal(tmp_path / "journal", worker.guard, Engine()) as journal:
+
+        def expire(service, _kwargs):
+            intent(journal, job.id, service.reservation_token)
+            Submission.objects.filter(pk=job.id).update(lease_until=timezone.now())
+
+        worker.execute_hook = expire
+        worker.run(once=True, container_journal=journal)
+        assert journal.load() is None and journal.engine.state is None
+        assert len(list(journal.directory.glob("*.done.json"))) == 1
+    assert worker.events.count("initial-recovery") == 2
+    job.refresh_from_db()
+    assert job.status == "finished" and job.verdict == "internal_error"
+    inactive(worker)
