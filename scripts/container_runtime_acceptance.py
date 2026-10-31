@@ -46,12 +46,17 @@ def build_image(engine, archive, out, tag):
     shutil.copyfile(ROOT / "vendor/gvisor/LICENSE", context / "gvisor-LICENSE")
     for name in ("container_entry.py", "container_contract.py"):
         shutil.copyfile(ROOT / "judge" / name, context / name)
-    for name in ("container_runtime_fixture.py", "gpu_runtime_cpu_guest.py"):
+    for name in (
+        "container_runtime_fixture.py",
+        "container_transport_fixture.py",
+        "gpu_runtime_cpu_guest.py",
+    ):
         shutil.copyfile(ROOT / "scripts" / name, context / name)
     (context / "judge").mkdir()
     host_only = {
         "judge/container_service.py",
         "judge/container_runtime_service.py",
+        "judge/container_connection.py",
         "judge/container_entry.py",
     }
     for path in (

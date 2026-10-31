@@ -29,6 +29,23 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | CUDA 候选合并、静态检查和参考解/错解 | [内容准备与验收](#cuda-content)；静态检查不占 GPU，真实 API 验收需要独占卡 |
 | 容器监督的独立期限、进程树与接管 | [可信容器监督检查](#container-supervision)；仅固定 CPU 基础设施，不是 GPU 部署入口 |
 | 容器内 runsc、会话故障和整树终止 | [嵌套运行时检查](#container-runtime)；固定 CPU guest，尚无 GPU 或正式准入 |
+| 容器控制连接、启动身份与断连恢复 | [受信通信检查](#container-transport)；真实 CPU guest，不生成 GPU 凭证 |
+
+<a id="container-transport"></a>
+
+## 不占 GPU 的容器控制通信检查
+
+使用与下方容器内 runsc 检查相同的 rootless Docker 环境和固定归档：
+
+```sh
+.venv/bin/python scripts/container_transport_acceptance.py \
+  --docker-socket /run/user/$(id -u)/docker.sock \
+  --runtime-archive var/gpu-preflight/gvisor.tar.bz2
+```
+
+此入口核对固定容器身份及启动握手，再经过真实控制连接驱动固定 CPU guest。检查包括 1 MiB 消息双向传输、guest 不可见通信路径、身份错配、超长帧、断连、客户端退出、取消、额外输入、独立期限及新调用恢复。它不接受任意程序输入，不创建应用数据库，也不会开放 GPU 提交。
+
+报告在 `test-results/px-container-transport-*/result.json`。只有全部检查和自有容器、镜像标签清理成功才有 `passed: true`。断连或 CLI 退出不是清理完成，报告还需有 guest 清理或外层独立停止及进程身份消失的证据。机制与边界见 [ADR-039](../adr/039-container-control-transport.md)，实测结果见 [G23](../acceptance-g23.md)。
 
 <a id="container-runtime"></a>
 

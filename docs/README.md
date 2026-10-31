@@ -66,6 +66,8 @@
 - [G21 容器监督基础的 CPU 验证](acceptance-g21.md) — 独立期限、身份与清理；尚未接入 GPU worker
 - [ADR-038：容器内直接 OCI runsc](adr/038-nested-runsc-container.md)
 - [G22 容器内 runsc 的 CPU 验证](acceptance-g22.md) — 运行与故障基础；整容器上限不等于独立 guest 配额
+- [ADR-039：固定容器身份与受信控制通道](adr/039-container-control-transport.md)
+- [G23 容器控制通信与 CPU 恢复](acceptance-g23.md) — 启动身份、断连与期限；正式 GPU 部署仍待完成
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)
