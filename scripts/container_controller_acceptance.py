@@ -19,7 +19,7 @@ from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from judge.container_connection import ContainerConnection  # noqa: E402
-from judge.container_contract import PYTHON  # noqa: E402
+from judge.container_contract import PYTHON, WORKLOAD_PROFILE, resource_limits  # noqa: E402
 from judge.container_controller import (  # noqa: E402
     CLI_ARCHIVE_SHA256,
     CLI_SHA256,
@@ -415,7 +415,11 @@ def main():
                 with DeviceLock(path / "locks", config["device"]) as guard:
                     with ContainerJournal(path / "journal", guard, engine) as journal:
                         service = PersistentRuntimeService(
-                            journal, config["job"], config["reservation"], image=task_image
+                            journal,
+                            config["job"],
+                            config["reservation"],
+                            image=task_image,
+                            resource_profile=WORKLOAD_PROFILE,
                         )
                         status = service.start(
                             [
@@ -436,7 +440,16 @@ def main():
                             assert connection.channel.receive()["event"] == "guest-ready"
                             connection.channel.send({"event": "hang"})
                             assert connection.channel.receive() == {"event": "busy"}
-                            active = {"container": service.container_id, "status": status}
+                            original_record = journal.load()
+                            assert original_record["version"] == 2
+                            assert original_record["resource_profile"] == WORKLOAD_PROFILE
+                            assert status["limits"] == resource_limits(WORKLOAD_PROFILE)
+                            active = {
+                                "container": service.container_id,
+                                "status": status,
+                                "journal_version": original_record["version"],
+                                "resource_profile": original_record["resource_profile"],
+                            }
                             processes = task_tree(engine, active)
             else:
                 current = control(path, config, "orphan")

@@ -95,9 +95,9 @@ curl --fail --location \
 
 构建工具核对整个 CLI 归档和二进制的固定 SHA-256；源码、基础镜像和运行时也固定身份。控制端只挂本次临时私有目录与精确 socket 文件，不挂整个用户目录，不依赖宿主 Python 或用户服务。镜像内 UID/GID 0 必须实际映射到宿主非 root 操作者；宿主、两个控制容器通过同一锁 inode 竞争。改变 UID、锁目录或 socket 身份应在创建任务前拒绝。
 
-随后运行真实 CPU guest，终止其可信控制容器，由另一容器或宿主读取原 journal 清理，并验证宿主创建的任务可以被容器接管；新调用使用新的实例和 nonce。任务容器继续无宿主挂载、无网络、无设备，使用独立期限。控制端拥有所选 daemon 的控制权；只读 socket 挂载不是 API 权限隔离，生产必须使用专用可信执行环境。
+随后运行真实 CPU guest，终止其可信控制容器，由另一容器或宿主读取原 journal 清理，并验证宿主创建的新预算任务（journal v2）可以被容器接管；其余场景继续覆盖原开发预算和 v1 记录。新调用使用新的实例和 nonce。任务容器继续无宿主挂载、无网络、无设备，使用独立期限。控制端拥有所选 daemon 的控制权；只读 socket 挂载不是 API 权限隔离，生产必须使用专用可信执行环境。
 
-结果保存在 `test-results/px-container-controller-*/result.json`；核对每项检查、原进程树消失、任务和控制容器清理、镜像标签及临时存储移除。失败时保留原始报告；无法确认清理时保留恢复目录，不能手动清空记录来绕过身份检查。资源与权限决策见 [ADR-041](../adr/041-containerized-control-identity.md)，实际结果与失败修正见 [G25](../acceptance-g25.md)。此工具不部署常驻 GPU worker，不连接应用数据库、不生成 receipt；完整 GPU Compose、设备监测和资源契约仍待交付。
+结果保存在 `test-results/px-container-controller-*/result.json`；核对每项检查、原进程树消失、任务和控制容器清理、镜像标签及临时存储移除。失败时保留原始报告；无法确认清理时保留恢复目录，不能手动清空记录来绕过身份检查。资源与权限决策见 [ADR-041](../adr/041-containerized-control-identity.md)，初次及当前预算兼容检查分别见 [G25](../acceptance-g25.md)和 [G28](../acceptance-g28.md)。此工具不部署常驻 GPU worker，不连接应用数据库、不生成 receipt；完整 GPU Compose、设备监测和正式容器环境仍待交付。
 
 <a id="container-journal"></a>
 

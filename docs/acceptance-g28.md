@@ -52,7 +52,9 @@
 
 修复后的 journal 七组检查全部通过，见 `test-results/px-container-journal-09a981c695e2/result.json` 和 `g28-journal.log`：意图、创建后未记录 ID、已记录 ID、运行中、源码升级、同名替换及已归档阶段均检查原记录恢复，并分别完成新的 CPU guest 调用。升级使用摘要已变化的独立源码副本，新执行拒绝原契约而恢复路径只清理原对象；同名替换保持运行且未被误认。14 个自有容器及其进程树清理，任务镜像标签移除。
 
-本批容器控制端回归仍在进行，尚未将早期版本的结果当作本批通过。
+容器控制端七组检查全部通过，见 `test-results/px-container-controller-2c7604709114/result.json` 和 `g28-controller.log`。覆盖实际 UID 映射、宿主/容器共用锁、错误 UID/锁/socket 拒绝及三种跨进程接管。宿主到容器的场景实际使用 `container-workload-v1` 和 journal v2，报告核对了 0.5 CPU/512 MiB/无 swap/256 PID 的原实例配置；其余场景保留 v1，恢复后均创建新调用。15 个自有任务/控制容器、临时存储和两个镜像标签清理。控制镜像为 `sha256:b01dcf0906d776e41d0cbd3470be433aee4d49b5617af315b9062db9dea81461`，控制端源码契约为 `daaed573dceb8747755f2cf01905064606d1c260416dbeed9a85a2816f4ca6bc`。
+
+独立只读查询覆盖本批十份成功/失败报告：114 个自有容器、11 个镜像标签均不存在，74 组已记录进程身份均已消失；六份最终成功报告的源码摘要与当前实现一致。原有 Web、CPU worker、tutor 仍运行且健康，CPU/WASI 策略未变，详见 `test-results/g28-audit.json`。九份相关文档的 328 个本地链接和新增预算锚点已核对，见 `g28-document-links.json`。失败记录完整保留，未把失败或未执行的场景计为通过。
 
 ## 剩余范围
 
