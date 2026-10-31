@@ -82,7 +82,7 @@ class KernelTask:
             raise ValueError("A kernel task can only be invoked once")
         self.used = True
         request = deepcopy(validate_request(request))
-        maintenance = request["event"] in {"recover", "check-kernel"}
+        maintenance = request["event"] in {"recover", "check-kernel", "check-resources"}
         if self.service.purpose != ("maintenance" if maintenance else "task"):
             raise ValueError("Kernel request does not match its original purpose")
         connection = None
@@ -128,7 +128,9 @@ class KernelTask:
             # Neither source nor protected fixtures cross the channel before
             # the caller's start transaction and original-record recheck.
             channel.send(request)
-            completed = checked_completion(channel.receive(), request)
+            completed = checked_completion(
+                channel.receive(), request, target=self.target, selection=self.service.device_spec
+            )
             tick()
             self.finishing = True
             channel.send({"event": "finish"})

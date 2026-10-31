@@ -209,7 +209,15 @@ def test_live_attach_client_cannot_hide_an_oom_until_the_request_times_out(monke
     counts = iter([{"max": 0, "oom": 0, "oom_kill": 0}, {"max": 10, "oom": 1, "oom_kill": 1}])
     events = []
     monkeypatch.setattr(container_oci, "counters", lambda _name: next(counts))
-    monkeypatch.setattr(runtime, "attach", lambda _label: SimpleNamespace(poll=lambda: None))
+    monkeypatch.setattr(
+        runtime,
+        "attach",
+        lambda _label: SimpleNamespace(
+            poll=lambda: None,
+            kill=lambda: events.append("original attach killed"),
+            wait=lambda **_kw: events.append("original attach waited"),
+        ),
+    )
     monkeypatch.setattr(runtime, "stop_container", lambda label: events.append("stopped " + label))
     monkeypatch.setattr(
         container_oci,
@@ -223,7 +231,48 @@ def test_live_attach_client_cannot_hide_an_oom_until_the_request_times_out(monke
         session["on_tick"]()
     assert error.value.verdict == "memory_limit"
     session["cleanup"]()
-    assert events == ["ownership checked", "stopped resource"]
+    assert events == [
+        "ownership checked",
+        "original attach killed",
+        "original attach waited",
+        "stopped resource",
+    ]
+
+
+def test_live_oom_attach_timeout_cannot_become_a_memory_verdict(monkeypatch):
+    import subprocess
+
+    runtime = container_oci.ContainerRuntime.__new__(container_oci.ContainerRuntime)
+    counts = iter([{"max": 0, "oom": 0, "oom_kill": 0}, {"max": 10, "oom": 1, "oom_kill": 1}])
+    events = []
+
+    def wait(**_kwargs):
+        raise subprocess.TimeoutExpired("fixed owned attach", 4)
+
+    monkeypatch.setattr(container_oci, "counters", lambda _name: next(counts))
+    monkeypatch.setattr(
+        runtime,
+        "attach",
+        lambda _label: SimpleNamespace(
+            poll=lambda: None,
+            kill=lambda: events.append("kill"),
+            wait=wait,
+        ),
+    )
+    monkeypatch.setattr(runtime, "stop_container", lambda label: events.append("stopped " + label))
+    monkeypatch.setattr(
+        container_oci,
+        "GPUSession",
+        lambda _process, callback, **kwargs: {"cleanup": callback, **kwargs},
+    )
+    session = runtime.session("resource", mode="run", on_tick=lambda: None)
+    with pytest.raises(SandboxUnavailable, match="OOM attach process remains"):
+        session["on_tick"]()
+    assert events == ["kill"]
+    # The enclosing session/finally still attempts original runtime cleanup;
+    # the failure is retained and cannot be converted into a successful probe.
+    session["cleanup"]()
+    assert events == ["kill", "stopped resource"]
 
 
 @pytest.mark.parametrize(

@@ -2,6 +2,7 @@
 
 import time
 
+from judge.container_isolation import check_resources
 from judge.container_kernel_checks import check_kernel
 from judge.container_kernel_protocol import PROTOCOL, checked_completion, validate_request
 from judge.gpu import evaluate_kernel
@@ -17,7 +18,7 @@ def serve_kernel(channel, runtime, identity):
     request = validate_request(channel.receive())
     deadline = runtime.deadline
     maintenance = request["event"] == "recover"
-    check = request["event"] == "check-kernel"
+    check = request["event"] in {"check-kernel", "check-resources"}
     try:
         if not maintenance:
             execution_deadline = deadline - RECOVERY_MARGIN - CLEANUP_MARGIN
@@ -34,7 +35,11 @@ def serve_kernel(channel, runtime, identity):
 
             if check:
                 runtime.deadline = execution_deadline
-                report = check_kernel(runtime, request)
+                report = (
+                    check_resources(runtime, request)
+                    if request["event"] == "check-resources"
+                    else check_kernel(runtime, request)
+                )
                 runtime.deadline = deadline
             else:
                 with runtime.kernel_session(
@@ -61,7 +66,12 @@ def serve_kernel(channel, runtime, identity):
             completed["report"] = report
         elif not maintenance:
             completed["result"] = result
-        checked_completion(completed, request)
+        checked_completion(
+            completed,
+            request,
+            target=getattr(runtime, "target", None),
+            selection=getattr(runtime, "device_spec", None),
+        )
         del request
         channel.send(completed)
         if channel.receive() != {"event": "finish"}:

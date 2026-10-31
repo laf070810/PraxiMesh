@@ -272,7 +272,18 @@ class ContainerRuntime:
             on_tick()
             if exceeded_memory():
                 # An OOM-killed sandbox need not promptly terminate its attach
-                # client. Observe the kernel throughout the live session.
+                # client. Match normal GPUSession.close() ordering: stop that
+                # original CLI before runtime commands, then independently
+                # verify the guest and its complete process tree. CLI death
+                # alone is never evidence of a cleaned OOM.
+                if process.poll() is None:
+                    process.kill()
+                    try:
+                        process.wait(timeout=4)
+                    except subprocess.TimeoutExpired:
+                        raise SandboxUnavailable(
+                            "OOM attach process remains; outer recovery required"
+                        ) from None
                 cleanup()
                 raise GPUExecutionError("memory_limit")
 

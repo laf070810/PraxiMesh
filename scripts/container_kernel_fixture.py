@@ -3,6 +3,7 @@
 import json
 import sys
 import time
+import traceback
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -59,6 +60,13 @@ def main():
     except BaseException as error:
         report["failure_kind"] = type(error).__name__
         report["failure"] = str(error)[:180]
+        # Fixed infrastructure only: record code locations, never frame locals,
+        # raw runtime output, paths, source, or caller credentials.
+        report["failure_trace"] = [
+            {"file": Path(frame.filename).name, "function": frame.name, "line": frame.lineno}
+            for frame in traceback.extract_tb(error.__traceback__)[-12:]
+        ]
+        report["remaining_seconds"] = listener.status["deadline"] - time.monotonic()
     finally:
         try:
             if runtime is not None:

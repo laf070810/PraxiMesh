@@ -96,6 +96,8 @@
 - [G36 容器环境身份与任务结算](acceptance-g36.md) — 私有历史与数据库边界、镜像内完整策略；完整启动及硬件路径仍待验收
 - [ADR-053：容器内固定内核启动检查](adr/053-container-kernel-startup-checks.md)
 - [G37 容器内固定内核启动检查](acceptance-g37.md) — 命名维护协议与原 guest 清理；CUDA 和完整启动仍待验收
+- [ADR-054：容器资源与隔离启动检查](adr/054-container-resource-startup-checks.md)
+- [G38 容器资源与隔离启动检查](acceptance-g38.md) — 固定九项资源维护与原任务清理；GPU 和完整启动仍待验收
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

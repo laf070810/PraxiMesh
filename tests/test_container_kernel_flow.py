@@ -161,3 +161,35 @@ def test_failed_named_check_withholds_report_and_closes_original_runtime(flow, m
         flow.run()
     assert "recovered" not in flow.events and flow.events[-1] == "runtime-closed"
     assert not any(item["event"] == "kernel-completed" for item in flow.sent)
+
+
+@pytest.mark.parametrize("failure", [None, "probe", "recovery"])
+def test_resource_report_waits_for_fresh_recovery_and_all_cleanup(flow, monkeypatch, failure):
+    from tests.test_container_isolation import REQUEST, resource_report
+
+    deadline = flow.runtime.deadline
+    flow.incoming[0] = copy.deepcopy(REQUEST)
+
+    def check(runtime, request):
+        assert request == REQUEST and runtime.deadline == deadline - 45
+        flow.events.append("resources")
+        if failure == "probe":
+            raise SandboxUnavailable("fixed resource probe failure")
+        return resource_report()
+
+    monkeypatch.setattr(module, "check_resources", check)
+    if failure == "recovery":
+
+        def fail(_runtime):
+            raise SandboxUnavailable("fixed resource recovery failure")
+
+        monkeypatch.setattr(module, "recover_device", fail)
+    if failure:
+        with pytest.raises(SandboxUnavailable, match="fixed resource"):
+            flow.run()
+        assert not any(item["event"] == "kernel-completed" for item in flow.sent)
+    else:
+        flow.run()
+        assert flow.events.index("resources") < flow.events.index("recovered")
+        assert flow.sent[-1]["report"] == resource_report() and "result" not in flow.sent[-1]
+    assert flow.events[-1] == "runtime-closed" and flow.runtime.deadline == deadline

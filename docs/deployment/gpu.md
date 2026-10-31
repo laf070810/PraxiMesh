@@ -40,7 +40,7 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 控制容器辨认宿主 PID、任务归属与失效记录 | [进程归属检查](#container-process-observer)；只读 CPU 进程观察，不查询 GPU |
 | 控制容器的 NVIDIA 身份、完整进程来源与占用拒绝 | [只读管理检查](#container-device-observer)；读取明确选定卡的管理元数据，不创建 CUDA 上下文或运行内核 |
 | 单卡设备传入任务/guest、新版记录与控制器中断恢复 | [设备节点检查](#container-device-nodes)；需要明确授权映射真实设备；固定 CPU guest 只读节点元信息，修复后实测待重放 |
-| 容器内核协议、固定启动检查、结果扣留与独立恢复 | [无设备调用链检查](#container-kernel-flow)；固定 CPU 夹具，不编译学员源码，不接入 GPU |
+| 容器内核协议、固定启动/资源检查、结果扣留与独立恢复 | [无设备调用链检查](#container-kernel-flow)；固定 CPU 夹具，不编译学员源码，不接入 GPU |
 
 <a id="container-kernel-flow"></a>
 
@@ -58,9 +58,15 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 
 固定启动检查也经该入口重放：命名维护请求、编译后取消与附着进程退出、非预期结果和恢复失败。核对报告挑战、中断前原 guest/附着进程活跃观察、实际清理状态与退出码，以及新正确 guest 的独立恢复。CPU 固定向量程序不执行对应 CUDA 源码，不能据此宣称十九项 CUDA 检查通过；报告格式与语义见 [ADR-053](../adr/053-container-kernel-startup-checks.md)。
 
+该入口还重放同一资源维护流程，预期总计十八个场景。资源请求的九项检查涵盖只读根/私有文件/外层回环/权限、输出、超时、取消、附着退出，以及 CPU、存储、OOM 和 PID 上限；每项之后验证新 guest，共检查十七个原 guest 的清理记录。任务总预算包含监督器，CPU/PID/内存来自实际 cgroup 计数，不能当作显存证据。完整资源检查后再运行固定正确恢复；另一个场景故意让恢复失败，确认成功报告被扣留。语义见 [ADR-054](../adr/054-container-resource-startup-checks.md)。
+
+定位资源问题时可加 `--resources-only`，只执行资源成功、恢复失败及后续新调用三个场景。此专项通过不代表完整十八项矩阵通过；保留各次报告及源码身份，修复后重放完整入口。OOM 后先终止原附着进程，再独立核对 guest、运行时及完整进程树清理；仅有 OOM 计数或 CLI 退出均不足以判定通过。
+
+十八项完整调用链、九项资源实测和控制镜像结果见 [G38 验收](../acceptance-g38.md)，包含原始失败及修正范围。
+
 每个场景按原 journal 恢复并核对进程退出；临时数据保存在自有目录，待恢复记录存在时保留现场。原报告在 `test-results/px-container-kernel-*/result.json`。这里不执行 [G34 设备节点检查](#container-device-nodes)，也不替代真实 CUDA、完整启动凭证或 GPU Compose 验收。
 
-容器调用现在也有独立环境身份，并接入原有任务结算和历史成绩校验，设计见 [ADR-052](../adr/052-container-gpu-environment.md)。完整控制镜像包含 GPU 策略所需的全部源码，[控制端映射检查](#container-controller)会在镜像内计算策略并核对实际 Docker 引擎身份。当前 `gpu_worker` 命令仍使用宿主适配器；容器固定内核检查已连接，完整启动、资源与整控制器故障检查尚未接通，因此这些组件不能通过现有命令、环境变量或旧 receipt 开放 GPU 提交。
+容器调用现在也有独立环境身份，并接入原有任务结算和历史成绩校验，设计见 [ADR-052](../adr/052-container-gpu-environment.md)。完整控制镜像包含 GPU 策略所需的全部源码，[控制端映射检查](#container-controller)会在镜像内计算策略并核对实际 Docker 引擎身份。当前 `gpu_worker` 命令仍使用宿主适配器；容器固定内核与资源检查已连接，完整启动与整控制器故障检查尚未接通，因此这些组件不能通过现有命令、环境变量或旧 receipt 开放 GPU 提交。
 
 <a id="container-device-nodes"></a>
 

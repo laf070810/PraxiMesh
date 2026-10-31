@@ -14,6 +14,7 @@ from judge.container_controller import (
 from judge.container_environment import engine_identity, environment_identity
 from judge.container_execution import KernelTask
 from judge.container_gpu import gpu_task_digest
+from judge.container_isolation_protocol import resource_request
 from judge.container_monitor import ContainerDeviceMonitor
 from judge.container_runtime_service import contract_digest
 from judge.container_service import IMAGE_ID
@@ -135,6 +136,16 @@ class ContainerGPUAdapter:
         completed = self.exchange(
             task,
             check_request(name, uuid4().hex),
+            deadline=deadline,
+            on_tick=on_tick,
+            on_begin=lambda: None,
+        )
+        return deepcopy(completed["report"]), deepcopy(self.environment)
+
+    def check_resources(self, task, *, deadline, on_tick):
+        completed = self.exchange(
+            task,
+            resource_request(uuid4().hex),
             deadline=deadline,
             on_tick=on_tick,
             on_begin=lambda: None,

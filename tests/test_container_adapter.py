@@ -237,6 +237,38 @@ def test_adapter_named_check_sends_only_fixed_name_and_fresh_challenge(configure
     assert "ready" not in environment
 
 
+def test_resource_adapter_uses_fresh_challenge_and_original_maintenance_task(configured):
+    from tests.test_container_isolation import resource_report
+
+    requests = []
+
+    def run(task, request, *, deadline, on_tick, on_begin):
+        assert task.service.purpose == "maintenance" and deadline == 180
+        assert set(request) == {"event", "canary"} and request["event"] == "check-resources"
+        requests.append(request)
+        on_tick()
+        on_begin()
+        return {
+            "report": resource_report(request, gpu=True),
+            "artifacts": {
+                "image": task.service.image,
+                "task_contract": configured.adapter.environment["artifacts"]["task_contract"],
+                "resource_profile": configured.adapter.environment["resource_profile"],
+                "limits": copy.deepcopy(configured.adapter.environment["workload_limits"]),
+            },
+        }
+
+    configured.run = run
+    adapter = configured.adapter
+    for _ in range(2):
+        task = adapter.task(configured.control.guard, "job", "reservation", purpose="maintenance")
+        report, environment = adapter.check_resources(task, deadline=180, on_tick=lambda: None)
+        assert report["gpu"] == adapter.target["uuid"] and environment == adapter.environment
+        report["checks"].clear()
+        assert environment.get("ready") is None
+    assert requests[0]["canary"] != requests[1]["canary"]
+
+
 def test_saved_container_identity_never_hashes_live_source(configured, monkeypatch):
     env = copy.deepcopy(configured.adapter.environment)
     env["execution_digest"] = "0" * 64

@@ -153,6 +153,36 @@ def source_sent(flow):
     return any(type(item) is tuple and item[1].get("event") == "execute" for item in flow.events)
 
 
+@pytest.mark.parametrize("defect", [None, "cpu", "target", "purpose", "cleanup"])
+def test_resource_maintenance_binds_original_target_and_removes_original_record(flow, defect):
+    from tests.test_container_isolation import REQUEST, completion
+
+    flow.message.clear()
+    flow.message.update(REQUEST)
+    flow.task.service.purpose = "task" if defect == "purpose" else "maintenance"
+    value = completion(gpu=defect != "cpu")
+    if defect != "cpu":
+        # The fixture uses physical minor 2 while this original task selects 0.
+        from judge.container_isolation_protocol import target_identity
+
+        _, nodes = target_identity(TARGET, flow.task.service.device_spec)
+        value["report"]["checks"][0]["details"]["guest"]["gpu_nodes"] = nodes
+    if defect == "target":
+        value["report"]["checks"][0]["details"]["guest"]["cuda"]["uuid"] = "changed"
+    if defect == "cleanup":
+        value["report"]["cleanup"].pop()
+    flow.incoming[1] = value
+    if defect:
+        with pytest.raises((ValueError, SandboxUnavailable)):
+            flow.run()
+    else:
+        completed = flow.run()
+        assert "report" in completed and "result" not in completed
+        assert flow.events.index("outer-recovered") < len(flow.events) - 1
+        assert flow.events[-1] == "idle-observed"
+    assert flow.journal.load() is None
+
+
 def test_result_requires_begin_original_task_cleanup_and_final_idle(flow):
     value = flow.run()
     position = next(

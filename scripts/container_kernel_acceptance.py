@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from judge.container_connection import ContainerConnection  # noqa: E402
 from judge.container_contract import PYTHON, WORKLOAD_PROFILE  # noqa: E402
+from judge.container_isolation_protocol import resource_request  # noqa: E402
 from judge.container_journal import ContainerJournal, PersistentRuntimeService  # noqa: E402
 from judge.container_kernel_protocol import checked_completion  # noqa: E402
 from judge.container_runtime_service import SOURCES, contract_digest  # noqa: E402
@@ -55,6 +56,8 @@ def problem():
 def request_for(test_mode):
     if test_mode == "recover":
         return {"event": "recover"}
+    if test_mode == "check-resources":
+        return resource_request(uuid.uuid4().hex)
     if test_mode.startswith("check-"):
         name = test_mode.removeprefix("check-")
         if name == "unexpected":
@@ -90,7 +93,7 @@ def scenario(engine, image, path, mode, test_mode):
             try:
                 status = service.start(
                     [PYTHON, "-I", "/opt/praximesh/container_kernel_fixture.py", mode],
-                    deadline=time.monotonic() + 100,
+                    deadline=time.monotonic() + (180 if test_mode == "check-resources" else 100),
                     on_tick=lambda: None,
                 )
                 row["container"] = service.container_id
@@ -176,6 +179,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--docker-socket", required=True)
     parser.add_argument("--runtime-archive", type=Path, required=True)
+    parser.add_argument(
+        "--resources-only",
+        action="store_true",
+        help="Only resource checks, failed recovery, and a new normal task; no GPU",
+    )
     options = parser.parse_args()
     engine = LocalEngine(options.docker_socket)
     engine.verify()
@@ -190,6 +198,7 @@ def main():
         "passed": False,
         "gpu_executed": False,
         "fixture_only": True,
+        "resources_only": options.resources_only,
         "checks": [],
         "runtime_contract": contract_digest(),
         "sources": {
@@ -204,7 +213,7 @@ def main():
     try:
         image = build_image(engine, options.runtime_archive, out, out.name)
         report["image"] = image
-        for mode, test_mode in (
+        scenarios = (
             ("normal", "run"),
             ("normal", "submit"),
             ("wrong-answer", "submit"),
@@ -220,8 +229,17 @@ def main():
             ("check-hang", "check-attach-death"),
             ("normal", "check-unexpected"),
             ("recovery-fail", "check-public-run"),
+            ("normal", "check-resources"),
+            ("recovery-fail", "check-resources"),
             ("normal", "run"),
-        ):
+        )
+        if options.resources_only:
+            scenarios = (
+                ("normal", "check-resources"),
+                ("recovery-fail", "check-resources"),
+                ("normal", "run"),
+            )
+        for mode, test_mode in scenarios:
             row = scenario(engine, image, base / str(len(report["checks"])), mode, test_mode)
             report["checks"].append(row)
             save(out / "result.json", report)

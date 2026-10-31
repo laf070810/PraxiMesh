@@ -7,6 +7,7 @@ LABEL io.praximesh.supervision.runtime=${RUNTIME_CONTRACT}
 COPY --from=guest / /opt/guest-root/
 COPY gpu_runtime_cpu_guest.py /opt/guest-root/opt/praximesh/cpu_guest.py
 COPY container_kernel_cpu_guest.py /opt/guest-root/opt/praximesh/kernel_cpu_guest.py
+COPY judge/container_isolation_guest.py /opt/guest-root/opt/praximesh/resource_guest.py
 COPY runtime /opt/runsc/
 COPY gvisor-LICENSE /opt/licenses/gvisor-LICENSE
 COPY judge /opt/praximesh/judge/

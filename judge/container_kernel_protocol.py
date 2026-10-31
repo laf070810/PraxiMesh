@@ -42,6 +42,10 @@ def prepared(selection, manifest, target):
 def validate_request(value):
     if value == {"event": "recover"}:
         return value
+    if type(value) is dict and value.get("event") == "check-resources":
+        from judge.container_isolation_protocol import validate_request as resource_request
+
+        return resource_request(value)
     if type(value) is dict and set(value) == {"event", "name", "challenge"}:
         if value == check_request(value["name"], value["challenge"]):
             return value
@@ -66,7 +70,7 @@ def check_prepared(value, expected):
 
 
 def expected_cleanup(request):
-    if request["event"] == "recover":
+    if request["event"] in {"recover", "check-resources"}:
         labels = ["device-recovery"]
     else:
         labels = [
@@ -76,11 +80,11 @@ def expected_cleanup(request):
     return [{"id": name, "stopped": True, "removed": True} for name in labels]
 
 
-def checked_completion(value, request):
+def checked_completion(value, request, *, target=None, selection=None):
     validate_request(request)
     fields = {"event", "protocol", "recovered", "cleanup", "ready"}
     maintenance = request["event"] == "recover"
-    check = request["event"] == "check-kernel"
+    check = request["event"] in {"check-kernel", "check-resources"}
     if check:
         fields.add("report")
     elif not maintenance:
@@ -98,7 +102,11 @@ def checked_completion(value, request):
         )
     ):
         raise SandboxUnavailable("Kernel task did not confirm independent recovery and cleanup")
-    if check:
+    if request["event"] == "check-resources":
+        from judge.container_isolation_protocol import validate_report
+
+        validate_report(value["report"], request, target=target, selection=selection)
+    elif check:
         from judge.container_kernel_checks import validate_check_report
 
         validate_check_report(value["report"], request)
