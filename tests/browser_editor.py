@@ -22,9 +22,19 @@ def fill(page, source):
 
 def layouts(page, base, artifacts, *, baseline=False):
     metrics = []
+    page.context.add_cookies([{"name": "django_language", "value": "zh-hans", "url": base}])
+    page.goto(base + "/community/new/")
+    page.locator("#id_kind").select_option("discussion")
+    page.locator("#id_title").fill(
+        "布局检查：较长标题在列表和详情中换行后，仍与正文及操作选项保持一致的页面边距"
+    )
+    page.locator("#id_body").fill("只属于本次浏览器验收的私有草稿，用于检查正文、列表和操作选项。")
+    page.get_by_role("button", name="保存内容", exact=True).click()
+    expect(page.get_by_role("heading", level=1)).to_contain_text("布局检查")
+    detail_route = page.url.removeprefix(base).strip("/")
     for language in ("zh-hans", "en"):
         page.context.add_cookies([{"name": "django_language", "value": language, "url": base}])
-        for width in (1440, 768, 390):
+        for width in (1440, 768, 390, 320):
             page.set_viewport_size({"width": width, "height": 1000})
             for route in (
                 "practice",
@@ -32,20 +42,37 @@ def layouts(page, base, artifacts, *, baseline=False):
                 "coaching/goals",
                 "organizations",
                 "problems/sum-positive",
+                "community",
+                "community/mine",
+                "community/new",
+                detail_route,
+                "projects",
+                "showcase/settings",
             ):
-                page.goto(f"{base}/{route}/")
+                response = page.goto(f"{base}/{route}/")
+                assert response.ok, route
                 if route.startswith("problems/") and not baseline:
                     expect(page.locator(".cm-content")).to_be_visible()
                 item = page.evaluate("""() => ({
                     overflow: document.documentElement.scrollWidth > innerWidth,
                     heading: document.querySelector('h1').getBoundingClientRect().x,
+                    body: [...document.querySelectorAll(
+                        '#main > :is(nav, form, p, article, h2, ul, ol), ' +
+                        '#main > .section.compact > :is(nav, form, p, article, h2, ul, ol)'
+                    )].map(e => ({
+                        tag: e.tagName,
+                        rect: e.getBoundingClientRect().toJSON(),
+                        startInset: e.tagName === 'NAV' ? parseFloat(getComputedStyle(e).paddingLeft) : 0,
+                        endInset: e.tagName === 'NAV' ? parseFloat(getComputedStyle(e).paddingRight) : 0
+                    })),
                     filters: [...document.querySelectorAll('.filters label')].map(e => ({
                         text: e.firstChild.textContent, rect: e.getBoundingClientRect().toJSON(),
                         control: e.querySelector('input, select').getBoundingClientRect().toJSON()
                     })),
                     choices: [...document.querySelectorAll('input[type=checkbox]')].map(e => ({
                         rect: e.getBoundingClientRect().toJSON(),
-                        label: e.closest('label')?.getBoundingClientRect().toJSON()
+                        label: e.labels[0]?.getBoundingClientRect().toJSON(),
+                        row: (e.closest('label') || e.closest('p')).getBoundingClientRect().toJSON()
                     }))
                 })""")
                 metrics.append({"language": language, "width": width, "route": route, **item})
@@ -56,10 +83,17 @@ def layouts(page, base, artifacts, *, baseline=False):
                 if not baseline:
                     assert not item["overflow"], metrics[-1]
                     assert item["heading"] >= 16, metrics[-1]
+                    for block in item["body"]:
+                        # Full-width navigation can inset its link content with padding.
+                        left = block["rect"]["left"] + block["startInset"]
+                        right = block["rect"]["right"] - block["endInset"]
+                        assert abs(left - item["heading"]) <= 2, metrics[-1]
+                        assert right <= width - 16, metrics[-1]
                     for choice in item["choices"]:
                         assert 12 <= choice["rect"]["width"] <= 24
                         assert choice["rect"]["height"] >= 12
-                        assert choice["label"]["height"] >= 28
+                        assert choice["label"]["height"] >= 20
+                        assert choice["row"]["height"] >= 28
                     if item["choices"]:
                         choice = page.locator('input[type="checkbox"]').first
                         choice.check()

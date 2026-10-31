@@ -2,7 +2,17 @@
 
 日期：2026-10-31。设计：[RFC-020](rfcs/020-browser-editor.md)、[ADR-021](adr/021-browser-editor.md)。使用和构建说明集中在 [编辑器指南](editor.md)。本轮在维护者要求的不占 GPU 范围内进行。
 
-## 当前源码复查
+## 社区与手机页面对齐补充
+
+2026-10-31，在 `53b5c7e` 基线上扩展检查发现社区首页、写内容页和详情页只有标题使用内容容器，正文、分类或表单仍从页面最左侧开始；“我的内容”、评论、举报/申诉记录、审核和错误页也未使用统一容器。桌面标题起点为 128 px，错位正文为 0 px；320 px 手机页对应为 22 px 与 0 px。原始 88 组尺寸和截图保存在 `test-results/layout-community-before/editor-before/`。这说明仅检查 h1 边距和横向溢出不足以发现正文错位。
+
+已为有独立页头的三类页面补上共用正文容器，其余六类页面继承 `workspace_base.html`。新增实际正文起点检查后，还发现手机做题页导航沿用 4% 边距：390 px 下导航为 15.59 px，标题为 22 px；已在手机断点统一为 22 px。此失败保留在 `layout-community-fixed.log`，修复后的 `layout-community-final.log` 与 `layout-community-final/editor/layouts.json` 确认 **88 组全部通过**：11 个页面、中英两种界面、1440/768/390/320 四种宽度，无横向溢出。
+
+专项同时重放 Python/JavaScript 高亮、补全、本地检查、格式化、快捷键、私有草稿、并发修订和资源失败回退。检查了有内容的社区列表和长标题详情、同排筛选底边，以及目标选择与公开设置两种复选框结构的尺寸、点击和 Space 切换。实际查看修复前后桌面社区、320 px 英文写内容和公开设置截图，正文与标题对齐。本轮没有新增界面文字、改变编辑器 bundle 或运行评测，现有站点镜像尚未重建。
+
+123 项社区、博客、编辑器、Web 和译文检查通过，无跳过，见 `layout-community-components-final.log` 与 `.xml`。完整 `scripts/browser_acceptance.py` 的编辑器、学习、社区审核/评论/私有举报/申诉/撤回/导出、英文与项目流程也通过，见 `layout-community-full.log`；合成作者、举报者和审核者均已删除，临时服务和数据库由原入口清理。汇总在 `layout-community-summary.json`。首次组件命令误写了不存在的测试文件名，未运行测试；更正后得到上述 123 项结果，原命令日志保留。代码格式与差异检查通过。
+
+## 较早的源码复查
 
 2026-10-31 在 `main` 的 `207ed76` 界面基线上重放 `scripts/browser_acceptance.py --interface`，结果在 `test-results/g26-interface.log` 与 `test-results/g26-interface/editor/`。此次未修改页面或编辑器代码。Python/JavaScript 的高亮、补全、真实本地检查与格式化、快捷键、私有草稿及降级行为通过；没有执行评测或占用 GPU。
 

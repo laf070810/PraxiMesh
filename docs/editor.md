@@ -39,6 +39,8 @@ npm audit
 
 源码在 `frontend/`，构建入口为 `scripts/build_editor.mjs`。提交 `package.json`、锁文件及 `static/editor/` 的构建结果、摘要清单和依赖许可证；不提交 `node_modules/`。资源一致性检查防止只修改源码而未重新构建。生成的 JS 包含上游模板字符串中的有效行尾空格，`.gitattributes` 仅对这两个生成文件排除行尾空白检查，不手工改写构建结果。修改中英界面时同步维护 `.po` 和 `.mo`。浏览器依赖安装与完整验证入口见 [README](../README.md#开发与检查)。
 
+`--interface` 也检查题库、知识、目标选项、组织、社区、工程项目和公开设置的中英布局，覆盖 320/390/768/1440 像素。除溢出外，还比较标题与正文边距、同排筛选控件底边，操作嵌套标签和独立标签两种复选框；社区长标题来自本次合成账号的私有草稿。所有写入留在一次性测试数据库，结束时清理账号及测试进程。实际结果见[编辑器与页面对齐验收](acceptance-editor.md)。
+
 CodeMirror 动态样式使用每次响应的 CSP nonce。只有练习详情页面允许同源 worker 和 WASM 编译；不放开内联脚本、任意内联样式或 JavaScript eval。新前端构建文件是发布包的可选源码项，旧制品清单仍可校验。设计见 [RFC-020](rfcs/020-browser-editor.md)。
 
 CUDA 语法扩展在 `scripts/editor_cuda.mjs`，基于锁定的 Lezer C++ 源码生成，不改写学员文本；编辑界面与分析 worker 使用同一语法。上游语法结构变化时构建会要求复核。`npm run test:editor` 测试实际打包 worker 的解析与格式化；浏览器 `--gpu-results` 检查合成 CUDA 页面、键盘、草稿、加载失败及中英布局，使用一次性数据库，不能作为真实 GPU 评测或性能验收。完整的 LLVM/Emscripten/musl 许可补充在 `frontend/clang-format-NOTICES.txt`，构建时合入分发声明。

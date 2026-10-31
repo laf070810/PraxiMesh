@@ -29,6 +29,7 @@
 - 发布包不可原地改写。新控制器必须能校验需要升级的旧制品；新增开发文档不得无意变成旧清单的必填项。schema 升级、失败恢复和内容发布分别说明验证范围。
 - 界面字符串使用 Django 翻译，维护 `.po` 和编译后的 `.mo`；内容译文绑定准确的源版本。缺少译文明确回退，不能借用另一版本文本。
 - 编辑器源码在 `frontend/`，按 [编辑器指南](docs/editor.md)更新 npm 锁文件、预构建静态资源和许可证；不能只改源码而遗留旧 bundle。保留 textarea 回退、私有草稿、异步修订保护及 CSP nonce，分析工具不得执行源码或外发代码。界面改动用 `scripts/browser_acceptance.py --interface` 验证中英、多种宽度、键盘操作与失败回退。
+- 标题、列表、表单与选项须共用页面边距。无独立页头的内容页继承 `workspace_base.html`；带 `.page-heading` 的正文使用 `.section.compact`，避免正文直接落在无边距的 main 下。布局检查应比较正文和标题的实际起点，并包含 320 像素手机页、多行标题及两种 Django 复选框结构，不能只检查横向溢出。
 - CUDA 编辑器在构建时扩展锁定的 Lezer C++ 语法，保留上游字符串/注释解析与独立生成的 token ID；不得靠删除或改写用户文本消除误报。结构提示不能代替 NVRTC。修改后运行 `npm run test:editor` 及 `scripts/browser_acceptance.py --gpu-results`；后者只操作自有临时数据库，不执行 GPU。题库 CPU 调用单位与 GPU 整卡秒数分别筛选；公开 `.cu` 包不得走本地 WASI 或宿主执行回退。
 
 ## 环境与验证

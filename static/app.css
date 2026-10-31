@@ -1307,6 +1307,9 @@ footer .brand {
   .problem-heading {
     padding: 26px 22px 10px;
   }
+  .problem-heading + .workspace-links {
+    padding-inline: 22px;
+  }
   .problem-heading h1 {
     font-size: 27px;
   }
