@@ -15,8 +15,38 @@ from judge.container_controller import ContainerController, identity, mapped_zer
 from judge.container_service import LocalEngine
 from judge.gpu_device_lock import DeviceLock, DeviceLockError
 from judge.sandbox import SandboxUnavailable
-from scripts.container_controller_acceptance import stage_cli
+from scripts.container_controller_acceptance import stage_cli, wait_report
 from tests.test_container_journal import Engine
+
+
+def test_observer_reads_report_published_while_checking_controller_exit(tmp_path):
+    expected = {"completion": {"removed": True, "ready": False}}
+
+    def inspect():
+        # The controller publishes atomically, then exits between observer reads.
+        path = tmp_path / "finished.json"
+        path.write_text(json.dumps(expected))
+        path.chmod(0o600)
+        return {"State": {"Running": False}}
+
+    control = SimpleNamespace(
+        inspect=inspect,
+        container_id="finished-controller",
+        engine=SimpleNamespace(run=lambda *args: SimpleNamespace(stdout=b"", stderr=b"")),
+    )
+    assert wait_report(control, tmp_path, "finished") == expected
+
+
+def test_observer_rejects_stopped_controller_without_report(tmp_path):
+    control = SimpleNamespace(
+        inspect=lambda: {"State": {"Running": False}},
+        container_id="failed-controller",
+        engine=SimpleNamespace(
+            run=lambda *args: SimpleNamespace(stdout=b"ControllerFailure", stderr=b"")
+        ),
+    )
+    with pytest.raises(RuntimeError, match="stopped before finished: ControllerFailure"):
+        wait_report(control, tmp_path, "finished")
 
 
 @pytest.mark.parametrize(

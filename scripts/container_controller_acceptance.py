@@ -241,13 +241,16 @@ class Control:
 def wait_report(control, path, name):
     end = time.monotonic() + 40
     while time.monotonic() < end:
+        # A final report is published before exit; observe exit before the file
+        # so publication between reads cannot look like a missing result.
+        state = control.inspect()["State"]
         report = path / (name + ".json")
         if report.exists():
             assert (
                 report.stat().st_uid == os.getuid() and stat.S_IMODE(report.stat().st_mode) == 0o600
             )
             return json.loads(report.read_text())
-        if not control.inspect()["State"]["Running"]:
+        if not state["Running"]:
             result = control.engine.run("container", "logs", control.container_id)
             logs = (result.stdout + result.stderr).decode()
             raise RuntimeError("Controller stopped before " + name + ": " + logs)
