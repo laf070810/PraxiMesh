@@ -30,6 +30,23 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 容器监督的独立期限、进程树与接管 | [可信容器监督检查](#container-supervision)；仅固定 CPU 基础设施，不是 GPU 部署入口 |
 | 容器内 runsc、会话故障和整树终止 | [嵌套运行时检查](#container-runtime)；固定 CPU guest，尚无 GPU 或正式准入 |
 | 容器控制连接、启动身份与断连恢复 | [受信通信检查](#container-transport)；真实 CPU guest，不生成 GPU 凭证 |
+| 持久容器身份、创建中断及旧制品清理 | [持久恢复检查](#container-journal)；固定 CPU，不释放数据库 GPU 预约 |
+
+<a id="container-journal"></a>
+
+## 不占 GPU 的容器持久恢复检查
+
+沿用下方容器检查的 rootless Docker 与固定完整 runsc 归档。存储还需支持原子重命名、文件/目录同步及文件锁；本工具在自己的结果目录验证这些操作，不修改已有站点状态：
+
+```sh
+.venv/bin/python scripts/container_journal_acceptance.py \
+  --docker-socket /run/user/$(id -u)/docker.sock \
+  --runtime-archive var/gpu-preflight/gvisor.tar.bz2
+```
+
+它依次在意图写入后、创建后但 ID 未记录、ID 已记录、真实 CPU guest 运行中及归档后中断控制器；由新进程读取原记录清理，再通过新调用运行固定 CPU guest。升级场景从源码副本执行改变摘要后的恢复控制器，确认新执行拒绝旧契约，而仅清理路径可以处理原对象；另实测拒绝停止同名替换容器。
+
+记录在 `test-results/px-container-journal-*/result.json`，应检查每项中断位置、原调用清理、归档、新调用及最终 `passed`。持久记录不是启动 receipt，恢复结果为 `ready: false`；后续生产 worker 仍须完成设备和数据库恢复。该入口不部署常驻 worker。设计与完整证据见 [ADR-040](../adr/040-durable-container-ownership.md)及 [G24](../acceptance-g24.md)。
 
 <a id="container-transport"></a>
 

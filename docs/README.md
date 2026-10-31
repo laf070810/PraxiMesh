@@ -68,6 +68,8 @@
 - [G22 容器内 runsc 的 CPU 验证](acceptance-g22.md) — 运行与故障基础；整容器上限不等于独立 guest 配额
 - [ADR-039：固定容器身份与受信控制通道](adr/039-container-control-transport.md)
 - [G23 容器控制通信与 CPU 恢复](acceptance-g23.md) — 启动身份、断连与期限；正式 GPU 部署仍待完成
+- [ADR-040：持久容器身份与旧调用清理](adr/040-durable-container-ownership.md)
+- [G24 持久容器身份与升级清理](acceptance-g24.md) — 创建中断、旧契约与新调用恢复；不表示 GPU 就绪
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

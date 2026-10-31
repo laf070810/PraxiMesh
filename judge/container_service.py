@@ -115,6 +115,15 @@ class ContainerService:
     def creation_options(self):
         yield ()
 
+    def record_intent(self, arguments):
+        pass
+
+    def record_created(self):
+        pass
+
+    def record_started(self, status):
+        pass
+
     def __init__(self, guard, job_id, reservation_token, *, engine, image, purpose="task"):
         if type(guard) is not DeviceLock:
             raise ValueError("An owned device lock is required")
@@ -325,6 +334,7 @@ class ContainerService:
         if before >= until:
             raise SandboxUnavailable("Reservation expired before creation")
         arguments = [str(before), str(until), uuid.uuid4().hex, "--", *command]
+        self.record_intent(arguments)
         with self.creation_options() as extra_options:
             created = (
                 self._run(
@@ -379,6 +389,7 @@ class ContainerService:
             raise SandboxUnavailable("Container creation did not return an identity")
         self.container_id = created
         self.inspect()
+        self.record_created()
         if time.monotonic() >= before:
             raise SandboxUnavailable("Container missed its startup window; recover it")
         self._run("container", "start", self.container_id, on_tick=on_tick)
@@ -424,6 +435,7 @@ class ContainerService:
                 current = self.inspect()
                 if current is None or not current["running"] or time.monotonic() >= until:
                     raise SandboxUnavailable("Supervisor ended before readiness was confirmed")
+                self.record_started(status)
                 return status
             on_tick()
             time.sleep(0.05)

@@ -57,6 +57,7 @@ def build_image(engine, archive, out, tag):
         "judge/container_service.py",
         "judge/container_runtime_service.py",
         "judge/container_connection.py",
+        "judge/container_journal.py",
         "judge/container_entry.py",
     }
     for path in (
