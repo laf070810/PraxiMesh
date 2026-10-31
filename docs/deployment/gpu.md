@@ -38,6 +38,7 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 控制容器内发起编译、取消和退出接管 | [容器编译控制检查](#container-compilation-control)；同一安装身份下的新任务恢复，不是 GPU 部署入口 |
 | 本机驱动快照、库依赖、精确 runsc 版本匹配 | [驱动制品检查](#container-driver)；无设备加载与编译，不初始化 CUDA 或证明硬件可用 |
 | 控制容器辨认宿主 PID、任务归属与失效记录 | [进程归属检查](#container-process-observer)；只读 CPU 进程观察，不查询 GPU |
+| 控制容器的 NVIDIA 身份、进程来源与占用拒绝 | [只读管理检查](#container-device-observer)；读取明确选定卡的 NVML 元数据，不创建 CUDA 上下文或运行内核 |
 
 <a id="container-driver"></a>
 
@@ -109,7 +110,7 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 
 procfs 只读并不限制所有魔术链接的目标；该视图只能交给本就拥有专用 rootless Docker socket 的可信控制端。观察代码只读取有界的 stat/status/cgroup，不读取环境、命令行或进程内存，不执行学员代码或停止未知 PID。任务容器和 guest 均不获得此挂载。cgroup 文本按读取者命名空间比较，不作为宿主文件路径使用。
 
-此模式只验证真实 CPU 进程归属和原记录生命周期，不查询 NVIDIA 进程、不建立 CUDA 上下文、不签发 GPU 就绪凭证。单卡注入、NVIDIA PID 来源、正式环境及完整启动/部署仍需后续连接与验收。
+此模式只验证真实 CPU 进程归属和原记录生命周期，不查询 NVIDIA 进程、不建立 CUDA 上下文、不签发 GPU 就绪凭证。NVIDIA 元数据使用[只读管理检查](#container-device-observer)；实际 CUDA 进程对应、任务单卡注入、正式环境及完整启动/部署仍需后续连接与验收。
 
 <a id="container-database"></a>
 
@@ -151,6 +152,27 @@ curl --fail --location \
 随后运行真实 CPU guest，终止其可信控制容器，由另一容器或宿主读取原 journal 清理，并验证宿主创建的新预算任务（journal v2）可以被容器接管；其余场景继续覆盖原开发预算和 v1 记录。新调用使用新的实例和 nonce。任务容器继续无宿主挂载、无网络、无设备，使用独立期限。控制端拥有所选 daemon 的控制权；只读 socket 挂载不是 API 权限隔离，生产必须使用专用可信执行环境。
 
 结果保存在 `test-results/px-container-controller-*/result.json`；核对每项检查、原进程树消失、任务和控制容器清理、镜像标签及临时存储移除。失败时保留原始报告；无法确认清理时保留恢复目录，不能手动清空记录来绕过身份检查。资源与权限决策见 [ADR-041](../adr/041-containerized-control-identity.md)，初次及当前预算兼容检查分别见 [G25](../acceptance-g25.md)和 [G28](../acceptance-g28.md)。此工具不部署常驻 GPU worker，不连接应用数据库、不生成 receipt；完整 GPU Compose、设备监测和正式容器环境仍待交付。
+
+<a id="container-device-observer"></a>
+
+### 可选：控制容器的只读 NVIDIA 管理查询
+
+适用于开发容器 worker 的设备身份和持续占用监测。需要已安装的 NVIDIA 管理库与明确选定的卡；本模式只读取 NVML 元数据，不创建 CUDA 上下文、不运行内核，也不停止显卡上的进程。因此可以在维护者允许只读观察、暂不允许计算验收时使用。
+
+先用 `nvidia-smi -i 0 --query-gpu=uuid --format=csv,noheader` 读取并核对指定卡的完整 UUID，将它设为 `PRAXIMESH_OBSERVE_GPU_UUID`；这里的 `0` 按维护者授权的卡选择。在上面原控制端检查命令末尾追加：
+
+```sh
+  --observe-device "$PRAXIMESH_OBSERVE_GPU_UUID" \
+  --nvml-library-dir /usr/lib64
+```
+
+Debian/Ubuntu 的库目录通常为 `/usr/lib/x86_64-linux-gnu`。构建只从受信系统目录静态复制当前版本的 `libnvidia-ml`，校验 ELF、SONAME、内核版本、大小和摘要；不改宿主驱动、不从学员输入选择文件，也不把本机驱动快照作为源码发布。管理库与四库 CUDA/PTX 任务镜像是不同制品。
+
+预期共十七项：八项管理配置拒绝、实际管理查询与无设备 CPU 任务、v2 进程视图兼容，再加原来的七组 v1 控制端检查。v3 仅向可信控制端映射所选卡和 `nvidiactl`，保持私有 PID/cgroup、只读宿主 procfs 及原控制预算。NVML 自建的 `nvidia-caps` 只允许为私有空目录；任何额外文件、设备、链接或可写共享目录均拒绝。任务容器与 CPU guest 不获得 NVIDIA 设备。
+
+计算、图形和 MPS 三类查询都必须成功；权限不足、不支持、部分结果、数量超限、版本变化和超时不能视为空闲。三个空列表也不证明没有 `O` 类或无需上下文的资源占用，该来源仍需在正式准入前补齐。报告中的 `real_external_gpu_processes_observed` 表示本次是否实际看到了外部 GPU 进程；为 false 时，只证明身份/空列表读取和原任务生命周期，不证明实际 CUDA PID 的归属或排他性。不得为补造此项证据擅自运行 GPU 程序。
+
+仍核对同一报告中的清理、原任务停止及 v1/v2 兼容；记录不得用作 GPU 就绪凭证。接口决策和本机结果见 [ADR-048](../adr/048-container-nvml-observation.md)及 [G32](../acceptance-g32.md)。完整任务设备隔离、启动与 CUDA 故障恢复、worker/Compose/发布集成继续待完成。
 
 <a id="container-journal"></a>
 

@@ -19,6 +19,8 @@ PRD §13 将代码许可证、题目/教程文字、社区投稿和外部测试/
 
 独立的[本地驱动制品检查](docs/deployment/gpu.md#container-driver)从维护者已安装的 NVIDIA 用户态驱动复制四个 CUDA/PTX 库，只用于本机镜像准备和无设备验证；快照、构建目录和镜像不随源码发布，不将驱动二进制纳入项目代码授权。该工具保留同一 NVRTC 许可，不表示已完成 NVIDIA 驱动的公开再分发交付。
 
+可选的[控制容器管理查询](docs/deployment/gpu.md#container-device-observer)另行复制当前系统的 `libnvidia-ml`，只用于本机管理镜像；同样不随源码或公开制品再分发，不改变 NVIDIA 的授权条件。代码仅绑定所需 NVML 接口，没有复制或分发 NVIDIA 头文件，也不将管理库视为项目许可证覆盖的依赖。
+
 可选 Compose 模型镜像保留固定 llama.cpp 来源的 MIT 许可 `/opt/LICENSE.llama.cpp` 与固定 Qwen3-0.6B-GGUF 版本的 Apache-2.0 许可 `/opt/LICENSE.qwen`。源码、权重及许可下载均校验固定摘要，见 `scripts/build_compose_tutor.py`；不改变平台本身的待确认授权状态。
 
 `LicenseRef-Pending-Maintainer-Approval` 是开发状态标记，不是开放许可证。此项不阻止本地研发，但阻止宣称已经完成开源公开发布。

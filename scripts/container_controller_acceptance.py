@@ -68,7 +68,7 @@ def stage_cli(archive, destination):
     snapshot.unlink()
 
 
-def build_controller(engine, archive, out, tag):
+def build_controller(engine, archive, out, tag, *, nvml_library_dir=None):
     context = out / "context"
     context.mkdir(mode=0o700)
     stage_cli(archive, context / "docker")
@@ -78,6 +78,15 @@ def build_controller(engine, archive, out, tag):
         target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         shutil.copyfile(ROOT / name, target)
     shutil.copyfile(ROOT / "deploy/container-controller.Dockerfile", context / "Dockerfile")
+    extra = []
+    if nvml_library_dir is not None:
+        from judge.nvml_artifacts import manifest_digest
+        from scripts.build_container_monitor import snapshot_management
+
+        observer = snapshot_management(nvml_library_dir, context / "observer")
+        extra = ["--build-arg", "OBSERVER_CONTRACT=" + manifest_digest(observer)]
+        with (context / "Dockerfile").open("ab") as target:
+            target.write((ROOT / "deploy/container-monitor.fragment").read_bytes())
     config = out / "docker-config"
     config.mkdir(mode=0o700)
     with (out / "build.log").open("w") as log:
@@ -95,6 +104,7 @@ def build_controller(engine, archive, out, tag):
                 str(out / "image-id"),
                 "--build-arg",
                 "CONTROLLER_CONTRACT=" + expected,
+                *extra,
                 str(context),
             ],
             env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "LC_ALL": "C.UTF-8"},
@@ -105,6 +115,10 @@ def build_controller(engine, archive, out, tag):
         )
     if expected != controller_digest():
         raise RuntimeError("Controller source changed during build")
+    if nvml_library_dir is not None:
+        from scripts.build_container_monitor import verify_installed
+
+        verify_installed(nvml_library_dir, observer)
     return (out / "image-id").read_text().strip()
 
 
@@ -122,12 +136,14 @@ class Control:
         host_processes=False,
         proc_path="/proc",
         proc_readonly=True,
+        observation_devices=(),
     ):
         self.engine, self.image = engine, image
         self.name = "px-controller-" + uuid.uuid4().hex
         self.label = "io.praximesh.controller.acceptance=" + self.name
         self.host_processes = host_processes
         self.proc_readonly = proc_readonly
+        self.observation_devices = tuple(observation_devices)
         observer_mount = []
         if host_processes:
             observer_mount = [
@@ -179,6 +195,7 @@ class Control:
                 "--mount",
                 f"type=bind,source={socket_path or engine.path},target={SOCKET},readonly",
                 *observer_mount,
+                *(f"--device={device}:{device}:rw" for device in self.observation_devices),
                 image,
                 *self.arguments,
             )
@@ -221,7 +238,10 @@ class Control:
             "Privileged": False,
             "CapDrop": ["ALL"],
             "NetworkMode": "none",
-            "Devices": [],
+            "Devices": [
+                {"PathOnHost": device, "PathInContainer": device, "CgroupPermissions": "rw"}
+                for device in self.observation_devices
+            ],
             "DeviceRequests": None,
             "ReadonlyRootfs": True,
             "PidMode": "",
@@ -294,14 +314,19 @@ def wait_report(control, path, name):
     raise TimeoutError("Controller report timed out: " + name)
 
 
-def state(engine, root, image, *, host_processes=False):
+def state(engine, root, image, *, host_processes=False, device_observer=None):
     root.mkdir(mode=0o700)
     for name in ("locks", "journal"):
         (root / name).mkdir(mode=0o700)
-    save(root / "mounts.json", manifest(root, engine, host_processes=host_processes))
+    save(
+        root / "mounts.json",
+        manifest(root, engine, host_processes=host_processes, device_observer=device_observer),
+    )
     config = {
         "image": image,
-        "device": "GPU-" + str(uuid.uuid4()),
+        "device": device_observer["target"]["uuid"]
+        if device_observer
+        else "GPU-" + str(uuid.uuid4()),
         "job": str(uuid.uuid4()),
         "reservation": str(uuid.uuid4()),
     }
@@ -340,7 +365,18 @@ def main():
     parser.add_argument("--docker-socket", required=True)
     parser.add_argument("--runtime-archive", required=True, type=Path)
     parser.add_argument("--docker-cli-archive", required=True, type=Path)
+    parser.add_argument(
+        "--observe-device", help="Only read NVML metadata for this explicitly selected GPU UUID"
+    )
+    parser.add_argument("--nvml-library-dir", type=Path)
     options = parser.parse_args()
+    if bool(options.observe_device) != bool(options.nvml_library_dir):
+        parser.error("--observe-device and --nvml-library-dir must be supplied together")
+    if options.observe_device:
+        from judge.gpu_monitor import identify
+
+        # Refuse an unknown selection before building or creating any container.
+        identify(options.observe_device)
     engine = LocalEngine(options.docker_socket)
     engine.verify()
     out = ROOT / "test-results" / ("px-container-controller-" + uuid.uuid4().hex[:12])
@@ -348,13 +384,18 @@ def main():
     report = {
         "passed": False,
         "gpu_executed": False,
+        "management_observation": bool(options.observe_device),
         "controller_contract": controller_digest(),
         "runtime_contract": contract_digest(),
         "checks": [],
         "cleanup": [],
         "sources": {
             name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
-            for name in (*CONTROLLER_SOURCES, "scripts/container_controller_acceptance.py")
+            for name in (
+                *CONTROLLER_SOURCES,
+                "scripts/container_controller_acceptance.py",
+                "scripts/container_monitor_acceptance.py",
+            )
         },
     }
     result_path = out / "result.json"
@@ -393,10 +434,29 @@ def main():
                 report["task_image"] = task_image
             else:
                 controller_image = build_controller(
-                    engine, options.docker_cli_archive, directory, tag
+                    engine,
+                    options.docker_cli_archive,
+                    directory,
+                    tag,
+                    nvml_library_dir=options.nvml_library_dir,
                 )
                 report["controller_image"] = controller_image
             save(result_path, report)
+        if options.observe_device:
+            from scripts.container_monitor_acceptance import observation_checks
+
+            observation_checks(
+                engine,
+                controller_image,
+                task_image,
+                options.observe_device,
+                out,
+                Path(storage.name),
+                controls,
+                states,
+                report,
+                passed,
+            )
         path, config = new_state("locks")
         held = control(path, config, "hold")
         value = wait_report(held, path, "held")

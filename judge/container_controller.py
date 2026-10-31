@@ -11,6 +11,7 @@ from pathlib import Path
 from judge.container_compiler import SOURCES as COMPILER_SOURCES
 from judge.container_driver import SOURCES as DRIVER_SOURCES
 from judge.container_journal import ContainerJournal, private
+from judge.container_monitor import check_prerequisites, validate_observer
 from judge.container_processes import HostProcessView, host_manifest, validate_manifest
 from judge.container_runtime_service import ROOT
 from judge.container_service import LocalEngine
@@ -37,9 +38,14 @@ CONTROLLER_SOURCES = tuple(
             *DRIVER_SOURCES,
             "judge/container_controller.py",
             "judge/container_processes.py",
+            "judge/container_monitor.py",
+            "judge/nvml_artifacts.py",
+            "judge/nvml_reader.py",
             "judge/container_compilation.py",
             "scripts/container_controller_fixture.py",
             "deploy/container-controller.Dockerfile",
+            "deploy/container-monitor.fragment",
+            "scripts/build_container_monitor.py",
             "vendor/docker-cli/LICENSE",
             "vendor/docker-cli/NOTICE",
         )
@@ -59,7 +65,7 @@ def identity(path):
     return [info.st_dev, info.st_ino]
 
 
-def manifest(directory, engine, *, host_processes=False):
+def manifest(directory, engine, *, host_processes=False, device_observer=None):
     """Host prepares a private mount identity; does not mount or change ownership."""
     if os.getuid() == 0 or os.getgid() == 0:
         raise ValueError("A non-root operator is required")
@@ -68,8 +74,12 @@ def manifest(directory, engine, *, host_processes=False):
     engine.verify()
     if type(host_processes) is not bool:
         raise ValueError("Explicit process observation selection is required")
+    if device_observer is not None:
+        if not host_processes:
+            raise ValueError("NVIDIA observation requires the pinned host process view")
+        validate_observer(device_observer)
     return {
-        "version": 2 if host_processes else 1,
+        "version": 3 if device_observer is not None else 2 if host_processes else 1,
         "operator": [os.getuid(), os.getgid()],
         "root": identity(directory),
         "locks": identity(directory / "locks"),
@@ -77,6 +87,7 @@ def manifest(directory, engine, *, host_processes=False):
         "socket": identity(engine.path),
         "engine": str(uuid.UUID(engine.run("info", "--format", "{{.ID}}").stdout.decode().strip())),
         **({"host_processes": host_manifest()} if host_processes else {}),
+        **({"device_observer": device_observer} if device_observer is not None else {}),
     }
 
 
@@ -127,16 +138,22 @@ class ContainerController:
         self.guard = self.journal = self.engine = self.host_processes = None
         self.saved = self.read_manifest()
         expected = {"version", "operator", "root", "locks", "journal", "socket", "engine"}
-        if self.saved.get("version") == 2:
+        if self.saved.get("version") in {2, 3}:
             expected.add("host_processes")
+        if self.saved.get("version") == 3:
+            expected.add("device_observer")
         if (
             set(self.saved) != expected
             or type(self.saved["version"]) is not int
-            or self.saved["version"] not in {1, 2}
+            or self.saved["version"] not in {1, 2, 3}
         ):
             raise SandboxUnavailable("Unknown controller mount contract")
-        if self.saved["version"] == 2:
+        if self.saved["version"] in {2, 3}:
             validate_manifest(self.saved["host_processes"])
+        if self.saved["version"] == 3:
+            validate_observer(self.saved["device_observer"])
+            if self.saved["device_observer"]["target"]["uuid"] != device:
+                raise SandboxUnavailable("Controller and NVIDIA observer select different devices")
         for key in ("operator", "root", "locks", "journal", "socket"):
             value = self.saved[key]
             if (
@@ -152,7 +169,7 @@ class ContainerController:
             raise SandboxUnavailable("Invalid controller engine identity") from None
         self.process_identity = environment(self.saved["operator"])
         try:
-            if self.saved["version"] == 2:
+            if self.saved["version"] in {2, 3}:
                 self.host_processes = HostProcessView(self.saved["host_processes"])
             self.check_mounts()
             self.engine = LocalEngine(SOCKET)
@@ -190,6 +207,8 @@ class ContainerController:
             raise SandboxUnavailable("Controller socket mount changed")
         if self.host_processes is not None:
             self.host_processes.check()
+        if self.saved["version"] == 3:
+            check_prerequisites(self.saved["device_observer"], self.host_processes)
 
     def check(self):
         self.check_mounts()

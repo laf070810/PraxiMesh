@@ -14,6 +14,7 @@ from judge.container_connection import ContainerConnection  # noqa: E402
 from judge.container_contract import PYTHON  # noqa: E402
 from judge.container_controller import STATE, ContainerController  # noqa: E402
 from judge.container_journal import PersistentRuntimeService, private  # noqa: E402
+from judge.container_monitor import ContainerDeviceMonitor, validate_observation  # noqa: E402
 from judge.container_processes import OwnedProcesses  # noqa: E402
 from judge.gpu_session import decode_frame  # noqa: E402
 from judge.sandbox import SandboxUnavailable  # noqa: E402
@@ -155,9 +156,25 @@ def main():
         "compile-orphan",
         "compile-observe",
     }
-    if mode not in {"hold", "normal", "orphan", "recover", "recover-normal"} | compiler_modes:
+    if (
+        mode
+        not in {
+            "hold",
+            "normal",
+            "orphan",
+            "recover",
+            "recover-normal",
+            "observe-device",
+            "observe-device-nonempty-caps",
+        }
+        | compiler_modes
+    ):
         raise ValueError("Unknown fixed controller scenario")
     signal.alarm(100)
+    if mode == "observe-device-nonempty-caps":
+        caps = Path("/dev/nvidia-caps")
+        caps.mkdir(mode=0o755)
+        (caps / "not-a-device").touch(mode=0o600)
     with ContainerController(device) as control:
         if mode in compiler_modes:
             return compile_task(control, mode, image, job, reservation)
@@ -169,6 +186,22 @@ def main():
             "name": service.name,
             "gpu_executed": False,
         }
+        monitor = None
+        if mode == "observe-device":
+            monitor = ContainerDeviceMonitor(control)
+            report["observation"] = monitor.read()
+            pids = validate_observation(report["observation"], monitor.saved)
+            try:
+                found = monitor.observe()
+            except SandboxUnavailable as error:
+                if not pids or str(error) != "Selected GPU is occupied; nothing was stopped":
+                    raise
+                report["external_occupation_rejected"] = True
+            else:
+                assert found == pids == []
+                report["external_occupation_rejected"] = False
+            report["private_pid"] = os.getpid()
+            report["host_pid"] = int(os.readlink("/run/praximesh-host-proc/self"))
         if mode == "hold":
             save("held", report)
             while True:
@@ -199,6 +232,23 @@ def main():
             report.update(
                 {"container": service.container_id, "guest": value["identity"], "status": status}
             )
+            if monitor is not None:
+                report["during_task"] = monitor.read()
+                pids = validate_observation(report["during_task"], monitor.saved)
+                try:
+                    found = monitor.observe(service)
+                except SandboxUnavailable as error:
+                    if (
+                        not pids
+                        or str(error) != "An observed host process is outside the original task"
+                    ):
+                        raise
+                    report["foreign_task_processes_rejected"] = True
+                else:
+                    assert found == pids == []
+                    report["foreign_task_processes_rejected"] = False
+                assert monitor.owned is not None
+                report["task_anchor"] = monitor.owned.check()
             if mode == "orphan":
                 connection.channel.send({"event": "hang"})
                 assert connection.channel.receive() == {"event": "busy"}
@@ -215,6 +265,13 @@ def main():
             connection.finish()
         report["completion"] = control.journal.recover()
         assert control.journal.load() is None
+        if monitor is not None:
+            try:
+                monitor.observe(service)
+            except SandboxUnavailable:
+                report["cleaned_monitor_rejected"] = True
+            else:
+                raise RuntimeError("NVIDIA monitor reused a cleaned task")
         save("finished", report)
 
 
@@ -222,6 +279,19 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as error:
+        if len(sys.argv) > 1 and sys.argv[1] == "observe-device":
+            try:
+                save(
+                    "failure",
+                    {
+                        "class": type(error).__name__,
+                        "message": str(error)[:512]
+                        if isinstance(error, SandboxUnavailable)
+                        else None,
+                    },
+                )
+            except OSError:
+                pass
         # Fixed failure class only; no raw CLI output, paths, credentials or learner data.
         print(type(error).__name__, flush=True)
         raise SystemExit(1) from None
