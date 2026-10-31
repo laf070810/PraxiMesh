@@ -193,3 +193,51 @@ def test_resource_report_waits_for_fresh_recovery_and_all_cleanup(flow, monkeypa
         assert flow.events.index("resources") < flow.events.index("recovered")
         assert flow.sent[-1]["report"] == resource_report() and "result" not in flow.sent[-1]
     assert flow.events[-1] == "runtime-closed" and flow.runtime.deadline == deadline
+
+
+@pytest.mark.parametrize("failure", [None, "correctness", "exited", "uncompiled"])
+def test_controller_fault_requires_verified_live_guest_and_never_returns_result(
+    flow, monkeypatch, failure
+):
+    from judge.container_lifecycle import LABEL, armed_message
+    from judge.controller_faults import fault_request
+
+    class Injected(BaseException):
+        pass
+
+    class Session:
+        compiled = False
+        process = SimpleNamespace(poll=lambda: 0 if failure == "exited" else None)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_error):
+            flow.events.append("fault-guest-closed")
+
+    session = Session()
+    flow.runtime.containers = {LABEL: {"process": session.process}}
+    flow.runtime.inspect = lambda _label: {"status": "running"}
+    flow.runtime.kernel_session = lambda label, **_kw: (
+        session if label == LABEL else pytest.fail("Unexpected new guest")
+    )
+    flow.incoming[0] = fault_request("controller-exit", "a" * 32)
+
+    def verify(active):
+        flow.events.append("correctness")
+        if failure == "correctness":
+            raise SandboxUnavailable("fixed correctness failure")
+        active.compiled = failure != "uncompiled"
+
+    def trigger(_channel, request, *, armed):
+        assert armed == armed_message(request)
+        flow.events.append("fault-triggered")
+        raise Injected
+
+    monkeypatch.setattr(module, "verify_device_session", verify)
+    monkeypatch.setattr(module, "trigger_fault", trigger)
+    with pytest.raises(SandboxUnavailable if failure else Injected):
+        flow.run()
+    assert ("fault-triggered" in flow.events) is (failure is None)
+    assert "recovered" not in flow.events and flow.events[-1] == "runtime-closed"
+    assert not any(item["event"] == "kernel-completed" for item in flow.sent)

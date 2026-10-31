@@ -47,6 +47,8 @@ def main():
         if (
             label in {"task", "startup-check"}
             and mode == "wrong-answer"
+            or label == "controller-fault"
+            and mode == "fault-prepare-fail"
             or label == "device-recovery"
             and mode == "recovery-fail"
         ):

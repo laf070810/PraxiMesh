@@ -41,6 +41,25 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 控制容器的 NVIDIA 身份、完整进程来源与占用拒绝 | [只读管理检查](#container-device-observer)；读取明确选定卡的管理元数据，不创建 CUDA 上下文或运行内核 |
 | 单卡设备传入任务/guest、新版记录与控制器中断恢复 | [设备节点检查](#container-device-nodes)；需要明确授权映射真实设备；固定 CPU guest 只读节点元信息，修复后实测待重放 |
 | 容器内核协议、固定启动/资源检查、结果扣留与独立恢复 | [无设备调用链检查](#container-kernel-flow)；固定 CPU 夹具，不编译学员源码，不接入 GPU |
+| 控制器退出、通信断开、独立硬期限及新实例恢复 | [无设备控制器故障检查](#container-controller-faults)；固定 CPU 正确性准备与新恢复，不执行 GPU |
+
+<a id="container-controller-faults"></a>
+
+## 不接入 GPU 的控制器故障检查
+
+适用于修改控制器异常退出、通道关闭、监督期限或故障后的新实例恢复。需要私有 rootless Docker 和[固定 runsc 归档](#提前保存固定镜像减少下载依赖)，不需要 NVIDIA 查询、驱动库或设备映射：
+
+```sh
+.venv/bin/python scripts/container_lifecycle_acceptance.py \
+  --docker-socket /run/user/$(id -u)/docker.sock \
+  --runtime-archive var/gpu-preflight/gvisor.tar.bz2
+```
+
+预期五组场景、十五个自有任务实例：控制器退出、通信断开、独立硬期限，以及准备错误和后续恢复错误。固定 CPU guest 在故障准备前先通过可信数值比较；独立退出/超时必须在主动清理前确认原进程树消失，断连场景则先确认原实例仍运行，再按原记录清理。每组随后使用新容器和 nonce 验证恢复，并再次运行新正确调用。
+
+CPU 专项给故障任务 45 秒预算，其中监督器硬期限为 40 秒；生产适配器为故障与新恢复各预留最多 90 秒，不因此宣称真实 CUDA 已在该预算内通过。报告在 `test-results/px-container-lifecycle-*/result.json`；核对原 ID、nonce、独立退出状态、进程、归档、临时目录和镜像标签清理。规则见 [ADR-055](../adr/055-container-controller-faults.md)。此入口不连接应用数据库、签发凭证或部署常驻 GPU worker。
+
+五组实际故障、正常调用回归和对应验证范围见 [G39 验收](../acceptance-g39.md)。
 
 <a id="container-kernel-flow"></a>
 
@@ -66,7 +85,7 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 
 每个场景按原 journal 恢复并核对进程退出；临时数据保存在自有目录，待恢复记录存在时保留现场。原报告在 `test-results/px-container-kernel-*/result.json`。这里不执行 [G34 设备节点检查](#container-device-nodes)，也不替代真实 CUDA、完整启动凭证或 GPU Compose 验收。
 
-容器调用现在也有独立环境身份，并接入原有任务结算和历史成绩校验，设计见 [ADR-052](../adr/052-container-gpu-environment.md)。完整控制镜像包含 GPU 策略所需的全部源码，[控制端映射检查](#container-controller)会在镜像内计算策略并核对实际 Docker 引擎身份。当前 `gpu_worker` 命令仍使用宿主适配器；容器固定内核与资源检查已连接，完整启动与整控制器故障检查尚未接通，因此这些组件不能通过现有命令、环境变量或旧 receipt 开放 GPU 提交。
+容器调用现在也有独立环境身份，并接入原有任务结算和历史成绩校验，设计见 [ADR-052](../adr/052-container-gpu-environment.md)。完整控制镜像包含 GPU 策略所需的全部源码，[控制端映射检查](#container-controller)会在镜像内计算策略并核对实际 Docker 引擎身份。当前 `gpu_worker` 命令仍使用宿主适配器；容器固定内核、资源与控制器故障检查已连接，完整启动发布尚未接通，因此这些组件不能通过现有命令、环境变量或旧 receipt 开放 GPU 提交。
 
 <a id="container-device-nodes"></a>
 

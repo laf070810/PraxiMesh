@@ -1,5 +1,6 @@
 """Owned single-card execution component; not a worker or readiness receipt."""
 
+import time
 from copy import deepcopy
 
 from judge.container_connection import ContainerConnection
@@ -13,6 +14,7 @@ from judge.container_kernel_protocol import (
     prepared,
     validate_request,
 )
+from judge.container_lifecycle import check_budget, observe_fault, validate_report
 from judge.container_monitor import ContainerDeviceMonitor
 from judge.sandbox import SandboxUnavailable
 
@@ -44,6 +46,7 @@ class KernelTask:
         )
         self.contract = gpu_task_digest()
         self.used = self.finishing = False
+        self.fault_observation = False
         self.status = self.record = self.cleanup = None
 
     def original_record(self):
@@ -82,9 +85,17 @@ class KernelTask:
             raise ValueError("A kernel task can only be invoked once")
         self.used = True
         request = deepcopy(validate_request(request))
-        maintenance = request["event"] in {"recover", "check-kernel", "check-resources"}
+        fault = request["event"] == "check-controller"
+        maintenance = request["event"] in {
+            "recover",
+            "check-kernel",
+            "check-resources",
+            "check-controller",
+        }
         if self.service.purpose != ("maintenance" if maintenance else "task"):
             raise ValueError("Kernel request does not match its original purpose")
+        if fault:
+            check_budget(deadline)
         connection = None
 
         def starting_tick():
@@ -97,10 +108,15 @@ class KernelTask:
             on_tick()
             self.original_record()
             if not self.finishing:
-                self.monitor.observe(self.service)
+                state = self.service.inspect() if self.fault_observation else None
+                if self.fault_observation and state is None:
+                    raise SandboxUnavailable("Controller fault lost its original task")
+                if not self.fault_observation or state["running"]:
+                    self.monitor.observe(self.service)
 
         try:
             starting_tick()
+            started = time.monotonic()
             self.status = self.service.start(
                 [
                     PYTHON,
@@ -128,13 +144,28 @@ class KernelTask:
             # Neither source nor protected fixtures cross the channel before
             # the caller's start transaction and original-record recheck.
             channel.send(request)
-            completed = checked_completion(
-                channel.receive(), request, target=self.target, selection=self.service.device_spec
-            )
-            tick()
-            self.finishing = True
-            channel.send({"event": "finish"})
-            connection.finish()
+            message = channel.receive()
+            if fault:
+                self.fault_observation = True
+                completed = {
+                    "report": observe_fault(
+                        connection,
+                        self.service,
+                        request,
+                        message,
+                        started=started,
+                        deadline=deadline,
+                        on_tick=tick,
+                    )
+                }
+            else:
+                completed = checked_completion(
+                    message, request, target=self.target, selection=self.service.device_spec
+                )
+                tick()
+                self.finishing = True
+                channel.send({"event": "finish"})
+                connection.finish()
         finally:
             try:
                 if connection is not None:
@@ -146,6 +177,9 @@ class KernelTask:
         # Discard the consumed task observer only after that original record
         # has been removed; a fresh idle observation never reclaims its PID.
         ContainerDeviceMonitor(self.control).observe()
+        if fault:
+            completed["report"]["cleanup"] = deepcopy(self.cleanup)
+            validate_report(completed["report"], request, device_uuid=self.target["uuid"])
         if gpu_task_digest() != self.contract:
             raise SandboxUnavailable("Kernel task source changed during execution")
         return {

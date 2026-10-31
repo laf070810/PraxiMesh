@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from judge import controller_faults
 from judge import gpu_lifecycle as lifecycle
 from judge.sandbox import SandboxUnavailable
 
@@ -140,7 +141,7 @@ def test_fault_is_injected_only_after_matching_trigger(monkeypatch, name):
         events.append("no-polling")
         raise Injected
 
-    monkeypatch.setattr(lifecycle.os, "_exit", exit_process)
+    monkeypatch.setattr(controller_faults.os, "_exit", exit_process)
     monkeypatch.setattr(lifecycle.time, "sleep", sleep)
     with pytest.raises(Injected):
         lifecycle.trigger_fault(Channel(), request)

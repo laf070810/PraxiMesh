@@ -22,6 +22,8 @@ SOURCES = (
     "judge/container_isolation.py",
     "judge/container_isolation_protocol.py",
     "judge/container_isolation_guest.py",
+    "judge/controller_faults.py",
+    "judge/container_lifecycle.py",
     "judge/container_transport.py",
     "judge/container_bridge.py",
     "judge/container_connection.py",

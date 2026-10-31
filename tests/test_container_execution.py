@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -151,6 +152,70 @@ def flow(monkeypatch, bundle):
 
 def source_sent(flow):
     return any(type(item) is tuple and item[1].get("event") == "execute" for item in flow.events)
+
+
+@pytest.mark.parametrize("defect", [None, "purpose", "observation", "archive"])
+def test_controller_fault_uses_original_task_and_cleans_before_return(flow, monkeypatch, defect):
+    from judge.container_lifecycle import armed_message
+    from tests.test_container_lifecycle import REQUEST, report
+
+    flow.message.clear()
+    flow.message.update(REQUEST)
+    flow.incoming[1] = armed_message(REQUEST)
+    flow.task.service.purpose = "task" if defect == "purpose" else "maintenance"
+    flow.task.service.inspect = lambda: {"running": False}
+    original_recover = flow.journal.recover
+
+    def recover():
+        result = original_recover()
+        if defect != "archive":
+            result["history"] = TARGET["uuid"] + "." + "b" * 32 + ".done.json"
+        return result
+
+    flow.journal.recover = recover
+
+    def observe(_connection, service, request, armed, **kwargs):
+        assert (
+            service is flow.task.service and request == REQUEST and armed == armed_message(REQUEST)
+        )
+        assert "outer-recovered" not in flow.events
+        kwargs["on_tick"]()
+        flow.events.append("fault-observed")
+        if defect == "observation":
+            raise SandboxUnavailable("fixed fault observation failure")
+        value = report(device=TARGET["uuid"])
+        value.pop("cleanup")
+        return value
+
+    monkeypatch.setattr(module, "observe_fault", observe)
+
+    def run():
+        return flow.task.run(
+            flow.message,
+            deadline=time.monotonic() + 80,
+            on_begin=lambda: None,
+            on_tick=lambda: None,
+        )
+
+    if defect:
+        with pytest.raises((ValueError, SandboxUnavailable)):
+            run()
+    else:
+        completed = run()
+        assert (
+            "report" in completed
+            and "result" not in completed
+            and "recovered" not in completed["report"]
+        )
+        assert (
+            flow.events.index("fault-observed")
+            < flow.events.index("outer-recovered")
+            < flow.events.index("idle-observed", flow.events.index("outer-recovered"))
+        )
+        assert not any(
+            type(event) is tuple and event[1] == {"event": "finish"} for event in flow.events
+        )
+    assert flow.journal.load() is None
 
 
 @pytest.mark.parametrize("defect", [None, "cpu", "target", "purpose", "cleanup"])

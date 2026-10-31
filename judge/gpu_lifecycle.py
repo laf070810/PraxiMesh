@@ -5,65 +5,20 @@ uses the same protocol with a fixed CPU guest and cannot certify GPU readiness.
 """
 
 import math
-import os
-import re
 import time
 
+from judge.controller_faults import CHECKS as CHECKS
+from judge.controller_faults import fault_request as fault_request
+from judge.controller_faults import phase as phase
+from judge.controller_faults import require as require
+from judge.controller_faults import trigger_fault as trigger_fault
+from judge.controller_faults import validate_request as validate_request
 from judge.gpu_execution_contract import canonical_digest
 from judge.gpu_service import STOP_SECONDS
-from judge.sandbox import SandboxUnavailable
 
-CHECKS = ("controller-exit", "transport-loss", "service-deadline")
 FAULT_SECONDS = 90
 RECOVERY_SECONDS = 90
 STORAGE_SECONDS = 30
-
-
-def fault_request(name, challenge):
-    if (
-        type(name) is not str
-        or name not in CHECKS
-        or type(challenge) is not str
-        or not re.fullmatch(r"[a-f0-9]{32}", challenge)
-    ):
-        raise ValueError("A fixed controller fault and fresh challenge are required")
-    return {"event": "check-controller", "name": name, "challenge": challenge}
-
-
-def require(condition, message):
-    if not condition:
-        raise SandboxUnavailable(message)
-
-
-def validate_request(request):
-    require(
-        type(request) is dict
-        and set(request) == {"event", "name", "challenge"}
-        and request == fault_request(request["name"], request["challenge"]),
-        "Unexpected controller fault request",
-    )
-
-
-def phase(request, event):
-    return {**request, "event": event}
-
-
-def trigger_fault(channel, request):
-    """Only called after an owned live session is verified; never returns."""
-    validate_request(request)
-    channel.send(phase(request, "fault-armed"))
-    require(
-        canonical_digest(channel.receive()) == canonical_digest(phase(request, "fault-trigger")),
-        "Controller fault trigger does not match its prepared challenge",
-    )
-    if request["name"] == "controller-exit":
-        os._exit(37)
-    if request["name"] == "transport-loss":
-        channel.close()
-    # Deliberately no runtime/channel heartbeat: only the external supervisor
-    # and the independently configured systemd lifetime can stop this tree.
-    while True:
-        time.sleep(1)
 
 
 def observe_fault(channel, service, request, *, started, deadline, on_tick):

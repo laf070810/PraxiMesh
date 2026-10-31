@@ -1,6 +1,7 @@
 """Modeled device/task execution for adapter boundaries; never GPU acceptance."""
 
 import copy
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -267,6 +268,74 @@ def test_resource_adapter_uses_fresh_challenge_and_original_maintenance_task(con
         report["checks"].clear()
         assert environment.get("ready") is None
     assert requests[0]["canary"] != requests[1]["canary"]
+
+
+@pytest.mark.parametrize("defect", [None, "old-cleanup", "new-recovery", "reuse"])
+def test_controller_fault_creates_recovery_only_after_original_cleanup(configured, defect):
+    from tests.test_container_lifecycle import cleanup, report
+
+    events = []
+    adapter = configured.adapter
+    old = adapter.task(configured.control.guard, "job", "reservation", purpose="maintenance")
+
+    def run(task, request, *, deadline, on_tick, on_begin):
+        assert task.service.purpose == "maintenance"
+        assert task.service.job_id == old.service.job_id
+        assert task.service.reservation_token == old.service.reservation_token
+        on_tick()
+        on_begin()
+        if request["event"] == "check-controller":
+            assert task is old and len(configured.tasks) == 1
+            assert set(request) == {"event", "name", "challenge"}
+            events.append("old-cleaned")
+            value = report(request, device=TARGET["uuid"])
+            if defect == "old-cleanup":
+                value["cleanup"]["removed"] = False
+            completed = {"report": value}
+        else:
+            assert request == {"event": "recover"} and task is not old and events == ["old-cleaned"]
+            events.append("new-recovery")
+            if defect == "new-recovery":
+                raise SandboxUnavailable("fixed fresh recovery failure")
+            task.service.container_id = "c" * 64 if defect == "reuse" else "d" * 64
+            task.status = {"nonce": "c" * 32}
+            task.cleanup = cleanup(task.service.container_id, task.status["nonce"], TARGET["uuid"])
+            completed = {}
+        completed["artifacts"] = {
+            "image": task.service.image,
+            "task_contract": adapter.environment["artifacts"]["task_contract"],
+            "resource_profile": adapter.environment["resource_profile"],
+            "limits": copy.deepcopy(adapter.environment["workload_limits"]),
+        }
+        return completed
+
+    configured.run = run
+
+    def check():
+        return adapter.check_controller(
+            old, "controller-exit", deadline=time.monotonic() + 180, on_tick=lambda: None
+        )
+
+    if defect:
+        with pytest.raises(SandboxUnavailable):
+            check()
+        if defect == "old-cleanup":
+            assert len(configured.tasks) == 1 and events == ["old-cleaned"]
+    else:
+        value, environment = check()
+        assert events == ["old-cleaned", "new-recovery"] and value["recovered"] is True
+        assert environment == adapter.environment and "ready" not in environment
+
+
+@pytest.mark.parametrize("seconds", [-1, 20, 125, 181, float("nan")])
+def test_controller_fault_keeps_budget_for_independent_recovery(configured, seconds):
+    adapter = configured.adapter
+    task = adapter.task(configured.control.guard, "job", "reservation", purpose="maintenance")
+    with pytest.raises((ValueError, SandboxUnavailable)):
+        adapter.check_controller(
+            task, "service-deadline", deadline=time.monotonic() + seconds, on_tick=lambda: None
+        )
+    assert len(configured.tasks) == 1 and "runtime-recovery-and-cleanup" not in configured.events
 
 
 def test_saved_container_identity_never_hashes_live_source(configured, monkeypatch):

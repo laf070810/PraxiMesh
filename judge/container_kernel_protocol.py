@@ -42,6 +42,10 @@ def prepared(selection, manifest, target):
 def validate_request(value):
     if value == {"event": "recover"}:
         return value
+    if type(value) is dict and value.get("event") == "check-controller":
+        from judge.controller_faults import validate_request as fault_request
+
+        return fault_request(value)
     if type(value) is dict and value.get("event") == "check-resources":
         from judge.container_isolation_protocol import validate_request as resource_request
 
@@ -70,6 +74,8 @@ def check_prepared(value, expected):
 
 
 def expected_cleanup(request):
+    if request["event"] == "check-controller":
+        raise ValueError("A controller fault requires outer original-instance cleanup")
     if request["event"] in {"recover", "check-resources"}:
         labels = ["device-recovery"]
     else:
@@ -82,6 +88,8 @@ def expected_cleanup(request):
 
 def checked_completion(value, request, *, target=None, selection=None):
     validate_request(request)
+    if request["event"] == "check-controller":
+        raise SandboxUnavailable("Controller faults cannot return a normal kernel completion")
     fields = {"event", "protocol", "recovered", "cleanup", "ready"}
     maintenance = request["event"] == "recover"
     check = request["event"] in {"check-kernel", "check-resources"}

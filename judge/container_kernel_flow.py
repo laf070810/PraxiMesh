@@ -5,8 +5,11 @@ import time
 from judge.container_isolation import check_resources
 from judge.container_kernel_checks import check_kernel
 from judge.container_kernel_protocol import PROTOCOL, checked_completion, validate_request
+from judge.container_lifecycle import LABEL as FAULT_LABEL
+from judge.container_lifecycle import arm_fault
+from judge.controller_faults import trigger_fault
 from judge.gpu import evaluate_kernel
-from judge.gpu_recovery_kernel import recover_device
+from judge.gpu_recovery_kernel import recover_device, verify_device_session
 from judge.gpu_session import GPUExecutionError
 from judge.gpu_task_protocol import CLEANUP_MARGIN, RECOVERY_MARGIN
 from judge.sandbox import SandboxUnavailable
@@ -20,6 +23,12 @@ def serve_kernel(channel, runtime, identity):
     maintenance = request["event"] == "recover"
     check = request["event"] in {"check-kernel", "check-resources"}
     try:
+        if request["event"] == "check-controller":
+            with runtime.kernel_session(FAULT_LABEL, mode="run") as session:
+                verify_device_session(session)
+                armed = arm_fault(runtime, session, request)
+                trigger_fault(channel, request, armed=armed)
+                raise SandboxUnavailable("Container controller fault unexpectedly returned")
         if not maintenance:
             execution_deadline = deadline - RECOVERY_MARGIN - CLEANUP_MARGIN
             if time.monotonic() >= execution_deadline:

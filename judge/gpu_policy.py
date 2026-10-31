@@ -59,6 +59,8 @@ EXECUTION_SOURCES = (
     "judge/gpu_host_pids.py",
     "judge/gpu_kernel_checks.py",
     "judge/gpu_lifecycle.py",
+    "judge/controller_faults.py",
+    "judge/container_lifecycle.py",
     "judge/gpu_receipt.py",
     "judge/gpu_probes.py",
     "judge/gpu_device_lock.py",

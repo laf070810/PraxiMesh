@@ -1,5 +1,7 @@
 """Container GPU execution and identity; complete startup admission remains separate."""
 
+import math
+import time
 from copy import deepcopy
 from uuid import uuid4
 
@@ -15,9 +17,11 @@ from judge.container_environment import engine_identity, environment_identity
 from judge.container_execution import KernelTask
 from judge.container_gpu import gpu_task_digest
 from judge.container_isolation_protocol import resource_request
+from judge.container_lifecycle import check_budget, validate_report
 from judge.container_monitor import ContainerDeviceMonitor
 from judge.container_runtime_service import contract_digest
 from judge.container_service import IMAGE_ID
+from judge.controller_faults import FAULT_SECONDS, RECOVERY_SECONDS, fault_request
 from judge.driver_artifacts import manifest_digest, validate_manifest
 from judge.gpu_execution_contract import canonical_digest
 from judge.gpu_kernel_checks import check_request
@@ -151,3 +155,42 @@ class ContainerGPUAdapter:
             on_begin=lambda: None,
         )
         return deepcopy(completed["report"]), deepcopy(self.environment)
+
+    def check_controller(self, task, name, *, deadline, on_tick):
+        request = fault_request(name, uuid4().hex)
+        if (
+            type(task) is not KernelTask
+            or task.service.purpose != "maintenance"
+            or type(deadline) not in {int, float}
+            or not math.isfinite(deadline)
+            or not 0 < deadline - time.monotonic() <= FAULT_SECONDS + RECOVERY_SECONDS
+        ):
+            raise ValueError("Controller faults require an original bounded maintenance task")
+        fault_deadline = min(deadline - RECOVERY_SECONDS, time.monotonic() + FAULT_SECONDS)
+        check_budget(fault_deadline)
+        completed = self.exchange(
+            task, request, deadline=fault_deadline, on_tick=on_tick, on_begin=lambda: None
+        )
+        report = deepcopy(completed["report"])
+        validate_report(report, request, device_uuid=self.target["uuid"])
+        recovery = self.task(
+            self.control.guard,
+            task.service.job_id,
+            task.service.reservation_token,
+            purpose="maintenance",
+        )
+        environment = self.recover(
+            recovery,
+            deadline=min(deadline, time.monotonic() + RECOVERY_SECONDS),
+            on_tick=on_tick,
+        )
+        report.update(
+            recovered=True,
+            recovery={
+                "container_id": recovery.service.container_id,
+                "nonce": recovery.status["nonce"],
+                "cleanup": deepcopy(recovery.cleanup),
+            },
+        )
+        validate_report(report, request, device_uuid=self.target["uuid"], recovered=True)
+        return report, environment

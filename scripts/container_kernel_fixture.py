@@ -43,6 +43,7 @@ def main():
         "recovery-fail",
         "hang",
         "check-hang",
+        "fault-prepare-fail",
     }:
         raise ValueError("Unexpected fixed CPU kernel scenario")
     listener = ContainerListener(on_tick=lambda: None)
