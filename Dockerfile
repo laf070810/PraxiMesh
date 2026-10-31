@@ -42,6 +42,18 @@ ENV JUDGE_BACKEND=wasi JUDGE_WASI_BUNDLE=/opt/praximesh/wasi JUDGE_RECEIPT=/tmp/
 USER 65532:65532
 CMD ["python", "manage.py", "wasi_service"]
 
+# Development foundation for containerized trusted GPU control. No GPU devices,
+# learner execution, admission or readiness receipt is provided by this image.
+FROM ${PYTHON_IMAGE} AS container-supervisor
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+LABEL io.praximesh.supervision.protocol="praximesh-container-supervision-v1"
+COPY judge/container_contract.py judge/container_entry.py /opt/praximesh/
+COPY scripts/container_supervision_fixture.py /opt/praximesh/
+RUN mkdir -p /run/praximesh && chown 65532:65532 /run/praximesh && chmod 700 /run/praximesh
+USER 65532:65532
+WORKDIR /run/praximesh
+ENTRYPOINT ["/usr/local/bin/python", "-I", "/opt/praximesh/container_entry.py"]
+
 # Compose builds interpreters from the same pinned, verified sources as native deployment.
 # Keep this stage independent of application edits so its expensive build is cached.
 FROM ${PYTHON_IMAGE} AS wasi-build

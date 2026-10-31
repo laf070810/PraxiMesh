@@ -12,6 +12,10 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 
 所有控制器副本和升级必须共用原来的私有工作根与设备锁目录，不能换路径避开旧进程、存储或预约。调度组件使用 `gpu-slot-seconds-v1`：Run 90 秒、Submit 180 秒的整卡时段，默认每日 `JUDGE_DAILY_GPU_SECONDS=1800`，与 CPU 调用单位分开。这些是预约上限，不是测得的 GPU 时间；不能据此启用评测或手工清空预约。
 
+<a id="validation-options"></a>
+
+## 按改动选择检查入口
+
 | 要验证的改动 | 对应入口 |
 | --- | --- |
 | 用户服务、命名空间、控制连接 | [控制链检查](#不占-gpu-的控制链检查) |
@@ -23,6 +27,26 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 历史 GPU 成绩、私有进度、中英反馈与布局 | [成绩展示检查](#gpu-results)，不使用 GPU |
 | 源码部署的 GPU 准入配置、额度与排空 | [准入门槛](#gpu-admission)，当前只做不占 GPU 的验证 |
 | CUDA 候选合并、静态检查和参考解/错解 | [内容准备与验收](#cuda-content)；静态检查不占 GPU，真实 API 验收需要独占卡 |
+| 容器监督的独立期限、进程树与接管 | [可信容器监督检查](#container-supervision)；仅固定 CPU 基础设施，不是 GPU 部署入口 |
+
+<a id="container-supervision"></a>
+
+## 不占 GPU 的可信容器监督检查
+
+此入口验证后续容器部署所需的任务监督基础，尚未连接 GPU worker、设备或提交准入。需要当前用户的 rootless Docker、systemd/cgroup v2 和可用的 CPU、内存、swap、PID 限额。它不安装或修改 daemon，不需要 NVIDIA 工具、GPU 或 privileged 容器。
+
+明确选择自己的私有 Unix socket，在仓库根目录执行：
+
+```sh
+.venv/bin/python scripts/container_supervision_acceptance.py \
+  --docker-socket /run/user/$(id -u)/docker.sock
+```
+
+工具从固定 Python 基础镜像构建独立监督目标，使用空白 Docker 客户端配置和最小环境；不继承代理或应用凭证。首次构建需要能取得固定镜像元数据，构建失败会保留日志，不会启动 GPU 或调整网络配置。
+
+预期 `test-results/px-container-supervision-*/result.json` 包含七个通过项：`deadline-busy`、`parent-exit`、`owner-exit`、`takeover`、`replacement`、`foreign-label`、`late-start`。还应有 `passed: true`、`gpu_executed: false`、八个自有容器清理记录和 `owned_image_tag_removed: true`。检查实际 cgroup 数值、CPU 节流及进程树消失；首次创建者退出后，容器仍须按原截止时间停止。
+
+全部进程只运行固定的可信 CPU 探针。合成设备 UUID 仅命名临时文件锁，不读显卡、不创建正式设备行或凭证。失败时保留私有报告与已知身份；不能删除未知容器、重置 GPU，或把该结果当作学员 guest 隔离通过。设计与范围见 [RFC-021](../rfcs/021-gpu-container-supervision.md)、[G21](../acceptance-g21.md)。
 
 <a id="gpu-admission"></a>
 

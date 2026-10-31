@@ -61,6 +61,9 @@
 - [公开作品、撤回与分组成绩榜](sharing.md)
 - [ADR-036：GPU 成绩的独立公开范围与分组计时榜](adr/036-gpu-opt-in-leaderboards.md)
 - [G20 GPU 分享、计时榜与表单布局](acceptance-g20.md) — 非 GPU 数据与界面验证；不代表硬件性能通过
+- [RFC-021：GPU 容器部署的独立任务监督](rfcs/021-gpu-container-supervision.md)
+- [ADR-037：可信容器监督与接管](adr/037-trusted-container-supervision.md)
+- [G21 容器监督基础的 CPU 验证](acceptance-g21.md) — 独立期限、身份与清理；尚未接入 GPU worker
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)
