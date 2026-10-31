@@ -13,9 +13,11 @@ from judge.container_compilation import CompilationCancelled, CompilationTask  #
 from judge.container_connection import ContainerConnection  # noqa: E402
 from judge.container_contract import PYTHON  # noqa: E402
 from judge.container_controller import STATE, ContainerController  # noqa: E402
+from judge.container_environment import engine_identity  # noqa: E402
 from judge.container_journal import PersistentRuntimeService, private  # noqa: E402
 from judge.container_monitor import ContainerDeviceMonitor, validate_observation  # noqa: E402
 from judge.container_processes import OwnedProcesses  # noqa: E402
+from judge.gpu_policy import execution_digest  # noqa: E402
 from judge.gpu_session import decode_frame  # noqa: E402
 from judge.sandbox import SandboxUnavailable  # noqa: E402
 
@@ -193,6 +195,8 @@ def main():
             "owner": service.owner,
             "name": service.name,
             "gpu_executed": False,
+            "execution_digest": execution_digest(),
+            "engine_environment": engine_identity(control.engine.verify()),
         }
         monitor = None
         if mode == "observe-device":

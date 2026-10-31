@@ -58,6 +58,8 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 
 每个场景按原 journal 恢复并核对进程退出；临时数据保存在自有目录，待恢复记录存在时保留现场。原报告在 `test-results/px-container-kernel-*/result.json`。这里不执行 [G34 设备节点检查](#container-device-nodes)，也不替代真实 CUDA、完整启动凭证或 GPU Compose 验收。
 
+容器调用现在也有独立环境身份，并接入原有任务结算和历史成绩校验，设计见 [ADR-052](../adr/052-container-gpu-environment.md)。完整控制镜像包含 GPU 策略所需的全部源码，[控制端映射检查](#container-controller)会在镜像内计算策略并核对实际 Docker 引擎身份。当前 `gpu_worker` 命令仍使用宿主适配器；容器完整启动与资源/故障探针尚未接通，因此这些组件不能通过现有命令、环境变量或旧 receipt 开放 GPU 提交。
+
 <a id="container-device-nodes"></a>
 
 ## 不运行 CUDA 的单卡设备节点检查
@@ -193,7 +195,7 @@ curl --fail --location \
 
 随后运行真实 CPU guest，终止其可信控制容器，由另一容器或宿主读取原 journal 清理，并验证宿主创建的新预算任务（journal v2）可以被容器接管；其余场景继续覆盖原开发预算和 v1 记录。新调用使用新的实例和 nonce。任务容器继续无宿主挂载、无网络、无设备，使用独立期限。控制端拥有所选 daemon 的控制权；只读 socket 挂载不是 API 权限隔离，生产必须使用专用可信执行环境。
 
-结果保存在 `test-results/px-container-controller-*/result.json`；核对每项检查、原进程树消失、任务和控制容器清理、镜像标签及临时存储移除。失败时保留原始报告；无法确认清理时保留恢复目录，不能手动清空记录来绕过身份检查。资源与权限决策见 [ADR-041](../adr/041-containerized-control-identity.md)，初次及当前预算兼容检查分别见 [G25](../acceptance-g25.md)和 [G28](../acceptance-g28.md)。此工具不部署常驻 GPU worker，不连接应用数据库、不生成 receipt；完整 GPU Compose、设备监测和正式容器环境仍待交付。
+结果保存在 `test-results/px-container-controller-*/result.json`；核对每项检查、原进程树消失、任务和控制容器清理、镜像标签及临时存储移除。失败时保留原始报告；无法确认清理时保留恢复目录，不能手动清空记录来绕过身份检查。资源与权限决策见 [ADR-041](../adr/041-containerized-control-identity.md)，初次及当前预算兼容检查分别见 [G25](../acceptance-g25.md)和 [G28](../acceptance-g28.md)，镜像内完整策略核对见 [G36](../acceptance-g36.md)。此工具不部署常驻 GPU worker，不连接应用数据库、不生成 receipt；正式 worker 的环境发布、完整启动与 GPU Compose 仍待交付。
 
 <a id="container-device-observer"></a>
 

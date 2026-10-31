@@ -92,6 +92,8 @@
 - [G34 单卡设备配置与旧记录恢复](acceptance-g34.md) — 组件与数据库边界验证；设备 guest 启动曾失败，修复后实测待授权重放
 - [ADR-051：容器任务的完整内核调用](adr/051-container-kernel-execution.md)
 - [G35 容器内核调用与取消清理](acceptance-g35.md) — 真实 CPU 协议、独立恢复与结果扣留；GPU 专用路径仍待硬件验收
+- [ADR-052：容器 GPU 环境与任务结算](adr/052-container-gpu-environment.md)
+- [G36 容器环境身份与任务结算](acceptance-g36.md) — 私有历史与数据库边界、镜像内完整策略；完整启动及硬件路径仍待验收
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

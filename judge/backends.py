@@ -26,7 +26,7 @@ def configured_runtime_description():
 
 
 def result_environment_label(environment, fingerprint=None):
-    if environment.get("backend") == "gvisor-gpu":
+    if environment.get("backend") in ("gvisor-gpu", "gvisor-gpu-container"):
         from core.gpu_evidence import environment_profile
 
         try:

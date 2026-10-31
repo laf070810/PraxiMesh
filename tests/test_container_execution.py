@@ -280,7 +280,10 @@ def test_controller_snapshot_imports_kernel_api_without_host_checkout(tmp_path):
             "-c",
             "import sys; sys.path.insert(0,sys.argv[1]); "
             "from judge.container_execution import KernelTask; "
-            "from judge.container_gpu import gpu_task_digest; print(gpu_task_digest())",
+            "from judge.container_adapter import ContainerGPUAdapter; "
+            "from judge.container_gpu import gpu_task_digest; "
+            "from judge.gpu_policy import execution_digest; "
+            "print(gpu_task_digest()); print(execution_digest())",
             str(tmp_path),
         ],
         cwd=tmp_path,
@@ -289,7 +292,9 @@ def test_controller_snapshot_imports_kernel_api_without_host_checkout(tmp_path):
         timeout=10,
     )
     assert result.returncode == 0, result.stderr.decode()
-    assert result.stdout.decode().strip() == module.gpu_task_digest()
+    from judge.gpu_policy import execution_digest
+
+    assert result.stdout.decode().splitlines() == [module.gpu_task_digest(), execution_digest()]
 
 
 def test_cpu_acceptance_problem_uses_the_real_task_data_contract():

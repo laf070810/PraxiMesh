@@ -473,6 +473,11 @@ def main():
         held = control(path, config, "hold")
         value = wait_report(held, path, "held")
         same_identity(value, config)
+        from judge.container_environment import engine_identity
+        from judge.gpu_policy import execution_digest
+
+        assert value["execution_digest"] == execution_digest()
+        assert value["engine_environment"] == engine_identity(engine.verify())
         try:
             DeviceLock(path / "locks", config["device"]).acquire()
         except DeviceLockError as error:

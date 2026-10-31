@@ -1,6 +1,7 @@
 """Connect claimed GPU tasks to supervised execution and current worker checks."""
 
 from core.gpu_control import GPUJobControl
+from judge.container_adapter import ContainerGPUAdapter
 from judge.gpu_adapter import GPUExecutionAdapter
 from judge.gpu_service import OwnedJobService
 from judge.sandbox import SandboxUnavailable
@@ -13,14 +14,17 @@ def execute_claimed(guard, job, adapter, *, on_check=None):
     claiming work. The worker supplies its receipt/identity/stop check, which
     GPUJobControl invokes inside each state transition's own short transaction.
     """
-    if type(adapter) is not GPUExecutionAdapter:
+    if type(adapter) not in {GPUExecutionAdapter, ContainerGPUAdapter}:
         raise ValueError("The supervised GPU execution adapter is required")
     control = GPUJobControl(guard, job, on_check=on_check)
-    service = OwnedJobService(guard, job.id, job.lease_token)
+    container = type(adapter) is ContainerGPUAdapter
+    service = None if container else OwnedJobService(guard, job.id, job.lease_token)
     try:
         if job.evaluation_fingerprint != adapter.fingerprint:
             raise SandboxUnavailable("GPU task execution fingerprint changed")
         control.poll()
+        if container:
+            service = adapter.task(guard, job.id, job.lease_token)
         result, environment = adapter.evaluate(
             service,
             deadline=control.deadline,
@@ -34,7 +38,11 @@ def execute_claimed(guard, job, adapter, *, on_check=None):
     except BaseException:
         # A stuck DB transaction must not keep the submitted task alive. Stop
         # the exact owned service first, including pre-handshake failures.
-        service.stop()
+        if service is not None:
+            if container:
+                service.recover()
+            else:
+                service.stop()
         try:
             control.quarantine()
         except Exception as error:

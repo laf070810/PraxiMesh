@@ -100,6 +100,7 @@ class LocalEngine:
                 raise ValueError
         except (ValueError, TypeError, KeyError):
             raise SandboxUnavailable("Verified rootless cgroup v2 limits are required") from None
+        return info
 
 
 class ContainerService:

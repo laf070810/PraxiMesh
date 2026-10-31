@@ -17,6 +17,7 @@ from judge.container_processes import HostProcessView, host_manifest, validate_m
 from judge.container_runtime_service import ROOT
 from judge.container_service import LocalEngine
 from judge.gpu_device_lock import DeviceLock
+from judge.gpu_policy import EXECUTION_SOURCES
 from judge.gpu_session import decode_frame
 from judge.sandbox import SandboxUnavailable
 
@@ -38,6 +39,7 @@ CONTROLLER_SOURCES = tuple(
             *COMPILER_SOURCES,
             *DRIVER_SOURCES,
             *GPU_SOURCES,
+            *EXECUTION_SOURCES,
             "judge/container_controller.py",
             "judge/container_processes.py",
             "judge/container_monitor.py",

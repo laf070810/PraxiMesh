@@ -5,6 +5,8 @@ import re
 import uuid
 
 from core.resources import GPU_BUDGET_POLICY, reservation_units
+from judge.container_environment import BACKEND as CONTAINER_BACKEND
+from judge.container_environment import validate_environment as validate_container_environment
 from judge.gpu_contract import EVALUATOR, LANGUAGE
 from judge.gpu_execution_contract import canonical_digest, validate_result, validate_target
 from judge.gpu_policy import PROFILES, profile_digest
@@ -60,6 +62,18 @@ def environment_profile(environment, fingerprint):
     This verifies a trusted record's integrity and comparability, not physical
     runtime readiness. The worker's private receipt provides the latter gate.
     """
+    if type(environment) is dict and environment.get("backend") == CONTAINER_BACKEND:
+        require(
+            environment.get("language") == LANGUAGE and environment.get("evaluator") == EVALUATOR
+        )
+        return validate_container_environment(
+            {
+                key: value
+                for key, value in environment.items()
+                if key not in {"language", "evaluator"}
+            },
+            fingerprint,
+        )
     require(
         type(environment) is dict
         and set(environment) == ENVIRONMENT_FIELDS | {"language", "evaluator"}
