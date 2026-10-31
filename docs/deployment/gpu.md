@@ -31,6 +31,30 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 容器内 runsc、会话故障和整树终止 | [嵌套运行时检查](#container-runtime)；固定 CPU guest，尚无 GPU 或正式准入 |
 | 容器控制连接、启动身份与断连恢复 | [受信通信检查](#container-transport)；真实 CPU guest，不生成 GPU 凭证 |
 | 持久容器身份、创建中断及旧制品清理 | [持久恢复检查](#container-journal)；固定 CPU，不释放数据库 GPU 预约 |
+| 容器化控制端的 UID、共用锁与重启接管 | [控制端映射检查](#container-controller)；固定 CPU，不连接应用数据库或 GPU |
+
+<a id="container-controller"></a>
+
+## 不占 GPU 的容器化控制端检查
+
+适用于开发 GPU 容器部署、确认控制端与宿主是否共用同一把锁及恢复记录。它构建固定的可信控制镜像，连接下方检查使用的私有 rootless Docker；需要 Linux x86_64、固定完整 runsc 归档和 Docker CLI 29.9.2 官方归档。CLI 不安装到宿主，只校验并复制进测试镜像：
+
+```sh
+mkdir -p var/gpu-preflight
+curl --fail --location \
+  https://download.docker.com/linux/static/stable/x86_64/docker-29.9.2.tgz \
+  --output var/gpu-preflight/docker-29.9.2.tgz
+.venv/bin/python scripts/container_controller_acceptance.py \
+  --docker-socket /run/user/$(id -u)/docker.sock \
+  --runtime-archive var/gpu-preflight/gvisor.tar.bz2 \
+  --docker-cli-archive var/gpu-preflight/docker-29.9.2.tgz
+```
+
+构建工具核对整个 CLI 归档和二进制的固定 SHA-256；源码、基础镜像和运行时也固定身份。控制端只挂本次临时私有目录与精确 socket 文件，不挂整个用户目录，不依赖宿主 Python 或用户服务。镜像内 UID/GID 0 必须实际映射到宿主非 root 操作者；宿主、两个控制容器通过同一锁 inode 竞争。改变 UID、锁目录或 socket 身份应在创建任务前拒绝。
+
+随后运行真实 CPU guest，终止其可信控制容器，由另一容器或宿主读取原 journal 清理，并验证宿主创建的任务可以被容器接管；新调用使用新的实例和 nonce。任务容器继续无宿主挂载、无网络、无设备，使用独立期限。控制端拥有所选 daemon 的控制权；只读 socket 挂载不是 API 权限隔离，生产必须使用专用可信执行环境。
+
+结果保存在 `test-results/px-container-controller-*/result.json`；核对每项检查、原进程树消失、任务和控制容器清理、镜像标签及临时存储移除。失败时保留原始报告；无法确认清理时保留恢复目录，不能手动清空记录来绕过身份检查。资源与权限决策见 [ADR-041](../adr/041-containerized-control-identity.md)，实际结果与失败修正见 [G25](../acceptance-g25.md)。此工具不部署常驻 GPU worker，不连接应用数据库、不生成 receipt；完整 GPU Compose、设备监测和资源契约仍待交付。
 
 <a id="container-journal"></a>
 

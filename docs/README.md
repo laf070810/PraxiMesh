@@ -70,6 +70,8 @@
 - [G23 容器控制通信与 CPU 恢复](acceptance-g23.md) — 启动身份、断连与期限；正式 GPU 部署仍待完成
 - [ADR-040：持久容器身份与旧调用清理](adr/040-durable-container-ownership.md)
 - [G24 持久容器身份与升级清理](acceptance-g24.md) — 创建中断、旧契约与新调用恢复；不表示 GPU 就绪
+- [ADR-041：可信控制端容器与共用宿主身份](adr/041-containerized-control-identity.md)
+- [G25 容器化控制端、UID 与跨容器恢复](acceptance-g25.md) — 七组真实 CPU 身份/锁/接管检查；尚未接入正式 GPU worker
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

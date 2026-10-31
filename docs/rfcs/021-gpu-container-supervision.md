@@ -56,4 +56,12 @@ G22 已实际验证容器内 CPU guest，但只从固定探针文件收集结果
 
 需实际验证创建前、创建后、启动后中断、新进程接管、旧镜像契约与当前源码不一致时的清理、同名替换拒绝及新调用恢复。跨 UID/命名空间映射、真实 worker 容器与数据库连接、设备注入及完整发布仍需分别验收。
 
+### 容器化控制端与宿主文件身份
+
+下一阶段先交付不使用 GPU 的可信控制端镜像及实际接管检查。控制端连接指定的 rootless daemon，镜像内 UID/GID 0 必须实际映射到启动它的非 root 操作者；读取内核映射并核对宿主准备的私有挂载清单，不通过放宽 0700/0600 权限或改写文件拥有者解决映射问题。镜像固定 Docker CLI 制品、源码和入口，不依赖宿主 Python、Docker 配置或用户总线。
+
+控制端具有该 daemon 的完整控制权，必须属于可信执行平面，不能承载 Web 或学员代码。它只挂载精确的 socket 文件和专用持久目录；不挂整个用户运行目录、项目目录或 GPU。只读根、无额外能力、no-new-privileges、独立 PID/cgroup、限额、无网络仍需实际核对。socket 文件使用只读挂载并不限制 Docker API 权限；安全边界是可信代码和专用 rootless daemon。[Docker rootless 机制](https://docs.docker.com/engine/security/rootless/)、[bind mount 语义](https://docs.docker.com/engine/storage/bind-mounts/)。
+
+宿主清单固定目录和 socket 的 dev/inode、daemon ID、操作者 UID/GID，容器入口在打开任务记录前验证；共用原设备锁 inode 和 journal，不创建第二套独占机制。必须验证宿主持锁时容器拒绝、容器持锁时宿主及另一容器拒绝、映射错误和挂载替换拒绝、控制容器退出后原任务清理，以及新容器/宿主之间双向接管。任务容器仍由原独立 PID 1 期限管理，控制容器被杀不能自动视为任务完成。此阶段使用固定 CPU guest；数据库、GPU 设备/占用监测、资源契约及 Compose/发布仍为后续独立门槛。
+
 本阶段不修改当前执行策略、设备允许列表、默认题库或现有服务；不占用 GPU，不设置 privileged，不以普通容器运行学员代码。后续任何需要放宽监督容器权限的方案必须重新记录取舍和验证，不能悄悄扩大此契约。
