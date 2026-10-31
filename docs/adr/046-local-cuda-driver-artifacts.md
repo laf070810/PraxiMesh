@@ -1,6 +1,6 @@
 # ADR-046：本地 CUDA 驱动制品与无设备检查
 
-日期：2026-10-31。状态：接受设计；实际验证范围记录在 [G30](../acceptance-g30.md)。背景见 [RFC-021](../rfcs/021-gpu-container-supervision.md)。
+日期：2026-10-31。状态：接受；五项真实无设备场景、250 项组件检查与最终清理核对通过，实际范围记录在 [G30](../acceptance-g30.md)。背景见 [RFC-021](../rfcs/021-gpu-container-supervision.md)。
 
 容器编译链已能处理 CUDA 源码，但编译镜像刻意没有驱动。为后续 GPU 任务新增独立的本地驱动制品；不修改原编译镜像、监督预算、正式 GPU 策略或历史 journal。
 

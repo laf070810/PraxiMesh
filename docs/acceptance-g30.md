@@ -29,6 +29,10 @@
 
 真实无设备重放报告为 `test-results/px-container-driver-9a271c38cdd4/result.json`，日志为 `test-results/g30-driver-acceptance-final.log`：五项场景全部通过。错误驱动清单、无驱动编译接口使用新镜像均在创建容器前拒绝；完整检查、整任务 SIGKILL、清理后新调用三项沿同一安装身份及 v2 记录完成。两个完整调用分别通过库加载、向量加法编译、矩阵乘法编译、语法错误和恢复编译；共十一轮 guest 加载，不初始化 CUDA。三个任务容器、镜像标签和临时运行目录已清理。
 
-审阅后补齐验收工具对未完成或不可读 journal 的保留分支，三个对应组件检查通过。驱动镜像源码契约未变；当前入口的完整重放位于 `test-results/px-container-driver-615860808bfa/result.json`，尚在运行，最终进程/制品清理核对待补充。
+审阅后补齐验收工具对未完成或不可读 journal 的保留分支，三个对应组件检查通过。当前入口的最终重放为 `test-results/px-container-driver-615860808bfa/result.json`，日志为 `test-results/g30-driver-acceptance-cleanup.log`：五项再次通过，所有记录的源码摘要与提交 `8c93b76` 匹配；驱动镜像 ID 和契约未变。
+
+只读最终核对见 `test-results/g30-audit.json`：三份报告共七个测试容器、三个镜像标签均不存在，六组记录的原进程已消失，三个临时运行目录已清理。两个通过报告中，恢复前后的三份编译元数据逐项一致；这只比较 PTX 编译结果。现有 `praximesh-web-1`、`praximesh-worker-1`、`praximesh-tutor-1` 均为运行中且 healthy，未重建或停止现有站点。
+
+Ruff 检查和 582 个 Python 文件格式检查通过；十份相关文档的 346 个本地文件链接及新增检查入口锚点通过，CLI 参数与指南一致。结果在 `test-results/g30-ruff.log`、`g30-format.log`、`g30-document-links.json` 和 `g30-driver-help.txt`。
 
 本批不改变数据库、正式 GPU 执行策略或提交准入，不重新验证已有页面、CPU/WASI、模型或公开部署。四库配置是否覆盖实际 PTX JIT，仍需硬件重放；设备注入、持续占用与 PID 对应、完整容器 worker、Compose/发布协调及候选题型发布继续待完成。
