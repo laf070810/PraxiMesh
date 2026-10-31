@@ -177,12 +177,15 @@ class ContainerRuntime:
         self.tick()
         if type(label) is not str or not LABEL.fullmatch(label) or label in self.containers:
             raise ValueError("An unused fixed container label is required")
-        spec = specification([entrypoint, *arguments])
+        spec = self.specification([entrypoint, *arguments])
         bundle = self.base / label
         bundle.mkdir(mode=0o700)
         (bundle / "config.json").write_text(json.dumps(spec))
         self.containers[label] = {"bundle": bundle, "spec": spec, "process": None}
         return label
+
+    def specification(self, command):
+        return specification(command)
 
     def attach(self, label):
         self.tick()

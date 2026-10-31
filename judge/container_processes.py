@@ -9,6 +9,7 @@ from pathlib import Path
 
 from judge.container_compiler import CompilerContainerService
 from judge.container_driver import DriverContainerService
+from judge.container_gpu import GPUContainerService
 from judge.container_journal import PersistentRuntimeService
 from judge.sandbox import SandboxUnavailable
 
@@ -178,6 +179,7 @@ class OwnedProcesses:
             PersistentRuntimeService,
             CompilerContainerService,
             DriverContainerService,
+            GPUContainerService,
         }:
             raise SandboxUnavailable("Expected a reviewed persistent task service")
         if service.journal is not control.journal or control.host_processes is None:

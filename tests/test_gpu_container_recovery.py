@@ -12,10 +12,13 @@ from core import gpu_resources
 from core.gpu_container_recovery import BoundContainerRecovery
 from core.gpu_startup import recover_controller, startup_identity
 from core.models import GPUDevice, Submission
+from judge.container_devices import PROFILE as DEVICE_PROFILE
 from judge.container_journal import ContainerJournal
 from judge.gpu_adapter import GPUExecutionAdapter
 from judge.gpu_device_lock import DeviceLock
 from judge.sandbox import SandboxUnavailable
+from tests.test_container_driver import bundle as bundle
+from tests.test_container_gpu import device_intent
 from tests.test_container_journal import Engine, intent
 from tests.test_gpu_resources import DEVICE, FINGERPRINT, queued
 from tests.test_gpu_resources import gpu_version as gpu_version
@@ -25,13 +28,29 @@ from tests.test_gpu_startup import startup as startup
 pytestmark = pytest.mark.django_db(transaction=True)
 
 
-@pytest.fixture
-def pending(guard, gpu_version, user, tmp_path):
+def device_selection(guard):
+    return {
+        "schema": 1,
+        "profile": DEVICE_PROFILE,
+        "uuid": guard.device_uuid,
+        "driver": "590.48.01",
+        "minor": 0,
+        "uvm_major": 509,
+    }
+
+
+@pytest.fixture(params=[False, True], ids=["cpu-v1", "device-v3"])
+def pending(guard, gpu_version, user, tmp_path, request, bundle):
     queued(user, gpu_version)
     job = gpu_resources.claim(guard)
     engine = Engine()
     with ContainerJournal(tmp_path / "journal", guard, engine) as journal:
-        service, _state = intent(journal, job.id, job.lease_token)
+        if request.param:
+            service, _state = device_intent(
+                journal, bundle[1], device_selection(guard), job.id, job.lease_token
+            )
+        else:
+            service, _state = intent(journal, job.id, job.lease_token)
         yield journal, job, service, engine
 
 
@@ -122,11 +141,17 @@ def test_account_deletion_does_not_discard_the_physical_reservation(guard, pendi
 
 
 @pytest.mark.parametrize("purpose", ["maintenance", "recovery", "task"])
-def test_idle_recovery_accepts_only_fixed_startup_maintenance(guard, tmp_path, purpose):
+@pytest.mark.parametrize("device_task", [False, True])
+def test_idle_recovery_accepts_only_fixed_startup_maintenance(
+    guard, tmp_path, purpose, device_task, bundle
+):
     engine = Engine()
     with ContainerJournal(tmp_path / "journal", guard, engine) as journal:
         slot = startup_identity(DEVICE)
-        intent(journal, *slot, purpose=purpose)
+        if device_task:
+            device_intent(journal, bundle[1], device_selection(guard), *slot, purpose=purpose)
+        else:
+            intent(journal, *slot, purpose=purpose)
         gpu_resources.quarantine(guard)
         recovery = BoundContainerRecovery(journal)
         recovery.stop()

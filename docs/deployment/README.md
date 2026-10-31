@@ -17,6 +17,8 @@
 
 GPU 0 的独立环境已通过真实 CUDA 样例、内核参考解/错解和 CPU 限额检查。准备执行节点或排障时使用 [GPU 单卡环境检查](gpu.md#重放单卡环境检查)及[内核组件检查](gpu.md#重放内核正确性检查)。显卡被占用时，可按 [GPU 指南的检查入口表](gpu.md#validation-options)选择控制链、离线 runsc、异常恢复、可信容器监督、容器内 runsc 或[控制端 UID/锁映射检查](gpu.md#container-controller)；它们只运行固定 CPU 程序，尚不能作为接收学员提交的 GPU 部署方案。
 
+[单卡设备节点检查](gpu.md#container-device-nodes)属于需要明确授权的真实设备接入，即使固定程序只读取节点信息也不能当作无设备 CPU 检查。该开发入口仍待修复后实测，不是 GPU Compose 启动方式。
+
 ## Compose：直接做题和使用可选 AI
 
 在 Linux x86_64 主机准备 Docker Engine、Docker Compose 和构建时可用的下载网络。无需宿主 Python、预先构建的 WASI 或模型服务。基础运行建议预留 3 GiB 可用内存，带本地 AI 建议 6 GiB；首次构建还需额外磁盘、下载及编译时间。

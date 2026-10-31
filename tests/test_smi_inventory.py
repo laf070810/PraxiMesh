@@ -265,6 +265,27 @@ def test_empty_inventory_preserves_original_anchor_and_cleanup_boundary(combined
         item.monitor.observe(item.task.service)
 
 
+def test_task_selection_uses_pinned_device_and_kernel_registry(combined, monkeypatch):
+    item = combined
+    item.task.control.host_processes.fd = 99
+    calls = []
+
+    def read(fd, name, maximum):
+        calls.append((fd, name, maximum))
+        return "Character devices:\n195 nvidia\n507 nvidia-uvm\nBlock devices:\n"
+
+    monkeypatch.setattr(monitor_module, "read_file", read)
+    value = item.monitor.task_device_spec()
+    assert value["uuid"] == item.task.service.guard.device_uuid
+    assert value["minor"] == item.monitor.saved["minor"] and value["uvm_major"] == 507
+    assert calls == [(99, "devices", 65536)]
+
+
+def test_legacy_context_observer_cannot_prepare_device_task(monitored):  # noqa: F811
+    with pytest.raises(SandboxUnavailable, match="complete process source"):
+        monitored.monitor.task_device_spec()
+
+
 @pytest.mark.parametrize(
     "defect", [None, "version", "xml", "warning", "partial", "deadline", "native-schema"]
 )

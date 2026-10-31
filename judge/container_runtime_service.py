@@ -23,6 +23,8 @@ SOURCES = (
     "judge/container_bridge.py",
     "judge/container_connection.py",
     "judge/container_journal.py",
+    "judge/container_devices.py",
+    "judge/driver_artifacts.py",
     "judge/gpu_artifacts.py",
     "judge/gpu_command.py",
     "judge/gpu_device_lock.py",

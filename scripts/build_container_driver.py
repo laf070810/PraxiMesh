@@ -139,8 +139,18 @@ def verify_installed(directory, manifest):
         raise ValueError("Kernel driver changed during verification")
 
 
-def build_image(engine, runtime_archive, nvrtc_archive, library_dir, output, tag):
-    expected = driver_digest()
+def build_image(
+    engine, runtime_archive, nvrtc_archive, library_dir, output, tag, *, device_tasks=False
+):
+    if type(device_tasks) is not bool:
+        raise ValueError("Explicit single-card task profile selection required")
+    digest_function, image_identity = driver_digest, image_contract
+    if device_tasks:
+        from judge.container_gpu import gpu_task_digest
+        from judge.container_gpu import image_contract as gpu_image_contract
+
+        digest_function, image_identity = gpu_task_digest, gpu_image_contract
+    expected = digest_function()
     context = stage_context(runtime_archive, output)
     manifest = snapshot_driver(library_dir, context / "driver")
     compiler = context / "compiler"
@@ -162,15 +172,30 @@ def build_image(engine, runtime_archive, nvrtc_archive, library_dir, output, tag
     )
     with (context / "Dockerfile").open("ab") as target:
         target.write((ROOT / "deploy/container-driver.fragment").read_bytes())
-    if driver_digest() != expected:
+        if device_tasks:
+            target.write((ROOT / "deploy/container-gpu.fragment").read_bytes())
+    if device_tasks:
+        # runsc binds only the selected OCI devices onto these inert mount targets.
+        # Precreate them in the image so its root can remain read-only at runtime.
+        mount_targets = context / "device-mounts"
+        mount_targets.mkdir(mode=0o755)
+        for name in [*(f"nvidia{minor}" for minor in range(255)), "nvidiactl", "nvidia-uvm"]:
+            target = mount_targets / name
+            target.touch(mode=0o444)
+        for name in ("container_gpu_runtime.py", "container_gpu_guest.py"):
+            shutil.copyfile(ROOT / "judge" / name, context / name)
+        shutil.copyfile(
+            ROOT / "scripts/container_gpu_fixture.py", context / "container_gpu_fixture.py"
+        )
+    if digest_function() != expected:
         raise ValueError("Driver image source changed during staging")
     image = build_context(
         engine,
         context,
         output,
         tag,
-        lambda: image_contract(manifest),
-        expected_digest=image_contract(manifest),
+        lambda: image_identity(manifest),
+        expected_digest=image_identity(manifest),
     )
     verify_bundle(context / "driver", manifest)
     verify_installed(library_dir, manifest)

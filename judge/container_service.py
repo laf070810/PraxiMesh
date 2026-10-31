@@ -285,6 +285,7 @@ class ContainerService:
             }
             if (
                 not self.valid_security_options(host.get("SecurityOpt"))
+                or not self.valid_devices(host.get("Devices"))
                 or any(host.get(key) != value for key, value in expected.items())
                 or any(
                     host.get(key)
@@ -292,7 +293,6 @@ class ContainerService:
                         "Binds",
                         "Mounts",
                         "VolumesFrom",
-                        "Devices",
                         "DeviceRequests",
                         "DeviceCgroupRules",
                         "CapAdd",
@@ -321,6 +321,10 @@ class ContainerService:
             }
         except (KeyError, IndexError, TypeError, ValueError):
             raise SandboxUnavailable("Container ownership or containment does not match") from None
+
+    def valid_devices(self, value):
+        # Legacy CPU services, including old durable records, never gain devices.
+        return not value
 
     def start(self, command, *, deadline, on_tick):
         self.guard.assert_held()

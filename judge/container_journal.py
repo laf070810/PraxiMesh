@@ -19,6 +19,7 @@ from judge.container_contract import (
     WORKLOAD_PROFILE,
     resource_marker,
 )
+from judge.container_devices import docker_devices, validate_selection
 from judge.container_runtime_service import RuntimeContainerService, seccomp_profile
 from judge.container_service import HEX_ID, IMAGE_ID, PREFIX, ContainerService, digest
 from judge.gpu_device_lock import DeviceLock
@@ -253,13 +254,19 @@ class ContainerJournal:
             )
             labels, security = record["labels"], record["security"]
             version = record["version"]
-            if type(version) is not int or version not in {1, 2}:
+            if type(version) is not int or version not in {1, 2, 3}:
                 raise ValueError
             profile = SUPERVISION_PROFILE if version == 1 else record["resource_profile"]
-            if version == 2 and profile != WORKLOAD_PROFILE:
+            if version >= 2 and profile != WORKLOAD_PROFILE:
                 raise ValueError
+            keys = KEYS | ({"resource_profile"} if version >= 2 else set())
+            if version == 3:
+                keys.add("device_spec")
+                selection = validate_selection(record["device_spec"])
+                if selection["uuid"] != record["device"]:
+                    raise ValueError
             if (
-                set(record) != (KEYS if version == 1 else KEYS | {"resource_profile"})
+                set(record) != keys
                 or any(
                     record[key] != self.identity[key]
                     for key in ("installation", "engine", "lock_namespace")
@@ -335,6 +342,15 @@ class ContainerJournal:
         }
         if service.resource_profile != SUPERVISION_PROFILE:
             record.update(version=2, resource_profile=service.resource_profile)
+        selection = service.journal_device_spec()
+        if selection is not None:
+            validate_selection(selection)
+            if (
+                selection["uuid"] != record["device"]
+                or service.resource_profile != WORKLOAD_PROFILE
+            ):
+                raise SandboxUnavailable("Device task does not match its lock or total budget")
+            record.update(version=3, device_spec=selection)
         self.write(self.filename, record, create=True)
 
     def update(self, service, phase):
@@ -451,6 +467,9 @@ class PersistentRuntimeService(RuntimeContainerService):
     def record_intent(self, arguments):
         self.journal.begin(self, arguments)
 
+    def journal_device_spec(self):
+        return None
+
     def record_created(self):
         self.journal.update(self, "created")
 
@@ -481,6 +500,11 @@ class RecoveryContainer(ContainerService):
 
     def required_image_labels(self):
         return self.record["labels"]
+
+    def valid_devices(self, value):
+        if self.record["version"] == 3:
+            return value == docker_devices(self.record["device_spec"])
+        return super().valid_devices(value)
 
     def valid_security_options(self, options):
         if type(options) is not list or len(options) != 2 or options[0] != "no-new-privileges":

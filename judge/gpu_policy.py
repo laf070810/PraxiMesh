@@ -70,6 +70,8 @@ def execution_digest(root=None):
         "judge/container_oci.py",
         "judge/container_resources.py",
         "judge/container_journal.py",
+        "judge/container_devices.py",
+        "judge/driver_artifacts.py",
         "judge/results.py",
         "core/gpu_resources.py",
         "core/gpu_control.py",

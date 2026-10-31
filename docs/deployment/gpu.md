@@ -39,6 +39,31 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 本机驱动快照、库依赖、精确 runsc 版本匹配 | [驱动制品检查](#container-driver)；无设备加载与编译，不初始化 CUDA 或证明硬件可用 |
 | 控制容器辨认宿主 PID、任务归属与失效记录 | [进程归属检查](#container-process-observer)；只读 CPU 进程观察，不查询 GPU |
 | 控制容器的 NVIDIA 身份、完整进程来源与占用拒绝 | [只读管理检查](#container-device-observer)；读取明确选定卡的管理元数据，不创建 CUDA 上下文或运行内核 |
+| 单卡设备传入任务/guest、新版记录与控制器中断恢复 | [设备节点检查](#container-device-nodes)；需要明确授权映射真实设备；固定 CPU guest 只读节点元信息，修复后实测待重放 |
+
+<a id="container-device-nodes"></a>
+
+## 不运行 CUDA 的单卡设备节点检查
+
+适用于开发容器 GPU worker 的设备映射与持久恢复，当前仍在验收中，首次实际运行的只读挂载失败及修复范围见 [G34](../acceptance-g34.md)。此入口会把真实设备映射给任务，必须取得维护者对此操作的明确授权；只有“不占 GPU 的开发”授权时，不执行下面命令。先按[只读管理检查](#container-device-observer)核对完整 UUID，并设定 `PRAXIMESH_OBSERVE_GPU_UUID`。要求对应卡没有外部进程、UVM 已由主机正常注册、私有 rootless Docker 和当前驱动/管理库可用；工具不会加载主机模块、重置设备或停止其他账号进程。
+
+```sh
+.venv/bin/python scripts/container_gpu_acceptance.py \
+  --docker-socket /run/user/$(id -u)/docker.sock \
+  --device "$PRAXIMESH_OBSERVE_GPU_UUID" \
+  --runtime-archive var/gpu-preflight/gvisor.tar.bz2 \
+  --nvrtc-archive var/gpu-preflight/nvrtc-13.1.115.tar.xz \
+  --docker-cli-archive var/gpu-preflight/docker-29.9.2.tgz \
+  --driver-library-dir /usr/lib64
+```
+
+固定归档的准备见下方[控制镜像](#container-controller)与[离线归档](#提前保存固定镜像减少下载依赖)；其他发行版选择实际受信系统库目录。它构建独立任务镜像与完整管理控制镜像。控制端仍只映射管理所需节点，任务才获得所选卡、`nvidiactl` 与 `nvidia-uvm`；UVM major 从内核注册表读取，不按其他主机的编号猜测。
+
+固定 CPU guest 在 gVisor 内仅对节点执行 `stat`，同时检查只读根及看不到外层监督状态。它不打开 NVIDIA 设备、加载 CUDA 库、执行参考解或测量 GPU 性能。四项场景为正常节点传递、错误 UVM 注册拒绝、控制器异常退出、由新控制器按原记录恢复后再次检查。Docker 设备映射、原 PID 1/cgroup、完整进程来源及停止后的空列表均需核对。
+
+任务总预算保持 0.5 CPU、512 MiB、无 swap 和 256 个宿主任务，包含监督器和运行时开销；不是 GPU 显存上限。新增 journal v3 保存单卡配置，旧 v1/v2 仍表示无设备任务。恢复按旧记录停止/移除，不重新执行旧镜像，也不发布就绪或释放数据库预约。
+
+报告在 `test-results/px-container-gpu-*/result.json`。失败保留原始任务诊断与状态副本；核对自有容器、进程、镜像标签和临时目录清理。此入口只验证设备元信息与原任务生命周期；真实 CUDA/资源边界、正确性与恢复、完整启动凭证及 GPU Compose 继续待验收和集成。
 
 <a id="container-driver"></a>
 

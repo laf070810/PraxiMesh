@@ -8,6 +8,7 @@ import sys
 import time
 from pathlib import Path
 
+from judge.container_devices import PROFILE, kernel_uvm_major, validate_selection
 from judge.container_processes import MAX_PIDS, OwnedProcesses, read_file
 from judge.driver_artifacts import VERSION, version_from_kernel
 from judge.gpu_command import run_command
@@ -206,6 +207,23 @@ class ContainerDeviceMonitor:
         validate_observation(value, self.saved)
         self.check()
         return value
+
+    def task_device_spec(self):
+        if self.saved["schema"] != 2:
+            raise SandboxUnavailable("A GPU task requires the complete process source")
+        self.check()
+        value = {
+            "schema": 1,
+            "profile": PROFILE,
+            "uuid": self.saved["target"]["uuid"],
+            "driver": self.saved["target"]["driver"],
+            "minor": self.saved["minor"],
+            "uvm_major": kernel_uvm_major(
+                read_file(self.control.host_processes.fd, "devices", 65536)
+            ),
+        }
+        self.check()
+        return validate_selection(value)
 
     def full_inventory(self, value, deadline):
         # The native child returns its original schema. Never silently overwrite

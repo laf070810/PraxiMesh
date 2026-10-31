@@ -88,6 +88,8 @@
 - [G32 控制容器的 NVIDIA 管理查询](acceptance-g32.md) — 固定 NVML 来源与原任务观察；不创建 CUDA 上下文或证明硬件恢复
 - [ADR-049：容器完整设备进程来源](adr/049-container-full-device-inventory.md)
 - [G33 完整设备进程来源验收](acceptance-g33.md) — 固定 SMI/NVML、完整列表与旧契约兼容；真实非空 GPU 来源仍待验收
+- [ADR-050：单卡容器任务与持久设备记录](adr/050-single-card-container-task.md)
+- [G34 单卡设备配置与旧记录恢复](acceptance-g34.md) — 组件与数据库边界验证；设备 guest 启动曾失败，修复后实测待授权重放
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

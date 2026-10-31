@@ -166,6 +166,10 @@ def main():
             "recover-normal",
             "observe-device",
             "observe-device-nonempty-caps",
+            "gpu-nodes",
+            "gpu-nodes-orphan",
+            "gpu-nodes-recover",
+            "gpu-nodes-wrong-uvm",
         }
         | compiler_modes
     ):
@@ -176,6 +180,10 @@ def main():
         caps.mkdir(mode=0o755)
         (caps / "not-a-device").touch(mode=0o600)
     with ContainerController(device) as control:
+        if mode.startswith("gpu-nodes"):
+            from scripts.container_gpu_control import run
+
+            return run(control, mode, image, job, reservation)
         if mode in compiler_modes:
             return compile_task(control, mode, image, job, reservation)
         service = PersistentRuntimeService(control.journal, job, reservation, image=image)
@@ -279,7 +287,9 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as error:
-        if len(sys.argv) > 1 and sys.argv[1] == "observe-device":
+        if len(sys.argv) > 1 and (
+            sys.argv[1] == "observe-device" or sys.argv[1].startswith("gpu-nodes")
+        ):
             try:
                 save(
                     "failure",

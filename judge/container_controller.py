@@ -10,6 +10,7 @@ from pathlib import Path
 
 from judge.container_compiler import SOURCES as COMPILER_SOURCES
 from judge.container_driver import SOURCES as DRIVER_SOURCES
+from judge.container_gpu import SOURCES as GPU_SOURCES
 from judge.container_journal import ContainerJournal, private
 from judge.container_monitor import check_prerequisites, validate_observer
 from judge.container_processes import HostProcessView, host_manifest, validate_manifest
@@ -36,6 +37,7 @@ CONTROLLER_SOURCES = tuple(
         (
             *COMPILER_SOURCES,
             *DRIVER_SOURCES,
+            *GPU_SOURCES,
             "judge/container_controller.py",
             "judge/container_processes.py",
             "judge/container_monitor.py",
@@ -44,6 +46,7 @@ CONTROLLER_SOURCES = tuple(
             "judge/smi_inventory.py",
             "judge/container_compilation.py",
             "scripts/container_controller_fixture.py",
+            "scripts/container_gpu_control.py",
             "deploy/container-controller.Dockerfile",
             "deploy/container-monitor.fragment",
             "scripts/build_container_monitor.py",
