@@ -132,6 +132,31 @@ def publish(revision):
     return revision
 
 
+def test_cuda_package_reuses_review_namespace_and_official_import_boundary(
+    catalog, org, user, reviewer, payload
+):
+    from django.conf import settings
+
+    from core.content import import_package
+
+    candidate = json.loads((settings.CONTENT_ROOT / "candidates/cuda.json").read_text())
+    problem = copy.deepcopy(candidate["problems"][0])
+    # A small organization fixture fits its normal 75 KB upload limit. It is
+    # structurally reviewed here; no hardware acceptance is asserted.
+    problem.update(id="vector-add", concepts=["concept"])
+    problem["tests"] = [problem["tests"][0], problem["tests"][-1]]
+    payload["content"]["problems"] = [problem]
+    revision = approved(user, org, reviewer, payload, "cuda")
+    publish(revision)
+    stored = Problem.objects.get(pk="sample-org--cuda--vector-add")
+    assert stored.current.data["evaluator"] == "cuda-kernel-v1"
+    assert stored.current.data["operation"] == "vector-add-f32-v1"
+    assert stored.current.data["concepts"] == ["sample-org--cuda--concept"]
+    import_package(catalog)
+    stored.refresh_from_db()
+    assert stored.published
+
+
 def course_plan():
     version = Problem.objects.get(pk="sum-positive").current
     return {

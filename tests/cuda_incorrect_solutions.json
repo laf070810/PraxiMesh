@@ -1,0 +1,30 @@
+{
+  "cuda-vector-add": [
+    {
+      "mistake": "误把逐元素相加写成相减",
+      "source": "extern \"C\" __global__ void solve(const float* a, const float* b, float* out, int n) {\n    int i = blockIdx.x * blockDim.x + threadIdx.x;\n    if (i < n) {\n        out[i] = a[i] - b[i];\n    }\n}\n"
+    },
+    {
+      "mistake": "只使用块内索引，漏掉后续线程块的输出",
+      "source": "extern \"C\" __global__ void solve(const float* a, const float* b, float* out, int n) {\n    int i = threadIdx.x;\n    if (i < n) {\n        out[i] = a[i] + b[i];\n    }\n}\n"
+    },
+    {
+      "mistake": "转换为整数后计算，丢失小数",
+      "source": "extern \"C\" __global__ void solve(const float* a, const float* b, float* out, int n) {\n    int i = blockIdx.x * blockDim.x + threadIdx.x;\n    if (i < n) {\n        out[i] = float(int(a[i]) + int(b[i]));\n    }\n}\n"
+    }
+  ],
+  "cuda-matrix-product": [
+    {
+      "mistake": "把行主序 B 当作转置布局",
+      "source": "extern \"C\" __global__ void solve(const float* a, const float* b, float* out, int m, int n, int k) {\n    int row = blockIdx.y * blockDim.y + threadIdx.y;\n    int column = blockIdx.x * blockDim.x + threadIdx.x;\n    if (row < m && column < n) {\n        float value = 0.0f;\n        for (int inner = 0; inner < k; ++inner) {\n            value += a[row * k + inner] * b[column * k + inner];\n        }\n        out[row * n + column] = value;\n    }\n}\n"
+    },
+    {
+      "mistake": "错误地用行数限制归约长度",
+      "source": "extern \"C\" __global__ void solve(const float* a, const float* b, float* out, int m, int n, int k) {\n    int row = blockIdx.y * blockDim.y + threadIdx.y;\n    int column = blockIdx.x * blockDim.x + threadIdx.x;\n    if (row < m && column < n) {\n        float value = 0.0f;\n        for (int inner = 0; inner < k && inner < m; ++inner) {\n            value += a[row * k + inner] * b[inner * n + column];\n        }\n        out[row * n + column] = value;\n    }\n}\n"
+    },
+    {
+      "mistake": "忘记线程块偏移，未覆盖大于一个块的矩阵",
+      "source": "extern \"C\" __global__ void solve(const float* a, const float* b, float* out, int m, int n, int k) {\n    int row = threadIdx.y;\n    int column = threadIdx.x;\n    if (row < m && column < n) {\n        float value = 0.0f;\n        for (int inner = 0; inner < k; ++inner) {\n            value += a[row * k + inner] * b[inner * n + column];\n        }\n        out[row * n + column] = value;\n    }\n}\n"
+    }
+  ]
+}

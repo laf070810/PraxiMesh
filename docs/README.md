@@ -55,6 +55,9 @@
 - [ADR-033：GPU 健康准入、独立额度与物理预约排空](adr/033-gpu-admission-and-drain.md)
 - [G18 CUDA 编辑器、公开包与资源筛选](acceptance-g18.md) — 浏览器静态分析与公开工具；不代表硬件验收
 - [ADR-034：CUDA 编辑、公开包与独立资源显示](adr/034-cuda-editor-and-public-tools.md)
+- [CUDA 内容契约与候选说明](cuda-contract.md)
+- [ADR-035：CUDA 内容校验、候选组合与正常队列验收](adr/035-cuda-content-and-review.md)
+- [G19 CUDA 内容与候选验收工具](acceptance-g19.md) — 内容、发布和工具边界通过；候选硬件验收待完成
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

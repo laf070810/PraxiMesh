@@ -22,6 +22,7 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 完整启动、长期领取、取消与退出流程 | [宿主 worker](#gpu-worker)，需要独占卡；非 GPU 状态检查使用下方 PostgreSQL 测试 |
 | 历史 GPU 成绩、私有进度、中英反馈与布局 | [成绩展示检查](#gpu-results)，不使用 GPU |
 | 源码部署的 GPU 准入配置、额度与排空 | [准入门槛](#gpu-admission)，当前只做不占 GPU 的验证 |
+| CUDA 候选合并、静态检查和参考解/错解 | [内容准备与验收](#cuda-content)；静态检查不占 GPU，真实 API 验收需要独占卡 |
 
 <a id="gpu-admission"></a>
 
@@ -79,6 +80,52 @@ JUDGE_ENABLED=1 .venv/bin/python manage.py gpu_worker \
 凭证最长有效 24 小时，空闲时不足完整任务余量会停用并重跑全部检查。文件缺失、时钟回拨、代码/主机/所有者变化会退出；运行中凭证失效丢弃结果并保留预约。取消、删除或租约丢失时，先核对原服务已停止，再独立恢复并核对相同预约，成功后才可领取下一任务。发现外部 GPU 进程只停止自有执行，不终止其他账号的工作。
 
 用前台 Ctrl-C 或向该 worker 进程发送 SIGTERM 停止。处理器只设置标志，常规回调负责清理、撤销本次凭证和停用设备；中断任务的预约保留到下一次完整启动恢复。数据库网络失联时不能保证 Python 立即返回，实际任务服务仍有独立硬期限。不要删除锁文件、手动释放预约或换工作根绕过故障。日志只包含固定阶段、任务 ID 和错误类别，保留最后成功阶段用于定位。
+
+<a id="cuda-content"></a>
+
+## CUDA 内容准备与真实验收
+
+两道候选及来源见 [CUDA 内容契约](../cuda-contract.md)。默认目录不导入它们。先生成一个可审阅的完整包；此操作只读内容文件，不连接数据库、不编译源码：
+
+```sh
+mkdir -p test-results
+.venv/bin/python manage.py content_compose \
+  --base content/starter.json --append content/candidates/cuda.json \
+  --output test-results/cuda-review.json
+.venv/bin/python manage.py content_check test-results/cuda-review.json
+```
+
+输出为 56 个知识节点、28 道题，权限为 0600，已存在的输出文件不会覆盖。需要重新生成时选择一个新文件名。可以重复 `--append` 加入其他全新 ID；该命令不用于修改已有版本。包包含参考实现和受保护数据，不要放到网站静态目录。
+
+仅查看候选页面时，可以在新建临时 SQLite 库中导入并关闭评测；不要向正在使用的开发或部署数据库导入示例全量包：
+
+```sh
+PRAXIMESH_CUDA_REVIEW_DIR=$(mktemp -d /tmp/praximesh-cuda-review.XXXXXX)
+env -u DATABASE_URL SQLITE_PATH="$PRAXIMESH_CUDA_REVIEW_DIR/review.sqlite3" \
+  .venv/bin/python manage.py migrate --noinput
+env -u DATABASE_URL SQLITE_PATH="$PRAXIMESH_CUDA_REVIEW_DIR/review.sqlite3" \
+  .venv/bin/python manage.py content_import test-results/cuda-review.json
+env -u DATABASE_URL SQLITE_PATH="$PRAXIMESH_CUDA_REVIEW_DIR/review.sqlite3" JUDGE_ENABLED=0 \
+  .venv/bin/python manage.py runserver 127.0.0.1:8019 --noreload
+```
+
+此时可阅读题意、编辑和保存草稿，不能执行 GPU 评测。停止该测试 Web 后才能删除自己创建的临时库。生产发布仍按原全量内容审核流程处理，不使用此示例覆盖既有目录。
+
+真实内容验收需要另行满足独占卡及完整 worker 启动条件：使用独立测试站点、合成账号和该站点自己的数据库；Web 与 [宿主 worker](#gpu-worker)连接同一测试库，按[准入配置](#gpu-admission)设置对应设备。不得与生产任务混用。当前仍按维护者要求不占 GPU，以下入口尚未完成真实硬件重放。
+
+候选每题运行一次公开参考 Run、一次正式参考 Submit、三次错解 Submit 和一次恢复参考 Submit，共 12 个串行任务、预约 1980 整卡秒。默认每日 1800 秒不足以完成整套检查；只在该隔离测试站点启动时将 `JUDGE_DAILY_GPU_SECONDS` 设为例如 `3600`，并确保测试账号有足够剩余额度。不会绕过配额，也不自动调整生产设置。等待完整启动完成和 GPU 可用，再创建具有提交、读取结果权限的[测试账号令牌](../local-practice.md)，放在 `PRAXIMESH_API_TOKEN` 环境变量中。
+
+```sh
+.venv/bin/python scripts/gpu_content_acceptance.py \
+  --package test-results/cuda-review.json \
+  --incorrect tests/cuda_incorrect_solutions.json \
+  --server http://127.0.0.1:8019 --allow-local-http \
+  --isolated-test-site --output test-results/cuda-content-hardware
+```
+
+外部测试站点使用 HTTPS，私有 CA 用 `--ca-file` 指定；不支持跳过证书检查、代理转发或重定向。命令会先比对所有题目摘要，正式结果须来自同一运行环境；每项报告保留源码摘要、请求键、任务 ID、公开结果及计时，不保存令牌或源代码。报告目录和文件分别为 0700/0600，不覆盖已有目录。
+
+观察期限默认为每题每次任务 600 秒，可用 `--timeout` 调整；它不终止任务。连接中断、平台错误、额度不足、版本变化或结果不匹配均使报告失败，并停止后续提交。保留报告和测试站点，根据任务 ID（或尚未得到 ID 时的幂等请求键）检查已提交任务；不要换请求键重复发送。确认 worker 已恢复设备、没有未结束任务或物理预约后，再关闭自己的测试服务和数据库。报告是内容验收记录，不是 `JUDGE_RECEIPT`，不能用于绕过完整启动。
 
 ## 不占 GPU 的控制链检查
 

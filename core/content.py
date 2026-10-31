@@ -61,7 +61,7 @@ def digest(value):
     ).hexdigest()
 
 
-def load_package(path):
+def _read_package(path):
     def invalid_constant(value):
         raise ContentError(f"Nonfinite JSON constant: {value}")
 
@@ -76,9 +76,39 @@ def load_package(path):
     path = Path(path)
     if path.stat().st_size > 5_000_000:
         raise ContentError("Content package exceeds 5 MB.")
-    data = json.loads(
+    return json.loads(
         path.read_text(), parse_constant=invalid_constant, object_pairs_hook=unique_keys
     )
+
+
+def load_package(path):
+    data = _read_package(path)
+    validate_package(data)
+    return data
+
+
+def compose_package(base, additions):
+    """Append candidate data without replacing identities, importing or executing it."""
+    if not 1 <= len(additions) <= 16:
+        raise ContentError("Choose 1-16 candidate additions.")
+    data = load_package(base)
+    for path in additions:
+        extra = _read_package(path)
+        if (
+            type(extra) is not dict
+            or set(extra) != {"schema_version", "nodes", "problems"}
+            or type(extra["schema_version"]) is not int
+            or extra["schema_version"] != 1
+            or type(extra["nodes"]) is not list
+            or type(extra["problems"]) is not list
+        ):
+            raise ContentError("Each addition must have the content-v1 root fields.")
+        data["nodes"].extend(extra["nodes"])
+        data["problems"].extend(extra["problems"])
+    # Keep the resulting artifact loadable with the same byte limit, including
+    # the final newline written by the management command.
+    if len(json.dumps(data, ensure_ascii=False, allow_nan=False).encode()) + 1 > 5_000_000:
+        raise ContentError("Combined content package exceeds 5 MB.")
     validate_package(data)
     return data
 
@@ -164,6 +194,16 @@ def validate_package(data):
         names = [t["name"] for t in problem["tests"]]
         if len(names) != len(set(names)):
             raise ContentError("Duplicate test names.")
+        if problem["evaluator"] == "cuda-kernel-v1":
+            from judge.gpu_contract import compile_request, validate_problem
+
+            try:
+                validate_problem(problem)
+                for field in ("starter", "reference"):
+                    compile_request(problem[field], problem["operation"])
+            except ValueError:
+                raise ContentError("Invalid CUDA content or source budget.") from None
+            continue
         if problem["evaluator"] == "python-object-api-v1":
             from judge.object_api import validate_problem
 

@@ -262,7 +262,8 @@
         "language": {
           "enum": [
             "python",
-            "javascript"
+            "javascript",
+            "cuda"
           ]
         },
         "evaluator": {
@@ -273,7 +274,8 @@
             "python-ml-linear-v1",
             "python-weighted-fit-v1",
             "python-agent-tools-v1",
-            "python-object-api-v1"
+            "python-object-api-v1",
+            "cuda-kernel-v1"
           ]
         },
         "function": {
@@ -316,36 +318,67 @@
               },
               {
                 "$ref": "#/$defs/api_case"
+              },
+              {
+                "$ref": "#/$defs/cuda_case"
               }
             ]
           }
         },
         "comparison": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "kind",
-            "absolute",
-            "relative"
-          ],
-          "properties": {
-            "kind": {
-              "enum": [
-                "exact",
-                "numeric"
-              ]
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "absolute",
+                "relative"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "exact",
+                    "numeric"
+                  ]
+                },
+                "absolute": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 0.001
+                },
+                "relative": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 0.001
+                }
+              }
             },
-            "absolute": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 0.001
-            },
-            "relative": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 0.001
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "absolute",
+                "relative"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "float"
+                },
+                "absolute": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 0.01
+                },
+                "relative": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 0.01
+                }
+              }
             }
-          }
+          ]
         },
         "tags": {
           "type": "array",
@@ -446,6 +479,15 @@
               }
             }
           }
+        },
+        "operation": {
+          "enum": [
+            "vector-add-f32-v1",
+            "matmul-f32-v1"
+          ]
+        },
+        "entrypoint": {
+          "const": "solve"
         }
       },
       "allOf": [
@@ -808,6 +850,136 @@
               ]
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "evaluator": {
+                "const": "cuda-kernel-v1"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "operation",
+              "entrypoint"
+            ],
+            "properties": {
+              "language": {
+                "const": "cuda"
+              },
+              "comparison": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "absolute",
+                  "relative"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "float"
+                  },
+                  "absolute": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 0.01
+                  },
+                  "relative": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 0.01
+                  }
+                }
+              },
+              "tests": {
+                "minItems": 2,
+                "maxItems": 8,
+                "items": {
+                  "$ref": "#/$defs/cuda_case"
+                }
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "function"
+                  ]
+                },
+                {
+                  "required": [
+                    "output_format"
+                  ]
+                },
+                {
+                  "required": [
+                    "model_kind"
+                  ]
+                },
+                {
+                  "required": [
+                    "uncertainty_model"
+                  ]
+                },
+                {
+                  "required": [
+                    "assessment"
+                  ]
+                },
+                {
+                  "required": [
+                    "interface"
+                  ]
+                }
+              ]
+            }
+          },
+          "else": {
+            "properties": {
+              "comparison": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "absolute",
+                  "relative"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "exact",
+                      "numeric"
+                    ]
+                  },
+                  "absolute": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 0.001
+                  },
+                  "relative": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 0.001
+                  }
+                }
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "operation"
+                  ]
+                },
+                {
+                  "required": [
+                    "entrypoint"
+                  ]
+                }
+              ]
+            }
+          }
         }
       ]
     },
@@ -1103,6 +1275,111 @@
           "maxItems": 64,
           "items": {
             "type": "object"
+          }
+        }
+      }
+    },
+    "cuda_case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "public",
+        "inputs",
+        "expected"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "public": {
+          "type": "boolean"
+        },
+        "inputs": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "a",
+                "b"
+              ],
+              "properties": {
+                "a": {
+                  "type": "array",
+                  "maxItems": 4096,
+                  "items": {
+                    "type": "number",
+                    "minimum": -10000,
+                    "maximum": 10000
+                  }
+                },
+                "b": {
+                  "type": "array",
+                  "maxItems": 4096,
+                  "items": {
+                    "type": "number",
+                    "minimum": -10000,
+                    "maximum": 10000
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "a",
+                "b",
+                "m",
+                "n",
+                "k"
+              ],
+              "properties": {
+                "a": {
+                  "type": "array",
+                  "maxItems": 4096,
+                  "items": {
+                    "type": "number",
+                    "minimum": -10000,
+                    "maximum": 10000
+                  }
+                },
+                "b": {
+                  "type": "array",
+                  "maxItems": 4096,
+                  "items": {
+                    "type": "number",
+                    "minimum": -10000,
+                    "maximum": 10000
+                  }
+                },
+                "m": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 64
+                },
+                "n": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 64
+                },
+                "k": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 64
+                }
+              }
+            }
+          ]
+        },
+        "expected": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "type": "number"
           }
         }
       }
