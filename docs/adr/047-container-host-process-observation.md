@@ -1,6 +1,6 @@
 # ADR-047：控制容器中的宿主进程归属
 
-日期：2026-10-31。状态：接受；十八项真实无 GPU 观察/编译/恢复场景通过，原控制端兼容重放进行中，见 [G31](../acceptance-g31.md)。背景见 [RFC-021](../rfcs/021-gpu-container-supervision.md)。
+日期：2026-10-31。状态：接受；十八项真实无 GPU 观察/编译/恢复、七组原控制端兼容及最终清理核对通过，见 [G31](../acceptance-g31.md)。背景见 [RFC-021](../rfcs/021-gpu-container-supervision.md)。
 
 GPU 工具返回宿主 PID，控制容器的私有 `/proc` 不能直接解释它。新增显式挂载契约 v2，在原控制端身份之外保存宿主 procfs dev/inode 与 boot ID；将该视图递归只读、rprivate 挂到固定位置。控制端仍使用私有 PID/cgroup，维持原 UID 映射、无额外能力、只读根和资源限制。v1 继续不启用此接口。
 

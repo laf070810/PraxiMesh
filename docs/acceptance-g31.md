@@ -31,6 +31,10 @@
 
 组件与发布兼容检查：`g31-components-final.log/xml`，356 项通过，无跳过。GPU 原凭证、准入、历史证据和恢复边界：`g31-gpu-boundaries.log/xml`，190 项通过，1 项实际 PostgreSQL 锁竞争检查因本组使用 SQLite 而跳过；该项未计作通过。本批没有数据库结构或事务改动。
 
-原 v1 控制端的七组共用锁与跨容器/宿主接管重放在 `g31-controller-compatibility.log`，当前进行中；最终清理与当前源码核对待补充。
+原 v1 控制端的七组共用锁、UID/挂载拒绝、跨容器/宿主接管全部通过：`test-results/px-container-controller-399553819cb1/result.json` 与 `g31-controller-compatibility.log`。15 个控制/任务容器清理完成；仍使用原无宿主 procfs 的 v1 挂载清单，任务 journal 与 v2 总预算接管正常。
+
+只读最终核对在 `test-results/g31-audit.json`：两份最终报告中的全部源码摘要与实现提交 `3ac643a` 匹配，合计包括前提检查在内的 51 个自有容器、4 个镜像标签均不存在，16 组记录进程已消失。报告未保留未清理目录；原 Web、worker、AI 三个服务均运行中且 healthy。
+
+全仓 Ruff 检查与 586 个 Python 文件格式检查通过；新增验收文档后另有 36 项发布兼容检查通过，9 份相关文档的 344 个本地文件链接及进程观察锚点有效。结果为 `g31-ruff.log`、`g31-format.log`、`g31-release-docs.log/xml`、`g31-document-links.json` 和 `g31-observer-help.txt`，均位于 `test-results/`。
 
 本批不证明 NVIDIA 返回的 PID 来源、GPU 空闲、CUDA 故障恢复或性能正确。单卡设备接入、完整 GPU 启动/worker、正式环境和 Compose/发布协调继续待完成。
