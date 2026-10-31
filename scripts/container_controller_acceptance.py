@@ -68,7 +68,9 @@ def stage_cli(archive, destination):
     snapshot.unlink()
 
 
-def build_controller(engine, archive, out, tag, *, nvml_library_dir=None):
+def build_controller(engine, archive, out, tag, *, nvml_library_dir=None, full_inventory=False):
+    if full_inventory and nvml_library_dir is None:
+        raise ValueError("Full process inventory requires the management library")
     context = out / "context"
     context.mkdir(mode=0o700)
     stage_cli(archive, context / "docker")
@@ -83,7 +85,9 @@ def build_controller(engine, archive, out, tag, *, nvml_library_dir=None):
         from judge.nvml_artifacts import manifest_digest
         from scripts.build_container_monitor import snapshot_management
 
-        observer = snapshot_management(nvml_library_dir, context / "observer")
+        observer = snapshot_management(
+            nvml_library_dir, context / "observer", full_inventory=full_inventory
+        )
         extra = ["--build-arg", "OBSERVER_CONTRACT=" + manifest_digest(observer)]
         with (context / "Dockerfile").open("ab") as target:
             target.write((ROOT / "deploy/container-monitor.fragment").read_bytes())
@@ -369,9 +373,16 @@ def main():
         "--observe-device", help="Only read NVML metadata for this explicitly selected GPU UUID"
     )
     parser.add_argument("--nvml-library-dir", type=Path)
+    parser.add_argument(
+        "--full-device-inventory",
+        action="store_true",
+        help="Include the pinned full NVIDIA process query (management only, no CUDA)",
+    )
     options = parser.parse_args()
     if bool(options.observe_device) != bool(options.nvml_library_dir):
         parser.error("--observe-device and --nvml-library-dir must be supplied together")
+    if options.full_device_inventory and not options.observe_device:
+        parser.error("--full-device-inventory requires --observe-device and --nvml-library-dir")
     if options.observe_device:
         from judge.gpu_monitor import identify
 
@@ -439,6 +450,7 @@ def main():
                     directory,
                     tag,
                     nvml_library_dir=options.nvml_library_dir,
+                    full_inventory=options.full_device_inventory,
                 )
                 report["controller_image"] = controller_image
             save(result_path, report)

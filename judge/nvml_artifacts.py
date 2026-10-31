@@ -9,8 +9,10 @@ from pathlib import Path
 from judge.driver_artifacts import SHA256, VERSION, file_identity
 
 PROFILE = "nvml-observer-v1"
+INVENTORY_PROFILE = "nvidia-inventory-v2"
 DIRECTORY = Path("/opt/praximesh/nvml")
 MAX_LIBRARY = 32 * 1024**2
+MAX_UTILITY = 16 * 1024**2
 
 
 def library_name(version):
@@ -20,12 +22,14 @@ def library_name(version):
 
 
 def validate_manifest(value):
+    if type(value) is not dict or type(value.get("schema")) is not int:
+        raise ValueError("Unexpected NVIDIA management manifest")
+    full = value["schema"] == 2
     if (
-        type(value) is not dict
-        or set(value) != {"schema", "profile", "driver_version", "library"}
-        or type(value["schema"]) is not int
-        or value["schema"] != 1
-        or value["profile"] != PROFILE
+        set(value)
+        != {"schema", "profile", "driver_version", "library"} | ({"utility"} if full else set())
+        or value["schema"] not in {1, 2}
+        or value["profile"] != (INVENTORY_PROFILE if full else PROFILE)
         or type(value["library"]) is not dict
     ):
         raise ValueError("Unexpected NVIDIA management manifest")
@@ -41,6 +45,18 @@ def validate_manifest(value):
         or not SHA256.fullmatch(info["sha256"])
     ):
         raise ValueError("Invalid NVIDIA management library identity")
+    if full:
+        utility = value["utility"]
+        if (
+            type(utility) is not dict
+            or set(utility) != {"name", "size", "sha256"}
+            or utility["name"] != "nvidia-smi"
+            or type(utility["size"]) is not int
+            or not 0 < utility["size"] <= MAX_UTILITY
+            or type(utility["sha256"]) is not str
+            or not SHA256.fullmatch(utility["sha256"])
+        ):
+            raise ValueError("Invalid NVIDIA inventory utility identity")
     return value
 
 
@@ -68,16 +84,30 @@ def verify_bundle(expected, directory=DIRECTORY):
     if read_manifest(directory) != expected:
         raise ValueError("Management library manifest changed")
     entry = expected["library"]
-    if {path.name for path in directory.iterdir()} != {"manifest.json", entry["name"]}:
+    names = {"manifest.json", entry["name"]}
+    entries = [entry]
+    if expected["schema"] == 2:
+        names.update({entry["soname"], "nvidia-smi"})
+        entries.append(expected["utility"])
+        alias = directory / entry["soname"]
+        if not alias.is_symlink() or os.readlink(alias) != entry["name"]:
+            raise ValueError("Management library alias changed")
+    if {path.name for path in directory.iterdir()} != names:
         raise ValueError("Unexpected management bundle content")
-    fd = os.open(directory / entry["name"], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    for entry in entries:
+        verify_file(directory / entry["name"], entry, executable=entry["name"] == "nvidia-smi")
+    return manifest_digest(expected)
+
+
+def verify_file(path, entry, *, executable=False):
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     with os.fdopen(fd, "rb") as stream:
         before = os.fstat(stream.fileno())
         if (
             not stat.S_ISREG(before.st_mode)
+            or (executable and stat.S_IMODE(before.st_mode) != 0o755)
             or before.st_size != entry["size"]
             or hashlib.file_digest(stream, "sha256").hexdigest() != entry["sha256"]
             or file_identity(os.fstat(stream.fileno())) != file_identity(before)
         ):
-            raise ValueError("Management library changed")
-    return manifest_digest(expected)
+            raise ValueError("Management artifact changed")

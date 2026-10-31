@@ -143,3 +143,15 @@ G28 的任务预算与恢复已通过，但编译调用仍由宿主程序发起�
 接口依据为 [NVIDIA 管理功能说明](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/docker-specialized.html)与 [NVML 官方头文件](https://github.com/NVIDIA/go-nvml/blob/main/pkg/nvml/nvml.h)，实际绑定同时核对本机 CUDA 附带的 `nvml.h`。NVML 与 `nvidia-smi` 的输出稳定性区别见 [NVIDIA 查询说明](https://docs.nvidia.com/deploy/nvidia-smi/index.html)。
 
 完整镜像重放已有十七项管理/CPU/兼容场景通过；当前没有实际外部 GPU 进程，因此未验证非空 CUDA PID 来源。另经文档复核，NVIDIA 还定义了 `O` 类及无需上下文的资源占用，不能从三个上下文列表推出穷尽空闲。该来源或等价的可靠限制必须在正式容器准入前补齐；本阶段是观察组件，不是完整占用凭证。结果和决定见 [G32](../acceptance-g32.md)、[ADR-048](../adr/048-container-nvml-observation.md)。
+
+### 完整进程查询来源（G33）
+
+G32 的三个上下文 API 不替代 NVIDIA 文档定义的完整 `Processes` 列表。本阶段新增独立管理制品 v2，静态复制同一安装的 `/usr/bin/nvidia-smi` 与 NVML 库，绑定各自大小、摘要、库 SONAME 和驱动版本。采用显式控制端挂载契约 v4；旧 v3 仍只允许原来的上下文观察，不能以旧清单自动获得完整占用语义。
+
+可信控制端在同一个有界观察期限内执行固定 NVML 子程序、固定 `--version` 和指定 UUID 的 `--query --xml-format`。SMI 只使用清单内 NVML；不接受调用者参数、继承环境或任意查询工具路径。所有命令结束并通过身份校验后才返回经过投影的 PID 列表；进程名称、命令行、显存和其他原始 XML 信息不写普通日志。完整列表不按 `C/G/M/O` 过滤，未来或组合类型同样作为占用；缺失、N/A、重复字段、重复 PID、畸形数据和上限错误均拒绝。
+
+三类 NVML PID 必须是完整列表的子集，否则认为来源不一致并关闭本次观察。不同时间采样允许出现短暂不一致，但不能据此重试为“空闲”。完整列表中的每个 PID 都沿用 G31 的原任务归属核对，包括没有传统上下文的进程。此查询不授予排他访问；其他账号仍能启动任务，正式执行必须持续监测并在干扰时丢弃结果。
+
+只读实测比较宿主与私有 PID 控制容器的版本、设备和完整列表，验证损坏工具/库/契约拒绝、空列表下原任务核对及 v1/v2/v3 兼容。没有真实其他/无上下文进程时明确保留硬件证据缺口，不通过创建 CUDA 上下文补造数据；仍不签发就绪凭证。依据为 [NVIDIA 进程类型及 XML 查询说明](https://docs.nvidia.com/deploy/nvidia-smi/index.html)。
+
+十九项真实镜像场景、实际 v3 查询兼容和 475 项组件检查通过；管理镜像 `CUDA Version: N/A` 的真实失败与修正、空列表范围和最终清理见 [G33](../acceptance-g33.md)，决定见 [ADR-049](../adr/049-container-full-device-inventory.md)。

@@ -41,6 +41,7 @@ CONTROLLER_SOURCES = tuple(
             "judge/container_monitor.py",
             "judge/nvml_artifacts.py",
             "judge/nvml_reader.py",
+            "judge/smi_inventory.py",
             "judge/container_compilation.py",
             "scripts/container_controller_fixture.py",
             "deploy/container-controller.Dockerfile",
@@ -79,7 +80,11 @@ def manifest(directory, engine, *, host_processes=False, device_observer=None):
             raise ValueError("NVIDIA observation requires the pinned host process view")
         validate_observer(device_observer)
     return {
-        "version": 3 if device_observer is not None else 2 if host_processes else 1,
+        "version": device_observer["schema"] + 2
+        if device_observer is not None
+        else 2
+        if host_processes
+        else 1,
         "operator": [os.getuid(), os.getgid()],
         "root": identity(directory),
         "locks": identity(directory / "locks"),
@@ -138,20 +143,21 @@ class ContainerController:
         self.guard = self.journal = self.engine = self.host_processes = None
         self.saved = self.read_manifest()
         expected = {"version", "operator", "root", "locks", "journal", "socket", "engine"}
-        if self.saved.get("version") in {2, 3}:
-            expected.add("host_processes")
-        if self.saved.get("version") == 3:
-            expected.add("device_observer")
-        if (
-            set(self.saved) != expected
-            or type(self.saved["version"]) is not int
-            or self.saved["version"] not in {1, 2, 3}
-        ):
+        version = self.saved.get("version")
+        if type(version) is not int or version not in {1, 2, 3, 4}:
             raise SandboxUnavailable("Unknown controller mount contract")
-        if self.saved["version"] in {2, 3}:
+        if version >= 2:
+            expected.add("host_processes")
+        if version >= 3:
+            expected.add("device_observer")
+        if set(self.saved) != expected:
+            raise SandboxUnavailable("Unknown controller mount contract")
+        if version >= 2:
             validate_manifest(self.saved["host_processes"])
-        if self.saved["version"] == 3:
+        if version >= 3:
             validate_observer(self.saved["device_observer"])
+            if version != self.saved["device_observer"]["schema"] + 2:
+                raise SandboxUnavailable("NVIDIA observer and controller profiles differ")
             if self.saved["device_observer"]["target"]["uuid"] != device:
                 raise SandboxUnavailable("Controller and NVIDIA observer select different devices")
         for key in ("operator", "root", "locks", "journal", "socket"):
@@ -169,7 +175,7 @@ class ContainerController:
             raise SandboxUnavailable("Invalid controller engine identity") from None
         self.process_identity = environment(self.saved["operator"])
         try:
-            if self.saved["version"] in {2, 3}:
+            if version >= 2:
                 self.host_processes = HostProcessView(self.saved["host_processes"])
             self.check_mounts()
             self.engine = LocalEngine(SOCKET)
@@ -207,7 +213,7 @@ class ContainerController:
             raise SandboxUnavailable("Controller socket mount changed")
         if self.host_processes is not None:
             self.host_processes.check()
-        if self.saved["version"] == 3:
+        if self.saved["version"] >= 3:
             check_prerequisites(self.saved["device_observer"], self.host_processes)
 
     def check(self):

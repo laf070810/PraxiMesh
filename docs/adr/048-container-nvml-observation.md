@@ -15,3 +15,5 @@ NVML 590 会在自身 `/dev` 中创建空的 `nvidia-caps`。实际失败确认�
 管理设备句柄本身并非只读权限边界，因此只属于已有专用 rootless Docker 控制权的可信执行平面。此接口的只读性来自固定代码；它不证明学员 GPU 隔离，不签发 receipt、不释放预约，也不改变网站准入。没有实际外部 GPU 进程时不能宣称验证其 PID 来源；真实 CUDA 归属与恢复须另行独占验收。操作集中在 [GPU 指南](../deployment/gpu.md#container-device-observer)。
 
 三类 NVML 上下文列表也不是全部资源占用的穷尽证明。[NVIDIA 查询文档](https://docs.nvidia.com/deploy/nvidia-smi/index.html)另列出 `O` 类及无需上下文的资源分配；本接口尚未证明覆盖它们。正式容器准入前必须补齐该来源或建立经过真实验证的等价限制，不能仅凭本接口返回空列表发布空闲/就绪状态。
+
+后续 [ADR-049](049-container-full-device-inventory.md)增加显式 v4 完整查询来源；本 v3 保持原上下文语义，真实非空 GPU 进程仍须单独验收。

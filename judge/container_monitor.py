@@ -13,8 +13,9 @@ from judge.driver_artifacts import VERSION, version_from_kernel
 from judge.gpu_command import run_command
 from judge.gpu_device_lock import GPU_UUID
 from judge.gpu_session import decode_frame
-from judge.nvml_artifacts import manifest_digest, validate_manifest, verify_bundle
+from judge.nvml_artifacts import DIRECTORY, manifest_digest, validate_manifest, verify_bundle
 from judge.sandbox import SandboxUnavailable
+from judge.smi_inventory import MAX_XML, inventory, utility_version
 
 
 def validate_observer(value):
@@ -23,12 +24,14 @@ def validate_observer(value):
             type(value) is not dict
             or set(value) != {"schema", "target", "library", "minor"}
             or type(value["schema"]) is not int
-            or value["schema"] != 1
+            or value["schema"] not in {1, 2}
             or type(value["minor"]) is not int
             or not 0 <= value["minor"] < 255
         ):
             raise ValueError
         validate_manifest(value["library"])
+        if value["schema"] != value["library"]["schema"]:
+            raise ValueError
         target = value["target"]
         if (
             type(target) is not dict
@@ -109,6 +112,7 @@ def check_prerequisites(value, view):
 
 def validate_observation(value, saved):
     validate_observer(saved)
+    full = saved["schema"] == 2
     expected = {
         "schema",
         "bundle",
@@ -120,11 +124,14 @@ def validate_observation(value, saved):
         "nvml_version",
         "pids",
     }
+    if full:
+        expected.add("smi_version")
     if (
         type(value) is not dict
         or set(value) != expected
         or type(value["schema"]) is not int
-        or value["schema"] != 1
+        or value["schema"] != saved["schema"]
+        or (full and value["smi_version"] != saved["target"]["driver"])
         or value["bundle"] != manifest_digest(saved["library"])
         or type(value["minor"]) is not int
         or value["minor"] != saved["minor"]
@@ -137,7 +144,7 @@ def validate_observation(value, saved):
         or type(value["nvml_version"]) is not str
         or not re.fullmatch(r"[0-9.]{1,64}", value["nvml_version"])
         or type(value["pids"]) is not dict
-        or set(value["pids"]) != {"compute", "graphics", "mps"}
+        or set(value["pids"]) != {"compute", "graphics", "mps"} | ({"inventory"} if full else set())
     ):
         raise SandboxUnavailable("NVIDIA management observation identity changed")
     union = set()
@@ -152,15 +159,19 @@ def validate_observation(value, saved):
         union.update(found)
     if len(union) > MAX_PIDS:
         raise SandboxUnavailable("NVIDIA process inventory exceeded its bound")
+    if full and union != set(value["pids"]["inventory"]):
+        raise SandboxUnavailable("NVIDIA process sources disagree; device state is unavailable")
     return sorted(union)
 
 
 class ContainerDeviceMonitor:
     def __init__(self, control):
         self.control = control
-        if control.saved.get("version") != 3 or control.host_processes is None:
+        if control.saved.get("version") not in {3, 4} or control.host_processes is None:
             raise SandboxUnavailable("Explicit NVIDIA observation controller required")
         self.saved = copy.deepcopy(validate_observer(control.saved["device_observer"]))
+        if control.saved["version"] != self.saved["schema"] + 2:
+            raise SandboxUnavailable("NVIDIA observer and controller profiles differ")
         self.owned = self.service = None
         self.check()
 
@@ -175,6 +186,7 @@ class ContainerDeviceMonitor:
     def read(self):
         """Management metadata only; a successful read does not imply an idle GPU."""
         self.check()
+        deadline = time.monotonic() + 3
         result = run_command(
             [
                 sys.executable,
@@ -183,15 +195,61 @@ class ContainerDeviceMonitor:
                 self.saved["target"]["uuid"],
             ],
             env={"PATH": "/usr/local/bin:/usr/bin:/bin", "LC_ALL": "C"},
-            deadline=time.monotonic() + 3,
+            deadline=deadline,
             seconds=3,
             on_tick=self.check,
             max_output=256 * 1024,
         )
         value = decode_frame(result.stdout)
+        if self.saved["schema"] == 2:
+            value = self.full_inventory(value, deadline)
         validate_observation(value, self.saved)
         self.check()
         return value
+
+    def full_inventory(self, value, deadline):
+        # The native child returns its original schema. Never silently overwrite
+        # an existing full inventory, extra field or category from that child.
+        if (
+            type(value) is not dict
+            or type(value.get("schema")) is not int
+            or value["schema"] != 1
+            or "smi_version" in value
+            or type(value.get("pids")) is not dict
+            or set(value["pids"]) != {"compute", "graphics", "mps"}
+        ):
+            raise SandboxUnavailable("Unexpected native NVIDIA observation")
+        environment = {
+            "PATH": "/usr/bin:/bin",
+            "LC_ALL": "C",
+            "LD_LIBRARY_PATH": str(DIRECTORY),
+        }
+
+        def query(*arguments, maximum):
+            result = run_command(
+                [str(DIRECTORY / "nvidia-smi"), *arguments],
+                env=environment,
+                deadline=deadline,
+                seconds=3,
+                on_tick=self.check,
+                max_output=maximum,
+            )
+            # Warnings cannot silently downgrade a partial observation to idle.
+            if result.stderr:
+                raise SandboxUnavailable("NVIDIA inventory query returned a diagnostic")
+            return result.stdout
+
+        version = utility_version(query("--version", maximum=4096), self.saved["target"]["driver"])
+        pids = inventory(
+            query("-i", self.saved["target"]["uuid"], "--query", "--xml-format", maximum=MAX_XML),
+            self.saved,
+        )
+        return {
+            **value,
+            "schema": 2,
+            "smi_version": version,
+            "pids": {**value["pids"], "inventory": pids},
+        }
 
     def observe(self, service=None):
         if self.owned is not None and service is not self.service:

@@ -10,13 +10,14 @@ from judge.container_controller import ContainerController
 from judge.sandbox import SandboxUnavailable
 from tests.test_container_controller import mounts  # noqa: F401
 from tests.test_container_monitor import bundle, saved  # noqa: F401
+from tests.test_smi_inventory import upgrade
 
 
 def configure(mounts, saved, monkeypatch):  # noqa: F811
     calls = []
     saved["target"]["uuid"] = mounts.device
     mounts.value.update(
-        version=3,
+        version=saved["schema"] + 2,
         host_processes={
             "version": 1,
             "root": [22, 1],
@@ -87,3 +88,25 @@ def test_bad_device_files_close_procfs_without_opening_task_state(mounts, saved,
     with pytest.raises(SandboxUnavailable, match="device files"):
         ContainerController(mounts.device)
     assert calls[-1] == "close" and mounts.fake.calls == []
+
+
+def test_v4_rechecks_full_identity(mounts, saved, monkeypatch):  # noqa: F811
+    upgrade(saved)
+    calls = configure(mounts, saved, monkeypatch)
+    mounts.path.write_text(json.dumps(mounts.value))
+    with ContainerController(mounts.device) as control:
+        assert control.saved["version"] == 4
+        control.check()
+    assert calls.count("nvml") >= 3 and calls[-1] == "close"
+
+
+@pytest.mark.parametrize("full", [True, False])
+def test_mount_profile_cannot_downgrade(mounts, saved, monkeypatch, full):  # noqa: F811
+    if full:
+        upgrade(saved)
+    calls = configure(mounts, saved, monkeypatch)
+    mounts.value["version"] = 3 if full else 4
+    mounts.path.write_text(json.dumps(mounts.value))
+    with pytest.raises(SandboxUnavailable, match="profiles differ"):
+        ContainerController(mounts.device)
+    assert calls == [] and mounts.fake.calls == []

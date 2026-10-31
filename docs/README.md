@@ -86,6 +86,8 @@
 - [G31 可信控制容器的宿主进程观察](acceptance-g31.md) — 真实 CPU PID/cgroup、原任务身份和失效拒绝；不证明 GPU 空闲
 - [ADR-048：容器内 NVIDIA 管理观察](adr/048-container-nvml-observation.md)
 - [G32 控制容器的 NVIDIA 管理查询](acceptance-g32.md) — 固定 NVML 来源与原任务观察；不创建 CUDA 上下文或证明硬件恢复
+- [ADR-049：容器完整设备进程来源](adr/049-container-full-device-inventory.md)
+- [G33 完整设备进程来源验收](acceptance-g33.md) — 固定 SMI/NVML、完整列表与旧契约兼容；真实非空 GPU 来源仍待验收
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

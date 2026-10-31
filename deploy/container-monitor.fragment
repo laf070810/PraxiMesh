@@ -1,4 +1,4 @@
-# Optional management-only library; no CUDA library, UVM or workload in this image.
+# Optional management library/query utility; no CUDA library, UVM or workload.
 ARG OBSERVER_CONTRACT
 LABEL io.praximesh.controller.observer=${OBSERVER_CONTRACT}
 COPY observer /opt/praximesh/nvml/

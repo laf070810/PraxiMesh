@@ -38,7 +38,7 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 控制容器内发起编译、取消和退出接管 | [容器编译控制检查](#container-compilation-control)；同一安装身份下的新任务恢复，不是 GPU 部署入口 |
 | 本机驱动快照、库依赖、精确 runsc 版本匹配 | [驱动制品检查](#container-driver)；无设备加载与编译，不初始化 CUDA 或证明硬件可用 |
 | 控制容器辨认宿主 PID、任务归属与失效记录 | [进程归属检查](#container-process-observer)；只读 CPU 进程观察，不查询 GPU |
-| 控制容器的 NVIDIA 身份、进程来源与占用拒绝 | [只读管理检查](#container-device-observer)；读取明确选定卡的 NVML 元数据，不创建 CUDA 上下文或运行内核 |
+| 控制容器的 NVIDIA 身份、完整进程来源与占用拒绝 | [只读管理检查](#container-device-observer)；读取明确选定卡的管理元数据，不创建 CUDA 上下文或运行内核 |
 
 <a id="container-driver"></a>
 
@@ -157,22 +157,25 @@ curl --fail --location \
 
 ### 可选：控制容器的只读 NVIDIA 管理查询
 
-适用于开发容器 worker 的设备身份和持续占用监测。需要已安装的 NVIDIA 管理库与明确选定的卡；本模式只读取 NVML 元数据，不创建 CUDA 上下文、不运行内核，也不停止显卡上的进程。因此可以在维护者允许只读观察、暂不允许计算验收时使用。
+适用于开发容器 worker 的设备身份和持续占用监测。需要已安装的 NVIDIA 管理库、同版本 `/usr/bin/nvidia-smi` 与明确选定的卡；本模式只读取管理元数据，不创建 CUDA 上下文、不运行内核，也不停止显卡上的进程。因此可以在维护者允许只读观察、暂不允许计算验收时使用。
 
 先用 `nvidia-smi -i 0 --query-gpu=uuid --format=csv,noheader` 读取并核对指定卡的完整 UUID，将它设为 `PRAXIMESH_OBSERVE_GPU_UUID`；这里的 `0` 按维护者授权的卡选择。在上面原控制端检查命令末尾追加：
 
 ```sh
   --observe-device "$PRAXIMESH_OBSERVE_GPU_UUID" \
-  --nvml-library-dir /usr/lib64
+  --nvml-library-dir /usr/lib64 \
+  --full-device-inventory
 ```
 
-Debian/Ubuntu 的库目录通常为 `/usr/lib/x86_64-linux-gnu`。构建只从受信系统目录静态复制当前版本的 `libnvidia-ml`，校验 ELF、SONAME、内核版本、大小和摘要；不改宿主驱动、不从学员输入选择文件，也不把本机驱动快照作为源码发布。管理库与四库 CUDA/PTX 任务镜像是不同制品。
+Debian/Ubuntu 的库目录通常为 `/usr/lib/x86_64-linux-gnu`。构建只从受信系统目录静态复制当前版本的 `libnvidia-ml` 与固定查询工具，校验 ELF、SONAME、内核版本、大小和摘要；不改宿主驱动、不从学员输入选择文件，也不把本机驱动快照作为源码发布。管理制品与四库 CUDA/PTX 任务镜像不同。管理镜像没有 CUDA 库时，版本输出中的 `CUDA Version: N/A` 是允许的非身份信息；工具与驱动版本仍须精确匹配。
 
-预期共十七项：八项管理配置拒绝、实际管理查询与无设备 CPU 任务、v2 进程视图兼容，再加原来的七组 v1 控制端检查。v3 仅向可信控制端映射所选卡和 `nvidiactl`，保持私有 PID/cgroup、只读宿主 procfs 及原控制预算。NVML 自建的 `nvidia-caps` 只允许为私有空目录；任何额外文件、设备、链接或可写共享目录均拒绝。任务容器与 CPU guest 不获得 NVIDIA 设备。
+完整来源模式采用显式 v4 挂载契约和管理制品 v2，预期共十九项：十项配置拒绝、实际完整查询与无设备 CPU 任务、v2 进程视图兼容，再加原来的七组 v1 控制端检查。仅向可信控制端映射所选卡和 `nvidiactl`，保持私有 PID/cgroup、只读宿主 procfs 及原控制预算。NVML 自建的 `nvidia-caps` 只允许为私有空目录；任何额外文件、设备、链接或可写共享目录均拒绝。任务容器与 CPU guest 不获得 NVIDIA 设备。
 
-计算、图形和 MPS 三类查询都必须成功；权限不足、不支持、部分结果、数量超限、版本变化和超时不能视为空闲。三个空列表也不证明没有 `O` 类或无需上下文的资源占用，该来源仍需在正式准入前补齐。报告中的 `real_external_gpu_processes_observed` 表示本次是否实际看到了外部 GPU 进程；为 false 时，只证明身份/空列表读取和原任务生命周期，不证明实际 CUDA PID 的归属或排他性。不得为补造此项证据擅自运行 GPU 程序。
+计算、图形、MPS 及完整 XML 查询都必须成功。完整进程列表不按类型过滤，包含 `O`、组合类型及未知类型；三个上下文列表必须是它的子集。权限不足、不支持、缺失/重复字段、部分结果、来源不一致、数量超限、版本变化和超时不能视为空闲。原始 XML 和进程名称不写入普通报告。
 
-仍核对同一报告中的清理、原任务停止及 v1/v2 兼容；记录不得用作 GPU 就绪凭证。接口决策和本机结果见 [ADR-048](../adr/048-container-nvml-observation.md)及 [G32](../acceptance-g32.md)。完整任务设备隔离、启动与 CUDA 故障恢复、worker/Compose/发布集成继续待完成。
+报告中的 `real_external_gpu_processes_observed` 表示本次是否实际看到了外部 GPU 进程；为 false 时，只证明身份/空列表读取和原任务生命周期，不证明实际 CUDA、其他或无上下文 PID 的来源与归属。不得为补造此项证据擅自运行 GPU 程序。完整列表也不授予排他访问，正式执行仍需持续监测和硬件验收。
+
+去掉 `--full-device-inventory` 可重放原 v3、仅 NVML 三类上下文的十七项兼容检查；该模式不能提供完整占用语义。两种模式均须核对报告中的清理与原任务停止，不得用作 GPU 就绪凭证。完整来源与结果见 [ADR-049](../adr/049-container-full-device-inventory.md)、[G33](../acceptance-g33.md)，原接口见 [ADR-048](../adr/048-container-nvml-observation.md)、[G32](../acceptance-g32.md)。完整任务设备隔离、启动与 CUDA 故障恢复、worker/Compose/发布集成继续待完成。
 
 <a id="container-journal"></a>
 

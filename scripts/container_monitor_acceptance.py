@@ -16,6 +16,7 @@ from judge.container_monitor import devices, validate_observation, validate_obse
 from judge.gpu_device_lock import DeviceLock
 from judge.gpu_monitor import identify, processes, query
 from judge.nvml_artifacts import read_manifest
+from judge.smi_inventory import inventory
 from scripts.container_journal_acceptance import save
 from scripts.container_supervision_acceptance import gone
 
@@ -39,7 +40,12 @@ def observation_checks(
     if type(minor) is not str or not minor.isascii() or not minor.isdecimal():
         raise ValueError("Expected one NVIDIA device minor number")
     library = read_manifest(out / "controller" / "context" / "observer")
-    observer = {"schema": 1, "target": target, "library": library, "minor": int(minor)}
+    observer = {
+        "schema": library["schema"],
+        "target": target,
+        "library": library,
+        "minor": int(minor),
+    }
     validate_observer(observer)
     mapped = devices(observer)
     for name, numbers in mapped.items():
@@ -49,12 +55,14 @@ def observation_checks(
             and (os.major(info.st_rdev), os.minor(info.st_rdev)) == numbers
         )
     report["observer"] = observer
+    full = observer["schema"] == 2
+    report["full_device_inventory"] = full
     path = storage / "nvml-observer"
     config = state(engine, path, task_image, host_processes=True, device_observer=observer)
     states.append((path, config))
     original = json.loads((path / "mounts.json").read_text())
 
-    for name in (
+    defects = (
         "missing-devices",
         "missing-card",
         "wrong-minor",
@@ -63,7 +71,8 @@ def observation_checks(
         "wrong-device",
         "missing-proc",
         "nonempty-caps",
-    ):
+    ) + (("wrong-utility", "legacy-contract") if full else ())
+    for name in defects:
         value = copy.deepcopy(original)
         if name == "wrong-minor":
             value["device_observer"]["minor"] = (observer["minor"] + 1) % 255
@@ -73,6 +82,10 @@ def observation_checks(
             value["device_observer"]["target"]["driver"] = "999.99.99"
         elif name == "wrong-device":
             value["device_observer"]["target"]["uuid"] = "GPU-" + str(uuid.uuid4())
+        elif name == "wrong-utility":
+            value["device_observer"]["library"]["utility"]["sha256"] = "0" * 64
+        elif name == "legacy-contract":
+            value["version"] = 3
         save(path / "mounts.json", value)
         selection = (
             ()
@@ -105,7 +118,11 @@ def observation_checks(
         )
     save(path / "mounts.json", original)
 
-    host_before = processes(query("-i", device, "--query", "--xml-format"), target)
+    def host_inventory():
+        xml = query("-i", device, "--query", "--xml-format")
+        return inventory(xml.encode(), observer) if full else processes(xml, target)
+
+    host_before = host_inventory()
     control = Control(
         engine,
         image,
@@ -120,7 +137,7 @@ def observation_checks(
     active = wait_report(control, path, "active")
     same_identity(active, config)
     task_processes = task_tree(engine, active)
-    host_after = processes(query("-i", device, "--query", "--xml-format"), target)
+    host_after = host_inventory()
     initial = validate_observation(active["observation"], observer)
     during = validate_observation(active["during_task"], observer)
     assert sorted(set(host_before)) == initial == during == sorted(set(host_after)), (
