@@ -22,7 +22,7 @@ from judge.gpu_device_lock import DeviceLock  # noqa: E402
 from scripts.container_supervision_acceptance import gone, owned_cleanup, tree, wait_exit  # noqa: E402
 
 
-def build_image(engine, archive, out, tag):
+def stage_context(archive, out):
     context = out / "context"
     context.mkdir(mode=0o700)
     snapshot = context / "runtime.tar.bz2"
@@ -64,9 +64,15 @@ def build_image(engine, archive, out, tag):
         ROOT / name for name in SOURCES if name.startswith("judge/") and name not in host_only
     ):
         shutil.copyfile(path, context / "judge" / path.name)
+    return context
+
+
+def build_context(engine, context, out, tag, digest_function, *, expected_digest):
     config = out / "docker-config"
     config.mkdir(mode=0o700)
-    digest = contract_digest()
+    digest = digest_function()
+    if digest != expected_digest:
+        raise RuntimeError("Runtime source changed during staging")
     with (out / "build.log").open("w") as log:
         subprocess.run(
             [
@@ -90,9 +96,16 @@ def build_image(engine, archive, out, tag):
             timeout=1200,
             env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "LC_ALL": "C.UTF-8"},
         )
-    if digest != contract_digest():
+    if digest != digest_function():
         raise RuntimeError("Runtime source changed during build")
     return (out / "image-id").read_text().strip()
+
+
+def build_image(engine, archive, out, tag):
+    expected = contract_digest()
+    return build_context(
+        engine, stage_context(archive, out), out, tag, contract_digest, expected_digest=expected
+    )
 
 
 def read_report(engine, service, name, until):

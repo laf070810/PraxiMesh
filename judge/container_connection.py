@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 import time
 
+from judge.container_compiler import CompilerContainerService
 from judge.container_contract import PYTHON
 from judge.container_journal import PersistentRuntimeService
 from judge.container_runtime_service import RuntimeContainerService
@@ -16,7 +17,11 @@ from judge.sandbox import SandboxUnavailable
 
 class ContainerConnection:
     def __init__(self, service, status, *, on_tick):
-        if type(service) not in {RuntimeContainerService, PersistentRuntimeService}:
+        if type(service) not in {
+            RuntimeContainerService,
+            PersistentRuntimeService,
+            CompilerContainerService,
+        }:
             raise ValueError("A verified runtime container is required")
         self.service, self.on_tick = service, on_tick
         self.channel = self.process = self.config = None

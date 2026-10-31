@@ -74,6 +74,8 @@
 - [G25 容器化控制端、UID 与跨容器恢复](acceptance-g25.md) — 七组真实 CPU 身份/锁/接管检查；尚未接入正式 GPU worker
 - [ADR-042：容器恢复与数据库预约绑定](adr/042-container-recovery-database-fence.md)
 - [G26 数据库预约与持久容器恢复](acceptance-g26.md) — 真实 PostgreSQL 与固定 CPU guest；保留隔离、预约及预算
+- [ADR-043：容器内无设备 CUDA 编译](adr/043-device-free-container-compilation.md)
+- [G27 容器内 CUDA 编译与无设备验证](acceptance-g27.md) — 真实 NVRTC 编译、错误分类及清理；不证明 GPU 正确性或性能
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

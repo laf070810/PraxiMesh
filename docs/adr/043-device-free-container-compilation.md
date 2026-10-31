@@ -1,0 +1,13 @@
+# ADR-043：容器内无设备 CUDA 编译
+
+日期：2026-10-31。状态：接受；完整容器 GPU 执行仍待交付。背景见 [RFC-021](../rfcs/021-gpu-container-supervision.md)，操作集中在 [GPU 指南](../deployment/gpu.md#container-compiler)。
+
+正式 CUDA runtime 与无设备编译 guest 共用 `gpu_runtime.compile_ptx`。保留 NVRTC 13.1.115、C++17、禁用 FMA 合并、禁用可重定位设备代码及 4 MiB PTX 上限；正式路径仍按实际 GPU 确定架构并建立 context，无设备入口仅使用显式编译目标。两者都只能在隔离 guest 中处理源码。
+
+编译镜像复用现有 runtime 构建准备，额外校验固定 NVRTC 归档及两个库的 SHA-256，复制库、别名、LICENSE 和 harness 到只读 guest 根，并在构建时生成 guest 内固定库目录的动态链接缓存。基础 CPU 镜像继续独立构建。新镜像源码契约涵盖编译实现、可信通信、guest 和构建描述，在准备前及构建后检查源码未变；不得以编译镜像替代正式 GPU 凭证。
+
+可信外层使用原有限额、私有 PID/cgroup、断网、无设备、只读根和固定 seccomp；不向 guest 挂载控制目录、宿主路径或凭据。guest 在接受源码前确认没有 NVIDIA 设备或可加载的 CUDA 驱动，核对 NVRTC 版本。源码经现有有界消息传递，使用同一编译超时和输出预算；只返回有界状态及 PTX 大小/摘要，不传回 PTX 或原始诊断，不接收 guest 自报正式 verdict。
+
+编译错误与非法请求、平台配置错误分别处理。完成后确认 guest 和运行时进程消失，再发结果并等待确认；断连或独立期限触发后按原容器和 journal 恢复，清理失败保留自有状态目录。原 journal v1 仍按保存的标签及配置清理旧镜像，无需执行旧入口。
+
+此入口用于当前不占 GPU 的开发验证及后续完整执行镜像准备。可编译的语义错解必须仍视为未做正确性验证；不能据此发布候选题、开放 GPU Submit、生成 receipt 或宣称性能通过。外层总限额不等同于生产 guest 子配额；完整资源、设备注入、运行/监测及产品部署仍需继续实现和真实验收。

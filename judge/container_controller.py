@@ -30,6 +30,7 @@ LIMITS = {
 CONTROLLER_SOURCES = (
     *SOURCES,
     "judge/container_controller.py",
+    "judge/container_compiler.py",
     "scripts/container_controller_fixture.py",
     "deploy/container-controller.Dockerfile",
     "vendor/docker-cli/LICENSE",

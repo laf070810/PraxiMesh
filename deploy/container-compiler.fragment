@@ -1,0 +1,10 @@
+# Appended to the fixed runtime Dockerfile by the compiler builder.
+# Neither CUDA driver libraries nor device nodes are part of this image.
+COPY compiler/nvrtc/ /opt/guest-root/opt/nvrtc/
+COPY compiler/harness/ /opt/guest-root/opt/praximesh/
+COPY container_compile_guest.py /opt/guest-root/opt/praximesh/judge/container_compile_guest.py
+COPY container_compile_entry.py /opt/praximesh/container_compile_entry.py
+COPY container_compile_protocol.py /opt/praximesh/judge/container_compile_protocol.py
+USER 0:0
+RUN printf '%s\n' /opt/nvrtc > /opt/guest-root/etc/ld.so.conf.d/praximesh-nvrtc.conf && /sbin/ldconfig -r /opt/guest-root
+USER 65532:65532

@@ -33,6 +33,24 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 持久容器身份、创建中断及旧制品清理 | [持久恢复检查](#container-journal)；固定 CPU，不释放数据库 GPU 预约 |
 | 容器化控制端的 UID、共用锁与重启接管 | [控制端映射检查](#container-controller)；固定 CPU，不连接应用数据库或 GPU |
 | 持久容器记录与数据库预约、锁超时和重试 | [数据库/容器联合检查](#container-database)；一次性 PostgreSQL 与固定 CPU guest，不开放 GPU |
+| 固定 CUDA 编译器、候选语法和编译后清理 | [无设备编译检查](#container-compiler)；真实 NVRTC 在 gVisor guest 中运行，不占 GPU、不判题 |
+
+<a id="container-compiler"></a>
+
+## 不占 GPU 的 CUDA 编译检查
+
+适用于准备容器执行镜像、修改 NVRTC 编译逻辑或检查两道 CUDA 候选能否编译。需要同一私有 rootless Docker、固定 runsc 及 NVRTC 离线归档；归档来源见[固定离线制品](#提前保存固定镜像减少下载依赖)。在仓库根目录执行：
+
+```sh
+.venv/bin/python scripts/container_compiler_acceptance.py \
+  --docker-socket /run/user/$(id -u)/docker.sock \
+  --runtime-archive var/gpu-preflight/gvisor.tar.bz2 \
+  --nvrtc-archive var/gpu-preflight/nvrtc-13.1.115.tar.xz
+```
+
+工具构建独立的固定编译镜像，使用真实 gVisor guest 与 NVRTC 13.1.115；不挂载 GPU 或 CUDA 驱动，不连接数据库。编译目标固定为 compute 8.6，这是编译参数，不是硬件检测结果。它检查候选参考实现、六份语义错解、编译错误、非法请求和平台配置错误，并在编译后断连、独立期限及清理之后重新编译正确语法的代码。源码不在宿主或可信外层执行。
+
+报告为 `test-results/px-container-compiler-*/result.json`，构建输出为同目录 `build.log`。须检查总 `passed`、逐场景状态、原进程树清理、镜像标签和临时目录清理；清理失败时保留 `retained_storage` 指定的原 journal，排查后按同一身份恢复，不能删除未知对象。编译状态 `compiled` 只表示生成 PTX，语义错解也应能编译；本检查不证明入口加载、CUDA 正确性、性能或 GPU 就绪，不发布候选题目。设计见 [ADR-043](../adr/043-device-free-container-compilation.md)。
 
 <a id="container-database"></a>
 

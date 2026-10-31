@@ -2,6 +2,8 @@
 
 `cuda-kernel-v1` 已接入内容校验、不可变版本和现有发布流程。仓库中的两个候选题尚未通过当前完整 GPU 路径的硬件验收，不在默认题库中；结构检查不能证明参考解能编译、通过或具备性能优势。环境、候选包准备和真实验收操作统一见 [GPU 部署指南](deployment/gpu.md#cuda-content)。
 
+两份参考实现及六份针对性错解已在无 GPU 的真实 gVisor guest 中通过 NVRTC 编译，见 [G27](acceptance-g27.md)。该证据只覆盖固定 compute 8.6 目标下的 PTX 生成；错解也可以编译，实际入口、答案和性能仍需完整 GPU 验收。
+
 ## 设备函数
 
 共同字段为 `language: "cuda"`、`evaluator: "cuda-kernel-v1"`、`entrypoint: "solve"`。只提交设备源码，平台负责输入、分配、启动及同步。不声明 Python/JavaScript 的 `function`、`interface`、模型或工具字段。
@@ -11,7 +13,7 @@
 | `vector-add-f32-v1` | `extern "C" __global__ void solve(const float* a, const float* b, float* out, int n)` | `inputs` 只含等长 `a`、`b`，长度 0–4096；block 为 `(256,1,1)`，grid 为 `(max(1,ceil(n/256)),1,1)` |
 | `matmul-f32-v1` | `extern "C" __global__ void solve(const float* a, const float* b, float* out, int m, int n, int k)` | `inputs` 只含 `a`、`b`、`m`、`n`、`k`；三个维度均为 1–64 的整数。A 为 m×k、B 为 k×n、输出为 m×n，均为行主序。block 为 `(16,16,1)`，grid 为 `(ceil(n/16),ceil(m/16),1)` |
 
-输入数值有限且绝对值不超过 10,000，进入运行时前转换为 float32。每次调用须写完全部有效输出；输出先填充为 NaN，不能依赖上一次调用的内容。长度为零的向量也会启动一个块，内核必须保护边界。`starter` 和 `reference` 均按 UTF-8 字节计数，范围 1–20,000，禁止 NUL。只有真实隔离编译能判断 ABI 和源码是否正确，Schema 不分析 C++ 类型。
+输入数值有限且绝对值不超过 10,000，进入运行时前转换为 float32。每次调用须写完全部有效输出；输出先填充为 NaN，不能依赖上一次调用的内容。长度为零的向量也会启动一个块，内核必须保护边界。`starter` 和 `reference` 均按 UTF-8 字节计数，范围 1–20,000，禁止 NUL。Schema 不分析 C++ 类型；源码需要隔离编译，入口 ABI 和正确性还须通过实际加载与执行验证。
 
 当前固定运行时使用 NVRTC C++17、关闭乘加融合；矩阵参考值逐项执行 float32 乘法和累加。题目提供 `comparison: {"kind": "float", "absolute": ..., "relative": ...}`，两个容差均在 0–0.01。比较采用 `math.isclose`：差值不超过 `max(absolute, relative * max(abs(actual), abs(expected)))`。此范围只适用于 CUDA，不扩大既有 CPU 比较契约。编译选项与语义参考 [NVIDIA NVRTC 13.1.1 文档](https://docs.nvidia.com/cuda/archive/13.1.1/nvrtc/index.html#supported-compile-options)，具体运行边界以仓库固定驱动和隔离检查为准。
 

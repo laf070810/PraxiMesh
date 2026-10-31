@@ -73,6 +73,64 @@ def message():
     return result
 
 
+def compile_ptx(source, operation, architecture, *, library=None):
+    """Compile device-only source inside the guest; never initialize CUDA here."""
+    compile_request(source, operation)
+    if (
+        type(architecture) not in {list, tuple}
+        or len(architecture) != 2
+        or any(type(value) is not int for value in architecture)
+        or not 1 <= architecture[0] <= 99
+        or not 0 <= architecture[1] <= 9
+    ):
+        raise DriverFailure(70, "architecture")
+    if library is None:
+        library = c.CDLL(NVRTC_LIBRARY)
+    program = c.c_void_p()
+    create = bind(
+        library,
+        "nvrtcCreateProgram",
+        [c.POINTER(c.c_void_p), c.c_char_p, c.c_char_p, c.c_int, c.c_void_p, c.c_void_p],
+    )
+    compile_program = bind(
+        library, "nvrtcCompileProgram", [c.c_void_p, c.c_int, c.POINTER(c.c_char_p)]
+    )
+    destroy = bind(library, "nvrtcDestroyProgram", [c.POINTER(c.c_void_p)])
+    size_fn = bind(library, "nvrtcGetPTXSize", [c.c_void_p, c.POINTER(c.c_size_t)])
+    ptx_fn = bind(library, "nvrtcGetPTX", [c.c_void_p, c.c_void_p])
+    checked(create, c.byref(program), source.encode(), b"solution.cu", 0, None, None, platform=True)
+    try:
+        options = [
+            f"--gpu-architecture=compute_{architecture[0]}{architecture[1]}".encode(),
+            b"--std=c++17",
+            b"--fmad=false",
+            b"--relocatable-device-code=false",
+        ]
+        argv = (c.c_char_p * len(options))(*options)
+        result = compile_program(program, len(options), argv)
+        if result:
+            if os.environ.get("PRAXIMESH_GPU_DIAGNOSTICS") == "1":
+                log_size = c.c_size_t()
+                get_size = bind(
+                    library, "nvrtcGetProgramLogSize", [c.c_void_p, c.POINTER(c.c_size_t)]
+                )
+                get_log = bind(library, "nvrtcGetProgramLog", [c.c_void_p, c.c_void_p])
+                if get_size(program, c.byref(log_size)) == 0 and 0 < log_size.value <= 16384:
+                    log = c.create_string_buffer(log_size.value)
+                    if get_log(program, log) == 0:
+                        print(log.value.decode(errors="replace"), file=sys.stderr)
+            raise DriverFailure(3 if result == 6 else 70, "nvrtcCompileProgram", result)
+        size = c.c_size_t()
+        checked(size_fn, program, c.byref(size), platform=True)
+        if not 1 <= size.value <= MAX_PTX:
+            raise DriverFailure(4)
+        ptx = c.create_string_buffer(size.value)
+        checked(ptx_fn, program, ptx, platform=True)
+        return ptx
+    finally:
+        destroy(c.byref(program))
+
+
 class Kernel:
     def __init__(self, source, operation):
         compile_request(source, operation)
@@ -122,51 +180,7 @@ class Kernel:
         self.sync = bind(self.cuda, "cuCtxSynchronize", [])
 
     def _compile(self, source):
-        program = c.c_void_p()
-        create = bind(
-            self.nvrtc,
-            "nvrtcCreateProgram",
-            [c.POINTER(c.c_void_p), c.c_char_p, c.c_char_p, c.c_int, c.c_void_p, c.c_void_p],
-        )
-        compile_program = bind(
-            self.nvrtc, "nvrtcCompileProgram", [c.c_void_p, c.c_int, c.POINTER(c.c_char_p)]
-        )
-        destroy = bind(self.nvrtc, "nvrtcDestroyProgram", [c.POINTER(c.c_void_p)])
-        size_fn = bind(self.nvrtc, "nvrtcGetPTXSize", [c.c_void_p, c.POINTER(c.c_size_t)])
-        ptx_fn = bind(self.nvrtc, "nvrtcGetPTX", [c.c_void_p, c.c_void_p])
-        checked(
-            create, c.byref(program), source.encode(), b"solution.cu", 0, None, None, platform=True
-        )
-        try:
-            options = [
-                f"--gpu-architecture=compute_{self.arch[0]}{self.arch[1]}".encode(),
-                b"--std=c++17",
-                b"--fmad=false",
-                b"--relocatable-device-code=false",
-            ]
-            argv = (c.c_char_p * len(options))(*options)
-            result = compile_program(program, len(options), argv)
-            if result:
-                if os.environ.get("PRAXIMESH_GPU_DIAGNOSTICS") == "1":
-                    log_size = c.c_size_t()
-                    get_size = bind(
-                        self.nvrtc, "nvrtcGetProgramLogSize", [c.c_void_p, c.POINTER(c.c_size_t)]
-                    )
-                    get_log = bind(self.nvrtc, "nvrtcGetProgramLog", [c.c_void_p, c.c_void_p])
-                    if get_size(program, c.byref(log_size)) == 0 and 0 < log_size.value <= 16384:
-                        log = c.create_string_buffer(log_size.value)
-                        if get_log(program, log) == 0:
-                            print(log.value.decode(errors="replace"), file=sys.stderr)
-                raise DriverFailure(3 if result == 6 else 70, "nvrtcCompileProgram", result)
-            size = c.c_size_t()
-            checked(size_fn, program, c.byref(size), platform=True)
-            if not 1 <= size.value <= MAX_PTX:
-                raise DriverFailure(4)
-            ptx = c.create_string_buffer(size.value)
-            checked(ptx_fn, program, ptx, platform=True)
-            return ptx
-        finally:
-            destroy(c.byref(program))
+        return compile_ptx(source, self.operation, self.arch, library=self.nvrtc)
 
     def execute(self, inputs, repetitions=1):
         if type(repetitions) is not int or repetitions not in {1, BATCH_REPETITIONS}:
