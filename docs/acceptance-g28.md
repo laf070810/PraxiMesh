@@ -40,8 +40,20 @@
 
 最终容器、编译、正式 GPU 接口、历史成绩、凭证和发布兼容的 526 项定向组件检查通过、无跳过，见 `test-results/g28-components-final.log` 和 XML。Ruff、格式、无待生成迁移及原 50 节点/26 题静态检查通过；静态检查未执行参考程序。
 
-## 兼容回归与剩余范围
+首轮 journal 回归在四组场景通过后，于独立升级副本的导入阶段失败，见 `test-results/px-container-journal-c9855cb82de4/result.json` 和 `g28-journal-initial.log`。该副本漏复制 G27 新增的 `judge/container_compiler.py`；原副本的隔离 `--help` 复现为 `ModuleNotFoundError`，诊断保存在 `g28-journal-upgrade-diagnostic.log`，未将其误计为恢复成功。修复验收复制清单，并将恢复子进程输出保存到各场景的 `recovery.log`；新增脱离仓库启动副本的回归，与原 journal/控制端共 72 项通过，见 `g28-recovery-components-final.log` 和 XML。此修复不改变已验收的任务镜像或正式策略。
 
-本批原开发预算编译、持久 journal 升级、容器控制端和实际 PostgreSQL 预约恢复回归仍在进行，尚未将早期版本的结果当作本批通过。数据库验收入口已增加两种预算的 18 个真实场景，当前仅确认收集范围；未运行的场景不计为通过。
+## 兼容回归
+
+原开发预算的 18 项编译检查全部通过，见 `test-results/px-container-compiler-89b046ff841c/result.json` 和 `g28-legacy-compiler.log`。两种预算使用同一固定编译镜像，13 个共有且成功编译的场景具有相同 PTX 元数据；对比保存在 `g28-budget-compilation-comparison.json`。这只比较编译产物，不证明 CUDA 运行或性能。
+
+实际 PostgreSQL 联合验收 179 项通过、无失败或跳过，见 `test-results/px-container-database-10f1682a43a0/result.json` 和该目录的 `postgres.xml`。其中每种预算各九个真实容器场景，共 18 个任务容器、16 次固定 CPU guest 调用；创建后 ID 尚未记录的两个场景不启动 guest。覆盖运行中恢复、已消费额度、创建中断、账号删除、预约错配、行锁超时、归档重试、新拥有者接管和归档后数据库变化。原进程树、容器、工作目录、测试数据库/卷与镜像标签均核对清理；恢复不授予就绪、不释放原预约或预算。
+
+基础运行时的固定 guest 检查、控制器退出和独立期限三组通过，三个原容器及进程树均已清理，见 `test-results/px-container-runtime-1b3a12d5cadf/result.json`。它与数据库验收使用同一任务镜像 `sha256:44b59220ebfa751e1cef7ea9612bd7eb8bfc901c58acf395cec9bb051fa0bdd1`，源码契约为 `803161a0b17ce0b9cdfb0bcf685d856f739baea71f3f1b9f49cf2eb31972e530`。
+
+修复后的 journal 七组检查全部通过，见 `test-results/px-container-journal-09a981c695e2/result.json` 和 `g28-journal.log`：意图、创建后未记录 ID、已记录 ID、运行中、源码升级、同名替换及已归档阶段均检查原记录恢复，并分别完成新的 CPU guest 调用。升级使用摘要已变化的独立源码副本，新执行拒绝原契约而恢复路径只清理原对象；同名替换保持运行且未被误认。14 个自有容器及其进程树清理，任务镜像标签移除。
+
+本批容器控制端回归仍在进行，尚未将早期版本的结果当作本批通过。
+
+## 剩余范围
 
 新预算是明确的容器总资源契约，不证明 GPU 显存、设备注入或 CUDA 运行正确性与性能。正式容器环境身份、启动/领取/结算、设备监测、GPU Compose 及发布升级仍待完成。未重放完整 WASI、Compose、浏览器或 GPU 硬件验收；完整产品目标继续保留在[需求追踪](requirements.md)。

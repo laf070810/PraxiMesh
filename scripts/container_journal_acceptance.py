@@ -24,6 +24,7 @@ from scripts.container_runtime_acceptance import build_image, read_report  # noq
 from scripts.container_supervision_acceptance import gone, owned_cleanup, tree  # noqa: E402
 
 EXTRA = (
+    "judge/container_compiler.py",
     "scripts/container_journal_acceptance.py",
     "scripts/container_runtime_acceptance.py",
     "scripts/container_supervision_acceptance.py",
@@ -170,6 +171,17 @@ def fresh(engine, journal, config):
     }
 
 
+def stage_upgrade(directory):
+    for name in (*SOURCES, *EXTRA):
+        target = directory / name
+        target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / name, target)
+    with (directory / "judge/container_journal.py").open("a") as stream:
+        stream.write(
+            "\n# Fixed acceptance revision: changed code identity, unchanged v1 recovery.\n"
+        )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--docker-socket")
@@ -204,14 +216,7 @@ def main():
         image = build_image(engine, options.runtime_archive, out, out.name)
         report["image"] = image
         upgraded = out / "upgraded"
-        for name in (*SOURCES, *EXTRA):
-            target = upgraded / name
-            target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-            shutil.copyfile(ROOT / name, target)
-        with (upgraded / "judge/container_journal.py").open("a") as stream:
-            stream.write(
-                "\n# Fixed acceptance revision: changed code identity, unchanged v1 recovery.\n"
-            )
+        stage_upgrade(upgraded)
         for phase in (
             "intent",
             "unrecorded-create",
@@ -299,13 +304,18 @@ def main():
                     if phase == "upgrade"
                     else Path(__file__)
                 )
-                subprocess.run(
-                    [sys.executable, "-I", str(script), "--recover", str(path)],
-                    check=True,
-                    capture_output=True,
-                    timeout=35,
-                    env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "LC_ALL": "C.UTF-8"},
-                )
+                with (path / "recovery.log").open("x") as log:
+                    subprocess.run(
+                        [sys.executable, "-I", str(script), "--recover", str(path)],
+                        check=True,
+                        stdout=log,
+                        stderr=subprocess.STDOUT,
+                        timeout=35,
+                        env={
+                            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+                            "LC_ALL": "C.UTF-8",
+                        },
+                    )
                 record["recovery"] = json.loads((path / "recovered.json").read_text())
                 owner_path = path / "owner.json"
                 if owner_path.exists():
