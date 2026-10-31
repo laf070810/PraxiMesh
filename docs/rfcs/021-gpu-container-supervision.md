@@ -114,3 +114,16 @@ G28 的任务预算与恢复已通过，但编译调用仍由宿主程序发起�
 本阶段的真实检查始终沿用没有设备、挂载或网络的既有监督契约，在 gVisor guest 中核对清单、库摘要和动态依赖，重放固定正确/语法错误源码的 NVRTC 编译，并检查新会话恢复与完整清理。不能在宿主加载 CUDA 库，不能调用 CUDA 初始化或创建上下文，也不能将动态加载或 PTX 编译标记为硬件执行成功。旧 journal 的恢复规则不变。
 
 设备注入仍须后续独立版本契约：仅选定 UUID 对应的 `/dev/nvidiaN`、`/dev/nvidiactl`、`/dev/nvidia-uvm`，并验证内外设备身份、持续占用、PID 对应、完整启动和任务清理。驱动升级后必须重新生成制品和完整环境凭证；本阶段不接入正式提交、就绪凭证或 Compose GPU worker。
+### 控制容器中的宿主进程归属（G31）
+
+单卡执行前必须连接持续占用监测。现有宿主监测使用 NVIDIA 返回的宿主 PID 和 `/proc/PID/cgroup`；控制容器保留私有 PID/cgroup 命名空间，不能将该 PID 直接解释为容器内 PID。[Linux PID 命名空间说明](https://man7.org/linux/man-pages/man7/pid_namespaces.7.html)规定 procfs 的 PID 视图由其挂载所属命名空间决定；[内核 cgroup v2 文档](https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html)说明 cgroup 路径还相对于读取者的命名空间，因此不能把相对路径当作宿主绝对路径解析。
+
+采用显式的控制端挂载契约 v2：在原 socket、锁和 journal 身份之外，绑定宿主 procfs 的 dev/inode 和 boot ID，以 `bind-recursive=readonly,bind-propagation=rprivate` 挂到固定位置，并核对所有子挂载实际只读且私有。保留原 v1 无此挂载的语义。控制端仍使用私有 PID/cgroup、无额外能力和只读根；不加入 host PID 模式，不让任务容器或 guest 看到该挂载。
+
+固定 CPU 前提检查发现非递归 bind 返回 EINVAL；保留并递归只读挂载成功，真实记录在 `test-results/g31-proc-rprivate-prerequisite.json`，包括挂载身份、私有 PID 1、不同宿主 PID 及 `/../docker-….scope` cgroup。原失败和 Docker 要求显式 rprivate 的拒绝也已保留。较低权限 mount namespace 不能分离继承的锁定子挂载，[Linux mount 文档](https://man7.org/linux/man-pages/man7/mount_namespaces.7.html)与 [Docker 递归只读选项](https://docs.docker.com/engine/storage/bind-mounts/)解释此约束；不通过增加能力或改 daemon 绕过。
+
+该挂载只属于可信执行平面：procfs 可能暴露操作者可读的进程元数据，且只读挂载本身不能约束所有 proc 魔术链接的目标。拥有 Docker socket 的可信控制端已有该操作者权限；观察接口仅打开固定的 `stat`、`status`、`cgroup` 字段，不读取命令行、环境、内存、fd 或 root，不接受客户端路径或在观察中发送信号。
+
+任务归属同时依赖原设备锁、安装/journal、不可变容器 ID、启动实例、经过完整配置核对的 PID 1、进程出生时间和相同实际 cgroup。路径只作不透明身份比较，禁止借助 `..` 访问其他文件系统位置。记录替换、进程退出/复用、容器重启、挂载/boot 身份变化或读取失败时均拒绝，不能认为设备空闲或清空预约。独立原记录恢复继续负责终止，而观察器不停止未知 PID。
+
+先用真实 CPU 任务和外部固定进程验证两个 PID 视图、任务成员/外部成员、退出和接管边界，再连接 NVIDIA 库与单卡执行。此阶段不查询或占用 GPU、不签发 receipt；真实设备 PID 来源和 CUDA 清理仍须后续硬件验证。

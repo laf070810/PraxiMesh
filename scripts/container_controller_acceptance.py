@@ -31,6 +31,7 @@ from judge.container_controller import (  # noqa: E402
     manifest,
 )
 from judge.container_journal import ContainerJournal, PersistentRuntimeService  # noqa: E402
+from judge.container_processes import HOST_PROC  # noqa: E402
 from judge.container_runtime_service import contract_digest  # noqa: E402
 from judge.container_service import HEX_ID, LocalEngine  # noqa: E402
 from judge.gpu_device_lock import DeviceLock, DeviceLockError  # noqa: E402
@@ -108,10 +109,36 @@ def build_controller(engine, archive, out, tag):
 
 
 class Control:
-    def __init__(self, engine, image, path, config, mode, *, user="0:0", socket_path=None):
+    def __init__(
+        self,
+        engine,
+        image,
+        path,
+        config,
+        mode,
+        *,
+        user="0:0",
+        socket_path=None,
+        host_processes=False,
+        proc_path="/proc",
+        proc_readonly=True,
+    ):
         self.engine, self.image = engine, image
         self.name = "px-controller-" + uuid.uuid4().hex
         self.label = "io.praximesh.controller.acceptance=" + self.name
+        self.host_processes = host_processes
+        self.proc_readonly = proc_readonly
+        observer_mount = []
+        if host_processes:
+            observer_mount = [
+                "--mount",
+                f"type=bind,source={proc_path},target={HOST_PROC},"
+                + (
+                    "readonly,bind-recursive=readonly,bind-propagation=rprivate"
+                    if proc_readonly
+                    else "bind-propagation=rprivate"
+                ),
+            ]
         self.arguments = [
             mode,
             config["device"],
@@ -151,6 +178,7 @@ class Control:
                 f"type=bind,source={path},target={STATE}",
                 "--mount",
                 f"type=bind,source={socket_path or engine.path},target={SOCKET},readonly",
+                *observer_mount,
                 image,
                 *self.arguments,
             )
@@ -164,6 +192,8 @@ class Control:
             str(STATE): (str(path), True),
             str(SOCKET): (str(socket_path or engine.path), False),
         }
+        if host_processes:
+            self.expected_mounts[str(HOST_PROC)] = (str(proc_path), not proc_readonly)
 
     def inspect(self):
         result = self.engine.run("container", "inspect", self.container_id, check=False)
@@ -204,10 +234,16 @@ class Control:
         }
         assert all(info["HostConfig"][key] == value for key, value in expected.items())
         assert info["Config"]["Labels"]["io.praximesh.controller.contract"] == controller_digest()
-        assert len(info["Mounts"]) == 2
+        assert len(info["Mounts"]) == (3 if self.host_processes else 2)
         assert {
             mount["Destination"]: (mount["Source"], mount["RW"]) for mount in info["Mounts"]
         } == self.expected_mounts
+        if self.host_processes and self.proc_readonly:
+            mount = next(m for m in info["HostConfig"]["Mounts"] if m["Target"] == str(HOST_PROC))
+            options = mount["BindOptions"]
+            assert mount["ReadOnly"] is True and options["Propagation"] == "rprivate"
+            assert options["ReadOnlyForceRecursive"] is True
+            assert not options.get("NonRecursive") and not options.get("ReadOnlyNonRecursive")
         self.engine.run("container", "start", self.container_id)
 
     def wait(self, code=0):
@@ -258,11 +294,11 @@ def wait_report(control, path, name):
     raise TimeoutError("Controller report timed out: " + name)
 
 
-def state(engine, root, image):
+def state(engine, root, image, *, host_processes=False):
     root.mkdir(mode=0o700)
     for name in ("locks", "journal"):
         (root / name).mkdir(mode=0o700)
-    save(root / "mounts.json", manifest(root, engine))
+    save(root / "mounts.json", manifest(root, engine, host_processes=host_processes))
     config = {
         "image": image,
         "device": "GPU-" + str(uuid.uuid4()),

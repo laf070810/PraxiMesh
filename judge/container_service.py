@@ -316,6 +316,7 @@ class ContainerService:
                 "status": state["Status"],
                 "exit_code": state["ExitCode"],
                 "oom_killed": state["OOMKilled"],
+                "pid": state["Pid"],
                 "arguments": arguments,
             }
         except (KeyError, IndexError, TypeError, ValueError):

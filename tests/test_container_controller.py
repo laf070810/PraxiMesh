@@ -114,6 +114,7 @@ def mounts(tmp_path, monkeypatch):
 
 def test_controller_uses_original_device_lock_and_installation(mounts):
     with ContainerController(mounts.device) as control:
+        assert control.host_processes is None
         original = control.journal.identity
         assert original["lock_namespace"] == mounts.value["locks"]
         with pytest.raises(DeviceLockError, match="Another controller"):
@@ -122,6 +123,53 @@ def test_controller_uses_original_device_lock_and_installation(mounts):
             ContainerController(mounts.device)
     with ContainerController(mounts.device) as control:
         assert control.journal.identity == original
+
+
+def test_explicit_observation_contract_rechecks_and_closes_its_view(mounts, monkeypatch):
+    calls = []
+    saved = {"version": 1, "root": [22, 1], "boot": str(uuid.uuid4())}
+
+    class View:
+        def __init__(self, value):
+            assert value == saved
+            calls.append("open")
+
+        def check(self):
+            calls.append("check")
+
+        def close(self):
+            calls.append("close")
+
+    monkeypatch.setattr(module, "HostProcessView", View)
+    mounts.value.update(version=2, host_processes=saved)
+    mounts.path.write_text(json.dumps(mounts.value))
+    with ContainerController(mounts.device) as control:
+        assert isinstance(control.host_processes, View)
+        control.check()
+    assert calls[0] == "open" and calls[-1] == "close" and calls.count("check") >= 3
+
+
+@pytest.mark.parametrize("defect", ["missing", "extra", "boot", "boolean-root"])
+def test_bad_observation_contract_is_rejected_before_mount_or_engine_use(
+    mounts, monkeypatch, defect
+):
+    saved = {"version": 1, "root": [22, 1], "boot": str(uuid.uuid4())}
+    mounts.value.update(version=2, host_processes=saved)
+    if defect == "missing":
+        mounts.value.pop("host_processes")
+    elif defect == "extra":
+        saved["path"] = "/foreign"
+    elif defect == "boot":
+        saved["boot"] = "unknown"
+    else:
+        saved["root"][0] = True
+    mounts.path.write_text(json.dumps(mounts.value))
+    monkeypatch.setattr(
+        module, "HostProcessView", lambda _value: pytest.fail("Unverified view opened")
+    )
+    with pytest.raises(SandboxUnavailable):
+        ContainerController(mounts.device)
+    assert mounts.fake.calls == []
 
 
 @pytest.mark.parametrize("key", ["root", "locks", "journal", "socket"])

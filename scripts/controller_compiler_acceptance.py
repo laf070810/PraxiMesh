@@ -1,6 +1,7 @@
 """Real device-free compilation from a mapped trusted control container."""
 
 import argparse
+import copy
 import hashlib
 import json
 import sys
@@ -106,12 +107,62 @@ def verify_active(value, config):
     }
 
 
+def observer_rejections(engine, control_image, path, config, report, controls, result_path):
+    original = json.loads((path / "mounts.json").read_text())
+    assert original["version"] == 2
+    try:
+        for name in ("missing-proc", "wrong-proc", "wrong-boot", "writable-proc"):
+            value = copy.deepcopy(original)
+            if name == "wrong-proc":
+                value["host_processes"]["root"][1] += 1
+            elif name == "wrong-boot":
+                value["host_processes"]["boot"] = str(uuid.uuid4())
+            save(path / "mounts.json", value)
+            control = Control(
+                engine,
+                control_image,
+                path,
+                config,
+                "hold",
+                host_processes=name != "missing-proc",
+                proc_readonly=name != "writable-proc",
+            )
+            controls.append(control)
+            control.start()
+            logs = control.wait(1)
+            assert logs.strip() in {"SandboxUnavailable", "FileNotFoundError"}, logs
+            assert not (path / "held.json").exists()
+            with DeviceLock(path / "locks", config["device"]) as guard:
+                with ContainerJournal(path / "journal", guard, engine) as journal:
+                    assert journal.load() is None
+                    assert journal.identity == config["installation"]
+            report["cleanup"].append(control.cleanup())
+            report["checks"].append(
+                {
+                    "name": name,
+                    "passed": True,
+                    "controller": control.container_id,
+                    "task_created": False,
+                    "failure_class": logs.strip(),
+                }
+            )
+            save(result_path, report)
+            print("PASS " + name, flush=True)
+    finally:
+        save(path / "mounts.json", original)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--docker-socket", required=True)
     parser.add_argument("--runtime-archive", required=True, type=Path)
     parser.add_argument("--nvrtc-archive", required=True, type=Path)
     parser.add_argument("--docker-cli-archive", required=True, type=Path)
+    parser.add_argument(
+        "--process-observer",
+        action="store_true",
+        help="Use the explicit read-only host PID view and verify ownership fences",
+    )
     options = parser.parse_args()
     engine = LocalEngine(options.docker_socket)
     engine.verify()
@@ -120,6 +171,7 @@ def main():
     report = {
         "passed": False,
         "gpu_executed": False,
+        "process_observer": options.process_observer,
         "compiler_contract": compiler_digest(),
         "controller_contract": controller_digest(),
         "gpu_execution_digest": execution_digest(),
@@ -151,15 +203,25 @@ def main():
             engine, options.docker_cli_archive, out / "controller", tags[-1]
         )
         report["controller_image"] = control_image
-        config = state(engine, path, image)
+        config = state(engine, path, image, host_processes=options.process_observer)
+        if options.process_observer:
+            observer_rejections(engine, control_image, path, config, report, controls, result_path)
         for name, message, mode, expected in scenarios():
+            if (
+                options.process_observer
+                and mode == "compile-normal"
+                and expected in {"compiled", "killed"}
+            ):
+                mode = "compile-observe"
             config = fresh_config(
                 path, config, control_image if mode == "compile-bad-image" else image, engine
             )
             save(path / "input.json", message)
             row = {"name": name, "expected": expected, "passed": False, "processes": {}}
             report["checks"].append(row)
-            control = Control(engine, control_image, path, config, mode)
+            control = Control(
+                engine, control_image, path, config, mode, host_processes=options.process_observer
+            )
             controls.append(control)
             row["controller"] = control.container_id
             control.start()
@@ -176,6 +238,14 @@ def main():
                 verify_active(active, config)
                 validate_compiled(active["compilation"], message["architecture"])
                 row["active"] = active
+                if mode == "compile-observe":
+                    observed = active["process_observation"]
+                    assert len(observed) >= 3 and active["private_pid"] == 1
+                    assert len(active["rejected_host_pids"]) == 2
+                    assert all(
+                        item["cgroup"] == active["observer_anchor"]["cgroup"] for item in observed
+                    )
+                    assert active["observer_anchor"]["pid"] != 1
                 row["processes"].update(task_tree(engine, active))
                 if expected == "killed":
                     control.kill()
@@ -214,6 +284,8 @@ def main():
                         "limits": resource_limits(WORKLOAD_PROFILE),
                     }
                 row["finished"] = finished
+                if mode == "compile-observe":
+                    assert finished["cleaned_observer_rejected"] is True
                 if finished["cleanup"] is not None:
                     report["cleanup"].append(finished["cleanup"])
                 assert control.wait() == ""

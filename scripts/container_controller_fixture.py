@@ -14,6 +14,7 @@ from judge.container_connection import ContainerConnection  # noqa: E402
 from judge.container_contract import PYTHON  # noqa: E402
 from judge.container_controller import STATE, ContainerController  # noqa: E402
 from judge.container_journal import PersistentRuntimeService, private  # noqa: E402
+from judge.container_processes import OwnedProcesses  # noqa: E402
 from judge.gpu_session import decode_frame  # noqa: E402
 from judge.sandbox import SandboxUnavailable  # noqa: E402
 
@@ -77,6 +78,29 @@ def compile_task(control, mode, image, job, reservation):
     def compiled(value):
         snapshot()
         report["compilation"] = value
+        if mode == "compile-observe":
+            observer = OwnedProcesses(control, task.service)
+            record = observer.check()
+            own = (
+                control.engine.run("container", "top", task.service.container_id, "-eo", "pid")
+                .stdout.decode()
+                .splitlines()[1:]
+            )
+            pids = [int(line.strip()) for line in own]
+            assert record["pid"] in pids and len(pids) >= 3
+            report["process_observation"] = observer.require_owned(pids)
+            private = int(Path("/proc/self/stat").read_text().split()[0])
+            report["private_pid"] = private
+            # PID 1 in the controller is a different process from host PID 1.
+            for foreign in (1, int(os.readlink("/run/praximesh-host-proc/self"))):
+                try:
+                    observer.require_owned([foreign])
+                except SandboxUnavailable:
+                    report.setdefault("rejected_host_pids", []).append(foreign)
+                else:
+                    raise RuntimeError("Foreign host process accepted as task-owned")
+            report["observer_anchor"] = record
+            task.observer = observer
         save("active", report)
         release("continue")
         if mode == "compile-orphan":
@@ -110,6 +134,13 @@ def compile_task(control, mode, image, job, reservation):
         journal_empty=control.journal.load() is None,
     )
     assert report["journal_empty"] is True
+    if mode == "compile-observe":
+        try:
+            task.observer.require_owned([])
+        except SandboxUnavailable:
+            report["cleaned_observer_rejected"] = True
+        else:
+            raise RuntimeError("Cleaned task observation remained usable")
     save("finished", report)
 
 
@@ -122,6 +153,7 @@ def main():
         "compile-cancel-before",
         "compile-cancel",
         "compile-orphan",
+        "compile-observe",
     }
     if mode not in {"hold", "normal", "orphan", "recover", "recover-normal"} | compiler_modes:
         raise ValueError("Unknown fixed controller scenario")

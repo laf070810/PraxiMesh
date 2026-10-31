@@ -37,6 +37,7 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 任务总预算、CPU/内存/PID/存储上限和故障恢复 | [任务预算检查](#container-workload)；整个任务容器含运行时开销，不等同于 guest 独占资源或 GPU 显存 |
 | 控制容器内发起编译、取消和退出接管 | [容器编译控制检查](#container-compilation-control)；同一安装身份下的新任务恢复，不是 GPU 部署入口 |
 | 本机驱动快照、库依赖、精确 runsc 版本匹配 | [驱动制品检查](#container-driver)；无设备加载与编译，不初始化 CUDA 或证明硬件可用 |
+| 控制容器辨认宿主 PID、任务归属与失效记录 | [进程归属检查](#container-process-observer)；只读 CPU 进程观察，不查询 GPU |
 
 <a id="container-driver"></a>
 
@@ -97,6 +98,18 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 入口构建固定编译镜像和可信控制镜像，预期十四项场景：两份参考解、语法/架构错误、非法请求/错误镜像拒绝、发送源码前与编译后取消、控制器退出/终止，以及各故障后的新编译。源码只交给测试自有私有目录中的可信控制端，再经有界通信进入另一任务容器的 gVisor guest；不在宿主或控制容器中编译，不挂载 GPU 或驱动。
 
 结果为 `test-results/px-controller-compiler-*/result.json`，两个镜像的构建日志位于各自子目录。核对原实际预算、v2 记录、调用开始顺序、同一安装身份、原进程树和所有容器/标签/临时目录清理。失败且无法确认清理时保留 `retained_storage`，不能删除记录来重新开始。此入口没有应用数据库或正式成绩；生产 GPU worker 仍需完整设备与启动验收。设计见 [ADR-045](../adr/045-containerized-compilation-control.md)，实际结果见 [G29](../acceptance-g29.md)。
+
+<a id="container-process-observer"></a>
+
+### 控制容器中的宿主进程归属
+
+修改容器 GPU 占用监测的进程归属接口时，在上面的同一命令末尾增加 `--process-observer`。该模式预期十八项场景：保留十四项编译/取消/恢复检查，另加 proc 挂载缺失、身份错误、boot ID 错误及可写挂载拒绝；实际编译期间核对任务 PID 1 和其他成员，拒绝控制端自身与宿主 PID 1，并在任务清理后拒绝复用原观察对象。
+
+仅可信控制端使用挂载契约 v2，增加 `/proc` 到固定 `/run/praximesh-host-proc` 的递归只读、rprivate 挂载，仍保留私有 PID/cgroup、无额外能力及只读根。普通编译模式继续使用不含此挂载的 v1。需要 Docker 支持 `bind-recursive=readonly` 和对应内核能力；不支持时检查失败，不回退到可写挂载或 host PID 模式，不修改共享 daemon。
+
+procfs 只读并不限制所有魔术链接的目标；该视图只能交给本就拥有专用 rootless Docker socket 的可信控制端。观察代码只读取有界的 stat/status/cgroup，不读取环境、命令行或进程内存，不执行学员代码或停止未知 PID。任务容器和 guest 均不获得此挂载。cgroup 文本按读取者命名空间比较，不作为宿主文件路径使用。
+
+此模式只验证真实 CPU 进程归属和原记录生命周期，不查询 NVIDIA 进程、不建立 CUDA 上下文、不签发 GPU 就绪凭证。单卡注入、NVIDIA PID 来源、正式环境及完整启动/部署仍需后续连接与验收。
 
 <a id="container-database"></a>
 

@@ -9,7 +9,9 @@ import uuid
 from pathlib import Path
 
 from judge.container_compiler import SOURCES as COMPILER_SOURCES
+from judge.container_driver import SOURCES as DRIVER_SOURCES
 from judge.container_journal import ContainerJournal, private
+from judge.container_processes import HostProcessView, host_manifest, validate_manifest
 from judge.container_runtime_service import ROOT
 from judge.container_service import LocalEngine
 from judge.gpu_device_lock import DeviceLock
@@ -28,14 +30,20 @@ LIMITS = {
     "memory.swap.max": "0",
     "pids.max": "128",
 }
-CONTROLLER_SOURCES = (
-    *COMPILER_SOURCES,
-    "judge/container_controller.py",
-    "judge/container_compilation.py",
-    "scripts/container_controller_fixture.py",
-    "deploy/container-controller.Dockerfile",
-    "vendor/docker-cli/LICENSE",
-    "vendor/docker-cli/NOTICE",
+CONTROLLER_SOURCES = tuple(
+    dict.fromkeys(
+        (
+            *COMPILER_SOURCES,
+            *DRIVER_SOURCES,
+            "judge/container_controller.py",
+            "judge/container_processes.py",
+            "judge/container_compilation.py",
+            "scripts/container_controller_fixture.py",
+            "deploy/container-controller.Dockerfile",
+            "vendor/docker-cli/LICENSE",
+            "vendor/docker-cli/NOTICE",
+        )
+    )
 )
 
 
@@ -51,21 +59,24 @@ def identity(path):
     return [info.st_dev, info.st_ino]
 
 
-def manifest(directory, engine):
+def manifest(directory, engine, *, host_processes=False):
     """Host prepares a private mount identity; does not mount or change ownership."""
     if os.getuid() == 0 or os.getgid() == 0:
         raise ValueError("A non-root operator is required")
     for path in (directory, directory / "locks", directory / "journal"):
         private(path.lstat(), directory=True)
     engine.verify()
+    if type(host_processes) is not bool:
+        raise ValueError("Explicit process observation selection is required")
     return {
-        "version": 1,
+        "version": 2 if host_processes else 1,
         "operator": [os.getuid(), os.getgid()],
         "root": identity(directory),
         "locks": identity(directory / "locks"),
         "journal": identity(directory / "journal"),
         "socket": identity(engine.path),
         "engine": str(uuid.UUID(engine.run("info", "--format", "{{.ID}}").stdout.decode().strip())),
+        **({"host_processes": host_manifest()} if host_processes else {}),
     }
 
 
@@ -113,15 +124,19 @@ def environment(operator):
 
 class ContainerController:
     def __init__(self, device):
-        self.guard = self.journal = self.engine = None
+        self.guard = self.journal = self.engine = self.host_processes = None
         self.saved = self.read_manifest()
         expected = {"version", "operator", "root", "locks", "journal", "socket", "engine"}
+        if self.saved.get("version") == 2:
+            expected.add("host_processes")
         if (
             set(self.saved) != expected
             or type(self.saved["version"]) is not int
-            or self.saved["version"] != 1
+            or self.saved["version"] not in {1, 2}
         ):
             raise SandboxUnavailable("Unknown controller mount contract")
+        if self.saved["version"] == 2:
+            validate_manifest(self.saved["host_processes"])
         for key in ("operator", "root", "locks", "journal", "socket"):
             value = self.saved[key]
             if (
@@ -136,8 +151,10 @@ class ContainerController:
         except (ValueError, TypeError, AttributeError):
             raise SandboxUnavailable("Invalid controller engine identity") from None
         self.process_identity = environment(self.saved["operator"])
-        self.check_mounts()
         try:
+            if self.saved["version"] == 2:
+                self.host_processes = HostProcessView(self.saved["host_processes"])
+            self.check_mounts()
             self.engine = LocalEngine(SOCKET)
             self.guard = DeviceLock(STATE / "locks", device).acquire()
             self.journal = ContainerJournal(STATE / "journal", self.guard, self.engine)
@@ -171,6 +188,8 @@ class ContainerController:
                 raise SandboxUnavailable("Controller state mount changed")
         if identity(SOCKET) != self.saved["socket"]:
             raise SandboxUnavailable("Controller socket mount changed")
+        if self.host_processes is not None:
+            self.host_processes.check()
 
     def check(self):
         self.check_mounts()
@@ -179,6 +198,8 @@ class ContainerController:
         self.journal.check()
 
     def close(self):
+        if self.host_processes is not None:
+            self.host_processes.close()
         if self.journal is not None:
             self.journal.close()
         if self.guard is not None:
