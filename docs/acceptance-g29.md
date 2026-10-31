@@ -37,7 +37,9 @@ Ruff、格式与补丁检查通过；固定编译契约为 `8a6673a0f4db03726466
 | 控制镜像 | `sha256:439202b900e695da78e22139d33376835c165d33bdb54b77575e9afcedff3460` |
 | 控制端源码契约 | `3cad39f33890a9d23cf0331def4f5ad3612246a91295ef5d812757ac5cfe27de` |
 
-原控制端的 UID、锁和跨版本接管回归仍在本批重放中，尚未将早期版本报告计为本批通过。新增文档后的旧发布包兼容检查 36 项通过，见 `g29-release-docs.log`。
+原控制端七组回归全部通过，见 `test-results/px-container-controller-8711955d7a35/result.json` 和 `g29-controller-compatibility.log`。覆盖共享 UID/锁、错误用户/锁/socket 拒绝，以及容器间、容器到宿主、宿主到容器的接管；最后一种继续使用实际新预算和 v2 记录。它使用本批同一控制镜像，以及原任务镜像 `sha256:44b59220ebfa751e1cef7ea9612bd7eb8bfc901c58acf395cec9bb051fa0bdd1`。十五个任务/控制容器及临时存储清理。新增文档后的旧发布包兼容检查 36 项通过，见 `g29-release-docs.log`。
+
+独立只读查询确认两份真实报告的源码摘要与当前实现一致，合计 41 个自有容器、4 个镜像标签均不存在，15 组记录的进程身份均已消失；最初镜像已清理的前提尝试也没有遗留容器。原有 Web、CPU worker、tutor 仍运行且健康，见 `test-results/g29-audit.json`。九份相关文档的 336 个本地链接及新增集中入口锚点已核对，见 `g29-document-links.json`。
 
 ## 剩余范围
 

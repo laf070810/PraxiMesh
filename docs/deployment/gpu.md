@@ -75,7 +75,7 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 
 入口构建固定编译镜像和可信控制镜像，预期十四项场景：两份参考解、语法/架构错误、非法请求/错误镜像拒绝、发送源码前与编译后取消、控制器退出/终止，以及各故障后的新编译。源码只交给测试自有私有目录中的可信控制端，再经有界通信进入另一任务容器的 gVisor guest；不在宿主或控制容器中编译，不挂载 GPU 或驱动。
 
-结果为 `test-results/px-controller-compiler-*/result.json`，两个镜像的构建日志位于各自子目录。核对原实际预算、v2 记录、调用开始顺序、同一安装身份、原进程树和所有容器/标签/临时目录清理。失败且无法确认清理时保留 `retained_storage`，不能删除记录来重新开始。此入口没有应用数据库或正式成绩；生产 GPU worker 仍需完整设备与启动验收。设计见 [ADR-045](../adr/045-containerized-compilation-control.md)。
+结果为 `test-results/px-controller-compiler-*/result.json`，两个镜像的构建日志位于各自子目录。核对原实际预算、v2 记录、调用开始顺序、同一安装身份、原进程树和所有容器/标签/临时目录清理。失败且无法确认清理时保留 `retained_storage`，不能删除记录来重新开始。此入口没有应用数据库或正式成绩；生产 GPU worker 仍需完整设备与启动验收。设计见 [ADR-045](../adr/045-containerized-compilation-control.md)，实际结果见 [G29](../acceptance-g29.md)。
 
 <a id="container-database"></a>
 
