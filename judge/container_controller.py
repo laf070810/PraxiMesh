@@ -8,8 +8,9 @@ import os
 import uuid
 from pathlib import Path
 
+from judge.container_compiler import SOURCES as COMPILER_SOURCES
 from judge.container_journal import ContainerJournal, private
-from judge.container_runtime_service import ROOT, SOURCES
+from judge.container_runtime_service import ROOT
 from judge.container_service import LocalEngine
 from judge.gpu_device_lock import DeviceLock
 from judge.gpu_session import decode_frame
@@ -28,9 +29,9 @@ LIMITS = {
     "pids.max": "128",
 }
 CONTROLLER_SOURCES = (
-    *SOURCES,
+    *COMPILER_SOURCES,
     "judge/container_controller.py",
-    "judge/container_compiler.py",
+    "judge/container_compilation.py",
     "scripts/container_controller_fixture.py",
     "deploy/container-controller.Dockerfile",
     "vendor/docker-cli/LICENSE",

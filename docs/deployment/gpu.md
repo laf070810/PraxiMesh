@@ -35,6 +35,7 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 持久容器记录与数据库预约、锁超时和重试 | [数据库/容器联合检查](#container-database)；一次性 PostgreSQL 与固定 CPU guest，不开放 GPU |
 | 固定 CUDA 编译器、候选语法和编译后清理 | [无设备编译检查](#container-compiler)；真实 NVRTC 在 gVisor guest 中运行，不占 GPU、不判题 |
 | 任务总预算、CPU/内存/PID/存储上限和故障恢复 | [任务预算检查](#container-workload)；整个任务容器含运行时开销，不等同于 guest 独占资源或 GPU 显存 |
+| 控制容器内发起编译、取消和退出接管 | [容器编译控制检查](#container-compilation-control)；同一安装身份下的新任务恢复，不是 GPU 部署入口 |
 
 <a id="container-compiler"></a>
 <a id="container-workload"></a>
@@ -57,6 +58,24 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 上面的模式在 0.5 CPU、512 MiB 宿主内存、无 swap、256 个宿主任务的固定总预算中执行全部编译场景，并增加四项真实资源探针及各自的新容器编译恢复，预期共 26 项。预算包括监督器、runsc 和 guest，不代表 guest 独占这些资源；guest `/tmp` 上限为 32 MiB。内存检查须有内核 OOM 或原容器 OOM 状态证据，PID 检查只运行固定可信的 fork 探针。原开发预算为 `container-supervision-v1`（2 CPU、2 GiB、512 个宿主任务）；去掉最后两个参数可单独重放该预算下的 18 项编译检查。
 
 报告为 `test-results/px-container-compiler-*/result.json`，构建输出为同目录 `build.log`。须检查总 `passed`、逐场景状态、预算标识、原进程树清理、镜像标签和临时目录清理；清理失败时保留 `retained_storage` 指定的原 journal，排查后按同一身份恢复，不能删除未知对象。编译状态 `compiled` 只表示生成 PTX，语义错解也应能编译；本检查不证明入口加载、CUDA 正确性、性能或 GPU 就绪，不发布候选题目。设计见 [ADR-043](../adr/043-device-free-container-compilation.md)和 [ADR-044](../adr/044-container-workload-budget.md)。
+
+<a id="container-compilation-control"></a>
+
+## 不占 GPU 的容器编译控制检查
+
+适用于修改可信控制镜像的源码打包、编译调用或取消恢复。控制镜像须能独立计算完整编译契约；任务使用同一私有安装、设备锁和 journal，每次新建任务与预约身份。使用上面的 runsc/NVRTC 归档及[控制端入口](#container-controller)说明的固定 Docker CLI 归档：
+
+```sh
+.venv/bin/python scripts/controller_compiler_acceptance.py \
+  --docker-socket /run/user/$(id -u)/docker.sock \
+  --runtime-archive var/gpu-preflight/gvisor.tar.bz2 \
+  --nvrtc-archive var/gpu-preflight/nvrtc-13.1.115.tar.xz \
+  --docker-cli-archive var/gpu-preflight/docker-29.9.2.tgz
+```
+
+入口构建固定编译镜像和可信控制镜像，预期十四项场景：两份参考解、语法/架构错误、非法请求/错误镜像拒绝、发送源码前与编译后取消、控制器退出/终止，以及各故障后的新编译。源码只交给测试自有私有目录中的可信控制端，再经有界通信进入另一任务容器的 gVisor guest；不在宿主或控制容器中编译，不挂载 GPU 或驱动。
+
+结果为 `test-results/px-controller-compiler-*/result.json`，两个镜像的构建日志位于各自子目录。核对原实际预算、v2 记录、调用开始顺序、同一安装身份、原进程树和所有容器/标签/临时目录清理。失败且无法确认清理时保留 `retained_storage`，不能删除记录来重新开始。此入口没有应用数据库或正式成绩；生产 GPU worker 仍需完整设备与启动验收。设计见 [ADR-045](../adr/045-containerized-compilation-control.md)。
 
 <a id="container-database"></a>
 
