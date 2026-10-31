@@ -23,7 +23,7 @@ def english_extensions(catalog, settings, client):
         ("/accounts/tokens/", "Local tool access tokens"),
         ("/showcase/settings/", "Public profile settings"),
         ("/showcase/mine/", "Manage my shares"),
-        ("/showcase/boards/", "Grouped test-progress leaderboards"),
+        ("/showcase/boards/", "Grouped result leaderboards"),
     ],
 )
 def test_new_english_interfaces(english_extensions, user, path, heading):

@@ -58,6 +58,9 @@
 - [CUDA 内容契约与候选说明](cuda-contract.md)
 - [ADR-035：CUDA 内容校验、候选组合与正常队列验收](adr/035-cuda-content-and-review.md)
 - [G19 CUDA 内容与候选验收工具](acceptance-g19.md) — 内容、发布和工具边界通过；候选硬件验收待完成
+- [公开作品、撤回与分组成绩榜](sharing.md)
+- [ADR-036：GPU 成绩的独立公开范围与分组计时榜](adr/036-gpu-opt-in-leaderboards.md)
+- [G20 GPU 分享、计时榜与表单布局](acceptance-g20.md) — 非 GPU 数据与界面验证；不代表硬件性能通过
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

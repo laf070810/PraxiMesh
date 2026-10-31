@@ -246,12 +246,13 @@ def test_result_page_uses_validated_counts_and_gpu_units(job, logged_client, oth
     assert response.status_code == 200
     assert "控制器批次往返时间中位数" in text and "12.500" in text and "3.000" in text
     assert "180 秒 GPU 整卡时段" in text and "180 个 CPU" not in text
-    assert "总等待" not in text and "选择公开这条评测结果" not in text
+    assert "总等待" not in text and "选择公开这条评测结果" in text
     assert "PRIVATE_REFERENCE_SENTINEL" not in text and "PROTECTED_CASE_SENTINEL" not in text
     job.result["total"] = "PROTECTED_COUNT_SENTINEL"
     job.save(update_fields=["result"])
     text = logged_client.get(url).content.decode()
     assert "PROTECTED_COUNT_SENTINEL" not in text and "控制器批次往返时间中位数" not in text
+    assert "选择公开这条评测结果" not in text
     logged_client.force_login(other_user)
     assert logged_client.get(url).status_code == 404
 

@@ -1,6 +1,8 @@
 from django import forms
 from django.utils.translation import gettext_lazy as gettext
 
+from showcase.models import SharedResult
+
 
 class ProfileForm(forms.Form):
     revision = forms.IntegerField(min_value=0, widget=forms.HiddenInput)
@@ -33,6 +35,13 @@ class ShareForm(forms.Form):
     confirm_public = forms.BooleanField(
         label=gettext("我确认公开用户名及这次正式结果，并参与同题目版本、同策略的测试进度榜。")
     )
+
+    def __init__(self, *args, metric_kind=SharedResult.Metric.SEQUENTIAL, **kwargs):
+        super().__init__(*args, **kwargs)
+        if metric_kind == SharedResult.Metric.GPU_BATCH:
+            self.fields["confirm_public"].label = gettext(
+                "我确认公开用户名、这次正式 GPU 计时及评测环境指纹，并参与同题目版本、同环境的计时榜。"
+            )
 
 
 class RevisionForm(forms.Form):

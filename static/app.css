@@ -145,6 +145,32 @@ label > input[type="checkbox"],
 label > input[type="radio"] {
   margin: 5px 0 0;
 }
+/* Django's as_p forms render the label and checkbox as siblings. */
+form p:has(> input[type="checkbox"]),
+form p:has(> input[type="radio"]) {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: 9px;
+  min-height: 36px;
+  padding-block: 5px;
+}
+form p:has(> input[type="checkbox"]) > label,
+form p:has(> input[type="radio"]) > label {
+  grid-column: 2;
+  grid-row: 1;
+  font-weight: 400;
+}
+form p > input[type="checkbox"],
+form p > input[type="radio"] {
+  grid-column: 1;
+  grid-row: 1;
+  margin: 5px 0 0;
+}
+form p:has(> input[type="checkbox"]) > .helptext,
+form p:has(> input[type="radio"]) > .helptext {
+  grid-column: 2;
+}
 input:focus,
 textarea:focus,
 select:focus {
@@ -282,7 +308,9 @@ div.choice-list {
   background: var(--ink);
   color: white;
   line-height: 1.5;
-  white-space: nowrap;
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
   gap: 10px;
 }
 .button:hover,

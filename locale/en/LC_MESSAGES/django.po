@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PraxiMesh\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-30 15:42+0000\n"
+"POT-Creation-Date: 2026-10-31 00:32+0000\n"
 "PO-Revision-Date: 2026-10-23 00:00+0000\n"
 "Last-Translator: PraxiMesh contributors\n"
 "Language-Team: English\n"
@@ -13,61 +13,6 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-
-#, python-format
-msgid "%(passed)s / %(total)s 个正确性用例通过。"
-msgstr "%(passed)s / %(total)s correctness cases passed."
-
-#, python-format
-msgid "编译与初始化：%(milliseconds)s ms。"
-msgstr "Compilation and initialization: %(milliseconds)s ms."
-
-#, python-format
-msgid "控制器批次往返时间中位数：%(milliseconds)s ms。"
-msgstr "Controller round-trip batch median: %(milliseconds)s ms."
-
-#, python-format
-msgid "每批 %(repetitions)s 次执行；%(warmup)s 批预热，%(samples)s 批采样。"
-msgstr "%(repetitions)s executions per batch; %(warmup)s warmup batches and %(samples)s measured batches."
-
-msgid "该时间包含通信和同步成本；只比较同一题目版本、设备与评测环境。"
-msgstr "This time includes communication and synchronization. Compare only the same problem version, device, and evaluation environment."
-
-msgid "全部正确性用例通过后，重复批次仍可能失败；最终状态以评测结论为准。"
-msgstr "Repeated batches can fail after all correctness cases pass. The final verdict determines the outcome."
-
-#, python-format
-msgid "本次预约 %(units)s 秒 GPU 整卡时段，归属 %(day)s UTC 日。"
-msgstr "This task reserves %(units)s GPU device-slot seconds for the UTC day %(day)s."
-
-msgid "预约秒数是整卡时段上限，不是实测 GPU 时间或费用。"
-msgstr "Reserved seconds bound the exclusive device slot; they are not measured GPU time or a fee."
-
-msgid "今日 GPU 整卡时段预约额度不足，请在下个 UTC 日重试。"
-msgstr "Your GPU device-slot reservation budget is exhausted. Try again on the next UTC day."
-
-#, python-format
-msgid "%(day)s UTC 日 GPU 整卡时段：剩余 %(remaining)s / %(limit)s 秒。本题运行样例预约 %(run)s 秒，正式提交预约 %(submit)s 秒。"
-msgstr "GPU device-slot budget for %(day)s UTC: %(remaining)s / %(limit)s seconds remaining. This problem reserves %(run)s seconds for Run and %(submit)s seconds for Submit."
-
-msgid "CUDA C++ 设备内核；入口与启动参数由题目固定，只提交内核源码。"
-msgstr "CUDA C++ device kernels. The problem fixes the entry point and launch parameters; submit kernel source."
-
-msgid "输入数组与形状："
-msgstr "Input arrays and shapes:"
-
-msgid "预期输出数组："
-msgstr "Expected output array:"
-
-msgid "通过输出数组写入计算结果；用例之间重置输出缓冲区。"
-msgstr "Write results through the output array. Output buffers reset between cases."
-
-msgid "设备内核"
-msgstr "Device kernel"
-
-#, python-format
-msgid "定义 %(value1)s 设备内核 · 草稿仅自己可见"
-msgstr "Define the %(value1)s device kernel · Drafts are private"
 
 msgid "未开始"
 msgstr "Not started"
@@ -387,11 +332,17 @@ msgstr "Scientific computing and fitting"
 msgid "受控工具 Agent"
 msgstr "Constrained-tool Agent"
 
+msgid "CUDA 设备内核"
+msgstr "CUDA device kernel"
+
 msgid "Python 基础标准库"
 msgstr "Python base standard library"
 
 msgid "JavaScript 内置对象"
 msgstr "JavaScript built-in objects"
+
+msgid "CUDA 设备内置函数"
+msgstr "CUDA device built-ins"
 
 msgid "用户名"
 msgstr "Username"
@@ -443,6 +394,9 @@ msgstr "The judging queue is full. Please try again later."
 
 msgid "该题的资源预约策略无效，暂不能评测。"
 msgstr "This task has an invalid resource reservation policy and cannot be evaluated."
+
+msgid "今日 GPU 整卡时段预约额度不足，请在下个 UTC 日重试。"
+msgstr "Your GPU device-slot reservation budget is exhausted. Try again on the next UTC day."
 
 msgid "今日 CPU 练习预约额度不足，请在下个 UTC 日重试。"
 msgstr "Insufficient CPU practice allowance for today. Try again on the next UTC day."
@@ -649,6 +603,9 @@ msgstr "Foundational"
 msgid "进阶"
 msgstr "Advanced"
 
+msgid "CUDA C++ 设备内核；入口与启动参数由题目固定，只提交内核源码。"
+msgstr "CUDA C++ device kernels. The problem fixes the entry point and launch parameters; submit kernel source."
+
 msgid "当前评测环境不支持这道题的运行方式；仍可阅读、编辑和保存草稿。"
 msgstr "The current evaluation environment does not support this problem’s execution mode. You can still read the problem, edit code, and save drafts."
 
@@ -826,6 +783,15 @@ msgstr "Explicitly confirm the public information listed above."
 msgid "我确认公开用户名及这次正式结果，并参与同题目版本、同策略的测试进度榜。"
 msgstr "I agree to publish my username and this official result, and join the test-progress leaderboard for this exact problem version and policy."
 
+msgid "我确认公开用户名、这次正式 GPU 计时及评测环境指纹，并参与同题目版本、同环境的计时榜。"
+msgstr "I agree to publish my username, this official GPU timing and its evaluation environment fingerprint, and join the timing leaderboard for the same problem version and environment."
+
+msgid "顺序测试进度"
+msgstr "Sequential test progress"
+
+msgid "GPU 批次计时"
+msgstr "GPU batch timing"
+
 msgid "这条记录缺少可核对的正式评测结果，暂不能公开。"
 msgstr "This record lacks a verifiable official result and cannot be published."
 
@@ -843,6 +809,12 @@ msgstr "Sharing a result requires explicit confirmation."
 
 msgid "题目已经下线，不能公开这条结果。"
 msgstr "The problem was withdrawn. This result cannot be published."
+
+msgid "公开指标范围已改变，需要重新预览并确认分享。"
+msgstr "The public metric scope has changed. Preview and confirm sharing again."
+
+msgid "不同题目版本或环境的成绩不能混排。"
+msgstr "Results from different problem versions or environments cannot share a ranking."
 
 msgid "填写内容或公开确认不符合要求。"
 msgstr "The entered content or publication confirmation is invalid."
@@ -1795,6 +1767,28 @@ msgstr "Saved code (visible only to you)"
 msgid "保存时的题意与版本"
 msgstr "Problem statement and version when saved"
 
+#, python-format
+msgid "%(passed)s / %(total)s 个正确性用例通过。"
+msgstr "%(passed)s / %(total)s correctness cases passed."
+
+#, python-format
+msgid "编译与初始化：%(milliseconds)s ms。"
+msgstr "Compilation and initialization: %(milliseconds)s ms."
+
+#, python-format
+msgid "控制器批次往返时间中位数：%(milliseconds)s ms。"
+msgstr "Controller round-trip batch median: %(milliseconds)s ms."
+
+#, python-format
+msgid "每批 %(repetitions)s 次执行；%(warmup)s 批预热，%(samples)s 批采样。"
+msgstr "%(repetitions)s executions per batch; %(warmup)s warmup batches and %(samples)s measured batches."
+
+msgid "该时间包含通信和同步成本；只比较同一题目版本、设备与评测环境。"
+msgstr "This time includes communication and synchronization. Compare only the same problem version, device, and evaluation environment."
+
+msgid "全部正确性用例通过后，重复批次仍可能失败；最终状态以评测结论为准。"
+msgstr "Repeated batches can fail after all correctness cases pass. The final verdict determines the outcome."
+
 msgid "把“我懂了”"
 msgstr "Turn “I understand”"
 
@@ -2462,8 +2456,11 @@ msgstr "Supported by this environment"
 msgid "当前环境不支持"
 msgstr "Unsupported by this environment"
 
-msgid "每次正式提交最多预约单位"
-msgstr "Maximum reservation units per formal submission"
+msgid "每次正式提交最多 CPU 调用单位"
+msgstr "Maximum CPU invocation units per submission"
+
+msgid "每次正式提交最多 GPU 秒数"
+msgstr "Maximum GPU device-slot seconds per submission"
 
 msgid "我的状态"
 msgstr "My status"
@@ -2485,8 +2482,12 @@ msgid "公开成绩榜单"
 msgstr "Public results leaderboard"
 
 #, python-format
-msgid "正式提交预约 %(units)s 单位"
-msgstr "Formal submission reserves %(units)s units"
+msgid "正式提交预约 %(units)s 秒 GPU 整卡时段"
+msgstr "Submission reserves %(units)s GPU device-slot seconds"
+
+#, python-format
+msgid "正式提交预约 %(units)s CPU 调用单位"
+msgstr "Submission reserves %(units)s CPU invocation units"
 
 msgid "当前环境不支持此运行方式，仍可阅读与保存草稿。"
 msgstr "This environment does not support this execution mode. Reading and private drafts remain available."
@@ -2581,6 +2582,12 @@ msgstr "Call sequence:"
 msgid "预期返回值或异常："
 msgstr "Expected return values or exceptions:"
 
+msgid "输入数组与形状："
+msgstr "Input arrays and shapes:"
+
+msgid "预期输出数组："
+msgstr "Expected output array:"
+
 msgid "公开账目记录："
 msgstr "Public ledger records:"
 
@@ -2644,6 +2651,9 @@ msgstr "Each case runs in a separate program instance."
 msgid "实现场景中的类与方法；同一场景保留实例状态，场景之间重置。"
 msgstr "Implement the class and its methods. Instance state persists within a scenario and resets between scenarios."
 
+msgid "通过输出数组写入计算结果；用例之间重置输出缓冲区。"
+msgstr "Write results through the output array. Output buffers reset between cases."
+
 msgid "使用 return 返回结果。测试状态在每个用例之间重置。"
 msgstr "Use return to return the result. Test state is reset between cases."
 
@@ -2665,11 +2675,21 @@ msgstr "Complete program"
 msgid "库/API 类"
 msgstr "Library/API class"
 
+msgid "设备内核"
+msgstr "Device kernel"
+
 msgid "函数"
 msgstr "Function"
 
 msgid "评测暂不可用。你可以继续阅读、编辑和保存草稿。"
 msgstr "Judging is temporarily unavailable. You can still read, edit and save drafts."
+
+#, python-format
+msgid "%(day)s UTC 日 GPU 整卡时段：剩余 %(remaining)s / %(limit)s 秒。本题运行样例预约 %(run)s 秒，正式提交预约 %(submit)s 秒。"
+msgstr "GPU device-slot budget for %(day)s UTC: %(remaining)s / %(limit)s seconds remaining. This problem reserves %(run)s seconds for Run and %(submit)s seconds for Submit."
+
+msgid "预约秒数是整卡时段上限，不是实测 GPU 时间或费用。"
+msgstr "Reserved seconds bound the exclusive device slot; they are not measured GPU time or a fee."
 
 #, python-format
 msgid "%(day)s UTC 日 CPU 练习额度：剩余 %(remaining)s / %(limit)s 单位。本题运行样例预约 %(run)s，正式提交预约 %(submit)s。"
@@ -2687,17 +2707,18 @@ msgstr "Format"
 msgid "查找 / 替换"
 msgstr "Find / replace"
 
-#| msgid "读取标准输入并输出 JSON · Tab 可离开编辑区 · 草稿仅自己可见"
 msgid "读取标准输入并输出 JSON · 草稿仅自己可见"
 msgstr "Read standard input and print JSON · Drafts are private"
 
 #, python-format
-#| msgid "定义 %(class_name)s 类及声明的方法 · Tab 可离开编辑区 · 草稿仅自己可见"
 msgid "定义 %(class_name)s 类及声明的方法 · 草稿仅自己可见"
 msgstr "Define the %(class_name)s class and its declared methods · Drafts are private"
 
 #, python-format
-#| msgid "定义 %(value1)s 函数 · Tab 可离开编辑区 · 草稿仅自己可见"
+msgid "定义 %(value1)s 设备内核 · 草稿仅自己可见"
+msgstr "Define the %(value1)s device kernel · Drafts are private"
+
+#, python-format
 msgid "定义 %(value1)s 函数 · 草稿仅自己可见"
 msgstr "Define the %(value1)s function · Drafts are private"
 
@@ -2887,6 +2908,10 @@ msgid "此历史提交早于预约策略，不追溯扣减额度。"
 msgstr "This historical submission predates the reservation policy and is not charged retrospectively."
 
 #, python-format
+msgid "本次预约 %(units)s 秒 GPU 整卡时段，归属 %(day)s UTC 日。"
+msgstr "This task reserves %(units)s GPU device-slot seconds for the UTC day %(day)s."
+
+#, python-format
 msgid "本次预约 %(units)s 个 CPU 练习单位，归属 %(day)s UTC 日。"
 msgstr "This submission reserves %(units)s CPU practice units for %(day)s UTC."
 
@@ -2902,16 +2927,14 @@ msgstr "The platform stopped this job before invocation; its reservation was rel
 msgid "单位表示预留的最大沙箱调用次数，不是实测 CPU 时间或费用。"
 msgstr "Units represent reserved maximum sandbox calls, not measured CPU time or fees."
 
-#, python-format
-msgid "%(value1)s · 分组测试进度榜"
-msgstr "%(value1)s · Grouped test-progress leaderboard"
+msgid "GPU 批次计时榜"
+msgstr "GPU batch timing leaderboard"
+
+msgid "分组测试进度榜"
+msgstr "Grouped test-progress leaderboards"
 
 msgid "（历史版本）"
 msgstr "(Historical version)"
-
-#, python-format
-msgid "%(value1)s · 策略与制品标识："
-msgstr "%(value1)s · Policy and artifact fingerprint:"
 
 msgid "本分组只包含这一历史版本，不与当前版本合并。"
 msgstr "This group contains only this historical version. It is not merged with the current version."
@@ -2922,17 +2945,24 @@ msgstr "Rank"
 msgid "参与者（公开名称 / 用户名）"
 msgstr "Participant (public name / username)"
 
+msgid "中位数（ms）"
+msgstr "Median (ms)"
+
 msgid "顺序测试通过"
 msgstr "Sequential tests passed"
 
 msgid "正式结果"
 msgstr "Official result"
 
-msgid "分组测试进度榜 · PraxiMesh"
-msgstr "Grouped test-progress leaderboards · PraxiMesh"
+msgid "分组成绩榜 · PraxiMesh"
+msgstr "Grouped result leaderboards · PraxiMesh"
 
-msgid "分组测试进度榜"
-msgstr "Grouped test-progress leaderboards"
+msgid "分组成绩榜"
+msgstr "Grouped result leaderboards"
+
+#, python-format
+msgid "%(participants)s 位主动参与者 · GPU 批次计时"
+msgstr "%(participants)s opt-in participants · GPU batch timing"
 
 #, python-format
 msgid "%(value1)s 位主动参与者 · %(value2)s 个顺序测试"
@@ -2948,10 +2978,6 @@ msgstr "%(value1)s · Public result"
 #, python-format
 msgid "· 用户名 %(value1)s"
 msgstr "· Username %(value1)s"
-
-#, python-format
-msgid "%(value1)s · 顺序测试通过 %(value2)s / %(value3)s"
-msgstr "%(value1)s · Sequential tests passed: %(value2)s / %(value3)s"
 
 #, python-format
 msgid "隔离策略：%(value1)s；策略与制品标识："
@@ -2971,6 +2997,21 @@ msgstr "Sharing status unchanged · PraxiMesh"
 
 msgid "分享状态未改变"
 msgstr "Sharing status unchanged"
+
+#, python-format
+msgid "正确性通过 %(passed)s / %(total)s"
+msgstr "Correctness passed %(passed)s / %(total)s"
+
+msgid "批次往返中位数："
+msgstr "Median batch round trip: "
+
+#, python-format
+msgid "预热 %(warmup)s 批，采样 %(samples)s 批，每批 %(repetitions)s 次"
+msgstr "%(warmup)s warmup batches, %(samples)s measured batches, %(repetitions)s repetitions per batch"
+
+#, python-format
+msgid "%(value1)s · 顺序测试通过 %(value2)s / %(value3)s"
+msgstr "%(value1)s · Sequential tests passed: %(value2)s / %(value3)s"
 
 msgid "管理我的分享 · PraxiMesh"
 msgstr "Manage my shares · PraxiMesh"
@@ -2992,6 +3033,9 @@ msgstr "This record does not meet the requirements for sharing a verifiable offi
 
 msgid "已主动分享"
 msgstr "Explicitly shared"
+
+msgid "此分享当前不可公开展示，请检查结果或重新确认。"
+msgstr "This share cannot currently be displayed publicly. Review the result or confirm sharing again."
 
 msgid "未公开"
 msgstr "Not public"
@@ -3031,8 +3075,17 @@ msgstr "Only official results this user individually agreed to publish are shown
 msgid "尚未主动分享评测结果。"
 msgstr "No results explicitly shared yet."
 
+msgid "GPU 榜只比较同一题目版本、同一完整环境指纹下主动分享且全部正确的正式结果。按批次往返中位数四舍五入至 0.001 ms 排名，越小越好；显示为 0.000 ms 表示低于显示精度。每人取仍公开的最好成绩，同值同名次。统计全部仍公开记录，撤回立即生效。"
+msgstr "GPU leaderboards compare only explicitly shared, fully correct official results for the same problem version and complete environment fingerprint. Rank by the median batch round trip rounded half up to 0.001 ms; lower is better. A displayed 0.000 ms is below the display precision. Each person contributes their best still-public result, with equal values sharing a rank. All still-public records count; withdrawal takes effect immediately."
+
+msgid "计时包含控制通信、缓冲区处理和同步，不是纯内核时间。设备状态、主机负载、固定输入和重复尝试会影响结果；不用于跨设备加速比、严格基准认证或掌握程度判断。"
+msgstr "Timing includes control communication, buffer handling and synchronization, rather than kernel time alone. Device state, host load, fixed inputs and repeated attempts affect results. These rankings do not establish cross-device speedups, benchmark certification or mastery."
+
 msgid "只比较同一题目版本、同一评测策略与制品标识下主动分享的正式结果。当前评测在首个失败处停止；通过数量表示此前顺序测试的完成情况，尚未运行的测试不等于失败。每位参与者仅取已分享的最好结果，同分同名次。不按运行耗时排序，不做跨题总榜，也不据此判断知识掌握程度。"
 msgstr "Only explicitly shared official results for the same problem version, evaluation policy and artifact fingerprint are compared. Evaluation currently stops at the first failure: the count records preceding sequential tests passed; unexecuted tests are not failures. Each participant contributes only their best shared result; ties share a rank. Runtime is not ranked. There is no cross-problem overall leaderboard, and these results do not establish mastery."
+
+msgid "榜单仅使用逐条确认公开的正式结果。顺序测试进度与 GPU 批次计时分别比较；每组固定题目版本和评测环境，不设跨题或跨类型总榜。每人取仍公开的最好成绩，同值同名次；撤回立即生效。"
+msgstr "Leaderboards use only official results individually confirmed for publication. Sequential test progress and GPU batch timing are compared separately, with a fixed problem version and evaluation environment in each group. There is no overall ranking across problems or metric types. Each person contributes their best still-public result; equal values share a rank and withdrawal takes effect immediately."
 
 msgid "公开主页设置 · PraxiMesh"
 msgstr "Public profile settings · PraxiMesh"
@@ -3071,6 +3124,9 @@ msgstr "Username: %(value1)s · Public name: %(value2)s"
 
 msgid "策略标识："
 msgstr "Policy fingerprint:"
+
+msgid "确认后公开上述 GPU 计时、正确性计数、批次配置和环境指纹，并进入对应计时榜。不公开源码、测试内容、原始采样、编译耗时或设备及主机详情。"
+msgstr "Confirmation publishes the GPU timing, correctness counts, batch configuration and environment fingerprint shown above, and joins the corresponding timing leaderboard. Source code, test contents, raw samples, compilation time, device details and host details remain private."
 
 msgid "确认后公开上述信息并进入对应分组榜单。不会公开源码、笔记、隐藏测试内容、私有案件或主机信息。运行耗时不参与排名。"
 msgstr "Confirming publishes the information above and adds it to the corresponding leaderboard group. Source code, notes, hidden tests, private cases and host details remain private. Runtime does not affect ranking."
@@ -3159,6 +3215,21 @@ msgstr "Content hash of code:"
 msgid "评测环境："
 msgstr "Evaluation environment:"
 
+#~ msgid "每次正式提交最多预约单位"
+#~ msgstr "Maximum reservation units per formal submission"
+
+#, python-format
+#~ msgid "正式提交预约 %(units)s 单位"
+#~ msgstr "Formal submission reserves %(units)s units"
+
+#, python-format
+#~ msgid "%(value1)s · 分组测试进度榜"
+#~ msgstr "%(value1)s · Grouped test-progress leaderboard"
+
+#, python-format
+#~ msgid "%(value1)s · 策略与制品标识："
+#~ msgstr "%(value1)s · Policy and artifact fingerprint:"
+
 #~ msgid "写讨论、提问或题解"
 #~ msgstr "Write a discussion, question or solution"
 
@@ -3167,23 +3238,3 @@ msgstr "Evaluation environment:"
 
 #~ msgid "讨论、提问与题解"
 #~ msgstr "Discussions, questions and solutions"
-
-msgid "CUDA 设备内核"
-msgstr "CUDA device kernel"
-
-msgid "CUDA 设备内置函数"
-msgstr "CUDA device built-ins"
-
-msgid "每次正式提交最多 CPU 调用单位"
-msgstr "Maximum CPU invocation units per submission"
-
-msgid "每次正式提交最多 GPU 秒数"
-msgstr "Maximum GPU device-slot seconds per submission"
-
-#, python-format
-msgid "正式提交预约 %(units)s 秒 GPU 整卡时段"
-msgstr "Submission reserves %(units)s GPU device-slot seconds"
-
-#, python-format
-msgid "正式提交预约 %(units)s CPU 调用单位"
-msgstr "Submission reserves %(units)s CPU invocation units"

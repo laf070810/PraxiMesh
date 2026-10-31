@@ -23,7 +23,6 @@ from core.models import AccountProfile, Draft, Enrollment, KnowledgeNode, Proble
 from core.queue import AdmissionError, available, enqueue, gpu_available
 from core.resources import GPU_BUDGET_POLICY, reservation_data, reservation_units, usage
 from core.result_evidence import (
-    SEQUENTIAL_EVALUATORS,
     evidence_jobs,
     is_formal_evidence,
     safe_result,
@@ -37,6 +36,7 @@ from localization.presentation import localized_problem as public_problem
 from organizations.export import export_user_data as export_organizations
 from practice_api.models import AccessToken
 from practice_api.services import export_user_data as export_practice_api
+from showcase.services import SharingError, result_metrics
 from showcase.services import export_user_data as export_showcase
 
 
@@ -346,6 +346,12 @@ def submission_detail(request, job_id):
         Submission.objects.select_related("version"), id=job_id, user=request.user
     )
     result = safe_result(job)
+    try:
+        result_metrics(job)
+    except SharingError:
+        shareable = False
+    else:
+        shareable = job.version.problem.published and job.version.problem.current_id is not None
     return render(
         request,
         "submission.html",
@@ -360,8 +366,7 @@ def submission_detail(request, job_id):
             ),
             "public_cases": localized_public_cases(job.version, result),
             "reservation": reservation_data(job),
-            "shareable": job.version.data.get("evaluator") in SEQUENTIAL_EVALUATORS
-            and is_formal_evidence(job),
+            "shareable": shareable,
         },
     )
 

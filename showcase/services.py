@@ -2,6 +2,7 @@
 
 import re
 from collections import defaultdict
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -11,8 +12,9 @@ from django.http import Http404
 from django.utils import timezone
 from django.utils.translation import gettext
 
+from core.content import digest
 from core.models import Submission
-from core.result_evidence import InvalidResult, verified_metrics
+from core.result_evidence import InvalidResult, verified_evidence, verified_metrics
 from judge.results import LABELS
 from localization.presentation import VERDICTS as DISPLAY_VERDICTS
 from localization.presentation import localized_problem
@@ -29,13 +31,43 @@ class SharingError(Exception):
 
 
 def result_metrics(job):
-    # Sequential-test counts are comparable only within the same immutable
-    # problem version and policy. New specialist metrics need separate review.
     try:
+        if job.version.data.get("evaluator") == "cuda-kernel-v1":
+            evidence = verified_evidence(job)
+            if (
+                job.verdict != "accepted"
+                or job.version.digest != digest(job.version.data)
+                or job.version.problem_id != job.version.data.get("id")
+                or job.version.revision != job.version.data.get("revision")
+            ):
+                raise InvalidResult("GPU sharing needs a complete accepted immutable result")
+            performance = job.result["performance"]
+            # Decimal rounding defines both visible precision and tie policy.
+            milliseconds = Decimal(str(performance["median_batch_ms"])).quantize(
+                Decimal("0.001"), rounding=ROUND_HALF_UP
+            )
+            return {
+                "metric_kind": SharedResult.Metric.GPU_BATCH,
+                "passed": evidence["passed"],
+                "total": evidence["total"],
+                "verdict": evidence["verdict"],
+                "label": DISPLAY_VERDICTS[job.verdict],
+                "score_us": int(milliseconds * 1000),
+                "score_ms": format(milliseconds, ".3f"),
+                "policy": evidence["assessment"]["resource_profile"],
+                "warmup_batches": performance["warmup_batches"],
+                "sample_batches": performance["sample_batches"],
+                "batch_repetitions": performance["batch_repetitions"],
+            }
         metrics = verified_metrics(job)
-    except InvalidResult:
+    except (InvalidResult, ValueError, TypeError, KeyError, AttributeError, OverflowError):
         raise SharingError(gettext("这条记录缺少可核对的正式评测结果，暂不能公开。"), 400) from None
-    return {**metrics, "label": DISPLAY_VERDICTS[job.verdict]}
+    return {
+        **metrics,
+        "metric_kind": SharedResult.Metric.SEQUENTIAL,
+        "policy": job.environment["policy"],
+        "label": DISPLAY_VERDICTS[job.verdict],
+    }
 
 
 def lock_profile(user):
@@ -102,12 +134,13 @@ def share(user, submission_id, *, profile_revision, entry_revision, confirmed):
         raise ValidationError(gettext("公开结果需要明确确认。"))
     if not job.version.problem.published or job.version.problem.current_id is None:
         raise SharingError(gettext("题目已经下线，不能公开这条结果。"))
-    result_metrics(job)
+    metrics = result_metrics(job)
     entry = SharedResult.objects.filter(submission=job).first()
     expected_revision(entry.revision if entry else 0, entry_revision)
     if entry is None:
         entry = SharedResult(submission=job, revision=0)
     entry.is_public = True
+    entry.metric_kind = metrics["metric_kind"]
     entry.revision += 1
     entry.save()
     return entry
@@ -146,6 +179,8 @@ def public_entries():
 def public_card(entry):
     job = entry.submission
     metrics = result_metrics(job)
+    if entry.metric_kind != metrics["metric_kind"]:
+        raise SharingError(gettext("公开指标范围已改变，需要重新预览并确认分享。"), 400)
     profile = job.user.showcase_profile
     return {
         "id": entry.pk,
@@ -158,7 +193,6 @@ def public_card(entry):
         "revision": job.version.revision,
         "historical": job.version.problem.current_id != job.version_id,
         "fingerprint": job.evaluation_fingerprint,
-        "policy": job.environment["policy"],
         "shared_at": entry.created_at,
         **metrics,
     }
@@ -175,17 +209,38 @@ def cards(query):
 
 
 def ranked_results(query):
-    """One explicitly shared best result per person; equal progress has equal rank."""
+    """Rank one homogeneous board; only explicitly shared results compete."""
+
+    def value(card):
+        return (
+            card["score_us"]
+            if card["metric_kind"] == SharedResult.Metric.GPU_BATCH
+            else -card["passed"]
+        )
+
     best = {}
+    group = None
     for card in cards(query):
+        identity = card["version_id"], card["fingerprint"], card["metric_kind"]
+        if group is not None and identity != group:
+            raise SharingError(gettext("不同题目版本或环境的成绩不能混排。"), 400)
+        group = identity
         previous = best.get(card["username"])
-        if previous is None or card["passed"] > previous["passed"]:
+        if (
+            previous is None
+            or value(card) < value(previous)
+            or (
+                card["metric_kind"] == SharedResult.Metric.GPU_BATCH
+                and value(card) == value(previous)
+                and str(card["id"]) < str(previous["id"])
+            )
+        ):
             best[card["username"]] = card
-    rows = sorted(best.values(), key=lambda row: (-row["passed"], row["username"]))
+    rows = sorted(best.values(), key=lambda row: (value(row), row["username"]))
     previous_score, rank = None, 0
     for position, row in enumerate(rows, 1):
-        if row["passed"] != previous_score:
-            rank, previous_score = position, row["passed"]
+        if value(row) != previous_score:
+            rank, previous_score = position, value(row)
         row["rank"] = rank
     return rows
 
@@ -209,6 +264,7 @@ def board_groups():
                     "fingerprint",
                     "policy",
                     "total",
+                    "metric_kind",
                 )
             },
         )
@@ -236,6 +292,7 @@ def export_user_data(user):
                 "submission_id": str(entry.submission_id),
                 "is_public": entry.is_public,
                 "revision": entry.revision,
+                "metric_kind": entry.metric_kind,
                 "created_at": entry.created_at.isoformat(),
                 "updated_at": entry.updated_at.isoformat(),
             }

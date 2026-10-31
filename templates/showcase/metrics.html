@@ -1,0 +1,4 @@
+{% load i18n %}{% if metrics.metric_kind == 'gpu-batch-ms-v1' %}
+{% blocktranslate with passed=metrics.passed total=metrics.total %}正确性通过 {{ passed }} / {{ total }}{% endblocktranslate %} · {% translate "批次往返中位数：" %}<strong>{{ metrics.score_ms }} ms</strong>
+<span class="muted">{% blocktranslate with warmup=metrics.warmup_batches samples=metrics.sample_batches repetitions=metrics.batch_repetitions %}预热 {{ warmup }} 批，采样 {{ samples }} 批，每批 {{ repetitions }} 次{% endblocktranslate %}</span>
+{% else %}{% blocktranslate with value1=metrics.label value2=metrics.passed value3=metrics.total %}{{ value1 }} · 顺序测试通过 {{ value2 }} / {{ value3 }}{% endblocktranslate %}{% endif %}

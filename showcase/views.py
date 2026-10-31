@@ -95,14 +95,26 @@ def mine(request):
             metrics = services.result_metrics(job)
         except services.SharingError:
             metrics = None
+        entry = getattr(job, "showcase_entry", None)
+        available = (
+            metrics is not None
+            and job.version.problem.published
+            and job.version.problem.current_id is not None
+        )
         rows.append(
             {
                 "job": job,
-                "entry": getattr(job, "showcase_entry", None),
+                "entry": entry,
                 "metrics": metrics,
-                "available": metrics is not None
-                and job.version.problem.published
-                and job.version.problem.current_id is not None,
+                "available": available,
+                "public_visible": bool(
+                    available
+                    and profile
+                    and profile.is_public
+                    and entry
+                    and entry.is_public
+                    and entry.metric_kind == metrics["metric_kind"]
+                ),
             }
         )
     return render(request, "showcase/mine.html", {"rows": rows, "page": page, "profile": profile})
@@ -122,6 +134,7 @@ def share(request, submission_id):
     entry = SharedResult.objects.filter(submission=job).first()
     form = forms.ShareForm(
         request.POST if request.method == "POST" else None,
+        metric_kind=metrics["metric_kind"],
         initial={
             "profile_revision": profile.revision if profile else 1,
             "entry_revision": entry.revision if entry else 0,

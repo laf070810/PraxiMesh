@@ -33,6 +33,7 @@ def main():
 
     django.setup()
     from browser_cuda_editor import check_cuda_editor
+    from browser_gpu_showcase import check_gpu_showcase, prepare_gpu_showcase
     from django.conf import settings
     from django.contrib.auth import get_user_model
     from django.urls import reverse
@@ -58,6 +59,7 @@ def main():
     }
     jobs["corrupt"].result["total"] = "PROTECTED_COUNT_SENTINEL"
     jobs["corrupt"].save(update_fields=["result"])
+    showcase_fixtures = prepare_gpu_showcase(user, other, version)
     record = {
         "scope": "Synthetic GPU result UI only; no CUDA, startup receipt or performance acceptance",
         "database": str(database),
@@ -98,6 +100,21 @@ def main():
                 "core/discovery.py",
                 "templates/practice.html",
                 "scripts/browser_acceptance.py",
+                "showcase/models.py",
+                "showcase/services.py",
+                "showcase/forms.py",
+                "showcase/views.py",
+                "showcase/migrations/0002_shared_metric_scope.py",
+                "templates/showcase/share.html",
+                "templates/showcase/entry.html",
+                "templates/showcase/profile.html",
+                "templates/showcase/mine.html",
+                "templates/showcase/board.html",
+                "templates/showcase/boards.html",
+                "templates/showcase/metrics.html",
+                "templates/showcase/rules.html",
+                "templates/showcase/nav.html",
+                "tests/browser_gpu_showcase.py",
             )
         },
     }
@@ -167,9 +184,9 @@ def main():
                                     if language == "zh-hans"
                                     else "Repeated batches can fail"
                                 ) in text
-                            assert not page.locator(
+                            assert page.locator(
                                 'a[href="' + reverse("showcase:share", args=[job.pk]) + '"]'
-                            ).count()
+                            ).count() == int(kind == "accepted")
                             assert page.evaluate(
                                 "document.documentElement.scrollWidth <= innerWidth + 1"
                             )
@@ -238,6 +255,9 @@ def main():
                         raise
                     assert not errors, errors
                     context.close()
+                check_gpu_showcase(
+                    browser, address, user, other, password, version, showcase_fixtures, out, record
+                )
                 context = browser.new_context()
                 page = context.new_page()
                 login(page, other.username)
