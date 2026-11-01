@@ -16,6 +16,8 @@
 
 最终 `test-results/g56-components-final.xml/.log`：**784 passed、14 skipped**，耗时 212.59 秒。覆盖整站编排、原发布/准备/曝光/退出/恢复/冻结、CPU 协调器、Web 恢复和发布制品校验。14 项真实 PostgreSQL 专项因 SQLite 环境跳过：7 项配置/快照、5 项冻结和 2 项候选事务，不能计为通过。
 
+后续 [G57](acceptance-g57.md)已在独立 PostgreSQL 实例实际执行这 14 项，并补充完整迁移 schema 的权限与复制检查；上述 G56 日志继续保留当时的原始范围。
+
 整站模型使用实际原子文件、协调器文件锁和自有 CPU 子进程，数据库内容、Docker、代理、CPU/GPU 服务及成绩为显式模型。35 个整站场景覆盖四种安装/升级方向、曝光前后失败、未启动候选退出、清理失败保留原库、未标记数据库、归档与日志损坏、内容不重导、未知路由、活跃原 worker 的重试和退出后的重新恢复。
 
 其中十一处实际 SIGKILL 分别覆盖发布的 copying/migrating/preparing/exposing、代理开放后的写入，以及恢复的 freeze_source/retire_source/drain_target/prepare_target/expose_target/finished。父进程确认收到的信号并回收子进程，从实际保存的文件继续，检查不复制旧数据、不重启已经退休的候选。服务模型不能证明实际数据库复制、CUDA 清理或硬件正确性。

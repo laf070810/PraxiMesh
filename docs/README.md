@@ -32,6 +32,7 @@
 - [G55：GPU 配置退出与后续发布](acceptance-g55.md) — 原配置有序移除及实际 CPU 进程中断；完整 GPU→CPU 待连接
 - [ADR-072：按持久曝光决定协调整站 GPU 发布与恢复](adr/072-coordinated-gpu-release-recovery.md)
 - [G56：整站 GPU 发布编排与恢复方向](acceptance-g56.md) — 内部安装、升级和恢复的组合；公共入口及真实环境验收待完成
+- [G57：真实 PostgreSQL 权限、冻结与复制验证](acceptance-g57.md) — 完整迁移 schema、数据库恢复与事务竞争；不执行 GPU
 - [RFC-023：恢复时重建无状态 Web 容器](rfcs/023-web-container-recovery.md) — 已实施，真实复验待完成
 - [ADR-060：在原数据库恢复中重建无状态 Web](adr/060-web-container-recovery.md)
 - [G44：无状态 Web 持久重建的验证范围](acceptance-g44.md)

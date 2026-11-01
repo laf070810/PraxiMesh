@@ -39,6 +39,8 @@ def main():
             [
                 "--name",
                 name,
+                "--label",
+                "org.praximesh.acceptance=" + token,
                 "--memory=512m",
                 "--pids-limit=128",
                 "--mount",
@@ -65,7 +67,11 @@ def main():
                     raise RuntimeError("Temporary PostgreSQL did not become ready") from None
                 time.sleep(0.2)
         environment = dict(
-            os.environ, DATABASE_URL=url, DB_SSLMODE="disable", PRAXIMESH_MODE="local"
+            os.environ,
+            DATABASE_URL=url,
+            DB_SSLMODE="disable",
+            PRAXIMESH_MODE="local",
+            PRAXIMESH_TEST_POSTGRES_CONTAINER=name,
         )
         result = subprocess.run(
             [sys.executable, "-m", "pytest", *sys.argv[1:]],

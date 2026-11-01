@@ -177,6 +177,25 @@ export PRAXIMESH_DEPLOYMENT_TOKEN="$(python3 -c 'import uuid; print(uuid.uuid4()
 
 输出目录须尚不存在。脚本仅在本地派生固定 CPU HTTP 命令，使用自有临时容器、网络和占端口 socket，检查端口冲突、四处 SIGKILL 后继续及同名替换拒绝；结束时清理自有资源并核对基镜像保留。协调器/代理元数据为合成夹具，不使用数据库、学员代码或 GPU。此项通过后，仍须运行下文完整发布演练，验证实际 PostgreSQL、HTTPS、WASI、数据保留和 worker 重启；不能用专项检查替代完整恢复验收。
 
+<a id="database-validation"></a>
+
+### 原数据库权限、冻结与复制检查
+
+在独立验收环境执行以下命令。入口自动创建有资源上限的临时 PostgreSQL 容器和卷，使用回环端口；完整 schema 检查在额外的随机代际库运行当前真实迁移，按原 owner/marker 创建和清理角色及数据库。测试容器身份由入口自动提供，不使用已有站点数据库。
+
+```sh
+.venv/bin/python scripts/postgres_tests.py -q \
+    tests/test_deploy_database_postgres.py \
+    tests/test_deploy_gpu_config_postgres.py tests/test_deploy_gpu_freeze_postgres.py \
+    tests/test_deployment_gpu_check.py tests/test_deployment_gpu_check_postgres.py \
+    tests/test_gpu_admission_postgres.py tests/test_gpu_readiness_postgres.py \
+    tests/test_gpu_worker_postgres.py
+```
+
+范围包括真实 `pg_dump/pg_restore`、行和序列比较、Web/worker 权限、冻结后的连接拒绝、解冻时拒绝额外列权限与转授权限，以及候选队列、暂停、就绪和原任务结算的数据库竞争。GPU 状态和成绩是合成夹具，不查询设备、不运行 CUDA，也不开放 GPU 提交。直接在 SQLite 上运行会跳过 PostgreSQL 专属检查。
+
+当前结果见 [G57](../acceptance-g57.md)。这验证数据库组件，不替代 Web 端口专项、实际应用/worker 组合、HTTPS/WASI 发布矩阵或真实 GPU 升级验收。
+
 ### 完整发布与数据库检查
 
 ```sh

@@ -423,7 +423,7 @@ def test_completed_results_cannot_renew_expired_original_observation_budget(cand
 def test_cleanup_requires_explicit_terminal_status(candidate):
     prepare(candidate)
     settle(candidate)
-    Submission.objects.update(status="unknown-state")
+    Submission.objects.update(status="unknown")
     before = records()
     with pytest.raises(CommandError, match="terminal"):
         candidate.probe().run(cleanup=True)

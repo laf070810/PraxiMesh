@@ -62,6 +62,7 @@
 
 - 先复现具体失败，再修改和验证对应路径。优先有意义的状态、权限、边界与恢复检查；无需为纯文字调整增加重复实现的测试。相关检查通过后，仅在新改动或未解决问题需要时扩大测试范围。
 - 上例以内容检查为例，测试路径按改动模块选择。涉及 PostgreSQL 锁、角色权限或迁移时使用 `scripts/postgres_tests.py`，例如 `.venv/bin/python scripts/postgres_tests.py -q tests/test_community.py`；它创建并清理自有临时数据库。
+- 完整迁移 schema、角色权限、冻结/解冻和实际数据库复制使用 `tests/test_deploy_database_postgres.py`，沿上述 runner 提供的自有容器身份运行。它核对容器标签和回环端口，为每项检查建立随机数据库/角色，按原标记清理；不能把最小 schema 或 SQLite 结果当作完整 PostgreSQL 恢复验证。集中入口见[数据库验证](docs/deployment/production.md#database-validation)。
 - 真实评测先按 [WASI 指南](docs/deployment/wasi.md)配置可信 bundle、摘要及 `JUDGE_RECEIPT`，实际运行 `sandbox_check`。`RUN_SANDBOX_TESTS=1` 才启用相关集成场景；记录跳过原因，不把 skipped 当通过。
 - GPU 基础环境检查使用 `scripts/gpu_environment_probe.py`，按 [GPU 指南](docs/deployment/gpu.md)显式选择维护者授权的空闲单卡。检查采用固定完整 runsc 归档、临时用户服务和独立存储；不能以 CLI 参数代替真实父 cgroup 限额和节流检查。可选 `--nvrtc-archive` 重放审阅过的内核参考解/错解，编译也必须在隔离内进行，受保护答案留在控制器。各模式串行执行，不生成正式评测 receipt；保留制品/源码身份、失败、最终结果和清理记录。
 - GPU `--fault-probes` 只用于明确授权的独占卡，客户端超时后必须确认自有容器终止及设备无残留，并重跑正确解；不能终止未知进程或自动重置 GPU。`--image-archive` 可减少下载依赖，但必须校验固定清单与完整镜像层后导入独立存储，继续实际探针。CPU 内存配额、设备堆限制和整卡显存容量不能相互替代。

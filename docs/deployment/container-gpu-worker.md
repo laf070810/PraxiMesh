@@ -247,7 +247,7 @@ GPU 数据库冻结持有排空锁，直到 runtime 连接权限撤销和现有�
   tests/test_deploy_database.py tests/test_deploy_gpu_recovery.py
 ```
 
-具体范围、失败复现和 CPU 进程中断见 [G56](../acceptance-g56.md)，设计见 [ADR-072](../adr/072-coordinated-gpu-release-recovery.md)。还需实际 PostgreSQL 锁/权限和 Docker 组合验收，以及获授权独占 GPU 上的完整启动、队列、升级、候选失败回退和曝光后恢复。未完成这些检查前不开放公共入口；数据库辅助代码改变 worker 源码契约，须制作新的匹配制品，不能改写旧包。
+具体范围、失败复现和 CPU 进程中断见 [G56](../acceptance-g56.md)，设计见 [ADR-072](../adr/072-coordinated-gpu-release-recovery.md)。[真实数据库检查](production.md#database-validation)已补验证完整迁移 schema、角色/锁、冻结与复制，结果见 [G57](../acceptance-g57.md)。仍需实际应用/worker 与数据库的完整组合验收，以及获授权独占 GPU 上的完整启动、队列、升级、候选失败回退和曝光后恢复。未完成这些检查前不开放公共入口；数据库辅助代码改变 worker 源码契约，须制作新的匹配制品，不能改写旧包。
 
 <a id="configuration-retirement"></a>
 ### 回到 CPU 前退出原 GPU 配置
