@@ -1,6 +1,6 @@
 # RFC-023：恢复时重建无状态 Web 容器
 
-日期：2026-11-01，验证状态更新于 2026-11-02。状态：已实施，真实 Web 专项通过，完整发布复验待完成。对应 PRD R-09、AC-07；延续 [RFC-005](005-deployment-coordination.md)。决策见 [ADR-060](../adr/060-web-container-recovery.md)，组件与实测范围分别见 [G44](../acceptance-g44.md)、[G58](../acceptance-g58.md)。
+日期：2026-11-01，验证状态更新于 2026-11-02。状态：已实施，真实 Web 专项及当前 CPU 完整发布恢复矩阵通过。对应 PRD R-09、AC-07；延续 [RFC-005](005-deployment-coordination.md)。决策见 [ADR-060](../adr/060-web-container-recovery.md)，组件、专项与完整实测分别见 [G44](../acceptance-g44.md)、[G58](../acceptance-g58.md)、[G59](../acceptance-g59.md)。
 
 ## 已复现的问题
 
@@ -20,4 +20,4 @@
 
 控制流检查覆盖曝光前回到上一代、曝光后保留当前代，以及移除前、移除后、创建后、ID 保存后和启动后的中断重试、同名替换与持久数据拒绝。实际容器检查用自有固定 CPU HTTP 服务和占端口 socket，验证故障、重新创建、HTTP 和清理；明确不证明数据库或真实评测。
 
-完整 CPU 验收继续使用未改写的可信旧发布包、实际 PostgreSQL/HTTPS/WASI，重放四代切换、真实进程中断、数据保留、删除不复活和新提交。GPU 激活与真实硬件验证仍独立待完成；本修复不触碰设备。
+完整 CPU 验收在可信不可变制品上使用实际 PostgreSQL/HTTPS/WASI，重放代际切换、真实进程中断、数据保留、删除不复活和新提交。[G59](../acceptance-g59.md) 使用当前版本的新制品通过该矩阵；原旧发布包不改写，旧版→当前 schema 升级仍独立待验收。GPU 激活与真实硬件验证也尚待完成；本修复不触碰设备。

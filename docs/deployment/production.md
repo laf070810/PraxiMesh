@@ -149,7 +149,7 @@ export PRAXIMESH_DEPLOYMENT_TOKEN="$(python3 -c 'import uuid; print(uuid.uuid4()
 
 管理命令或所属容器的创建、启动、停止、移除失败时，协调器在私有状态目录保存 `control-failure-<UUID>.json`，文件为 0600。其中记录命令类别、退出码和脱敏后的 stdout/stderr 尾部，每路最多 64 KiB、整个文件最多 1 MiB；常规错误只给文件名定位。恢复失败也会在原部署日志记录失败阶段与诊断文件名，保留当前数据库和恢复阶段。日志不记录命令行或环境，已知配置凭证会被替换，但它仍是仅供部署维护者读取的内部诊断，不应作为公开 CI artifact 上传。诊断无法落盘时，原有控制容器清理和恢复流程仍会执行。
 
-已确认的 RootlessKit 端口冲突见 [G43](../acceptance-g43.md)：同容器重试可能显示 running，但没有发布端口且 HTTP 不可用。当前 `recover` 在维护、排空和停止后重建无状态 Web，沿用原代镜像、配置与数据库，重新分配内部回环端口；先记录原身份和意图，再移除/创建，保存新 ID 后才启动。未知容器、持久挂载或运行契约变化会拒绝自动处理。诊断须同时核对实际 `NetworkSettings.Ports` 和 HTTP，不能按容器运行状态判定恢复成功。组件验证见 [G44](../acceptance-g44.md)，六项真实 Docker/HTTP 专项已在 [G58](../acceptance-g58.md) 通过；完整应用、数据库与 worker 的发布矩阵仍待完成。
+已确认的 RootlessKit 端口冲突见 [G43](../acceptance-g43.md)：同容器重试可能显示 running，但没有发布端口且 HTTP 不可用。当前 `recover` 在维护、排空和停止后重建无状态 Web，沿用原代镜像、配置与数据库，重新分配内部回环端口；先记录原身份和意图，再移除/创建，保存新 ID 后才启动。未知容器、持久挂载或运行契约变化会拒绝自动处理。诊断须同时核对实际 `NetworkSettings.Ports` 和 HTTP，不能按容器运行状态判定恢复成功。组件验证见 [G44](../acceptance-g44.md)，六项真实 Docker/HTTP 专项见 [G58](../acceptance-g58.md)；[G59](../acceptance-g59.md) 已通过当前 CPU 制品的实际应用、数据库、HTTPS/WASI 与 worker 恢复矩阵。
 
 候选或恢复后的版本完成实际隔离探针、健康检查和功能验证后，用原 token 恢复：
 
@@ -202,7 +202,13 @@ PRAXIMESH_WEB_IMAGE=$(docker inspect --format '{{.Image}}' praximesh-web-1)
 
 当前结果见 [G57](../acceptance-g57.md)。这验证数据库组件，不替代 Web 端口专项、实际应用/worker 组合、HTTPS/WASI 发布矩阵或真实 GPU 升级验收。
 
+<a id="full-deployment-validation"></a>
+
 ### 完整发布与数据库检查
+
+完整演练包含真实浏览器操作，先在独立验收环境按 [HTTPS 验收准备](validation.md#准备与运行)配置浏览器及系统库。使用自定义 `PLAYWRIGHT_BROWSERS_PATH` 时，安装和运行须使用同一路径；它与服务容器中的依赖无关。
+
+当前通过记录见 [G59](../acceptance-g59.md)：同一 CPU 发布包的代际替换、真实失败迁移、曝光前后中断与自动重启恢复均通过。旧 F→当前版本的 schema 升级、真实 GPU 发布和目标主机运维仍分别验收。
 
 ```sh
 # PostgreSQL 并发矩阵；使用独立容器和显式数据库卷并自动清理。

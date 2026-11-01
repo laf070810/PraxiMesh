@@ -1,6 +1,6 @@
 # ADR-060：在原数据库恢复中重建无状态 Web
 
-日期：2026-11-01。状态：采纳；组件验证通过，真实容器与完整发布复验尚未完成。背景见 [RFC-023](../rfcs/023-web-container-recovery.md)，本轮证据见 [G44](../acceptance-g44.md)。
+日期：2026-11-01，验证状态更新于 2026-11-02。状态：采纳；组件、真实容器专项及当前 CPU 完整发布恢复矩阵通过。背景见 [RFC-023](../rfcs/023-web-container-recovery.md)，证据见 [G44](../acceptance-g44.md)、[G58](../acceptance-g58.md)、[G59](../acceptance-g59.md)。
 
 RootlessKit 的重启端口冲突可能留下 running 但无发布映射的容器。恢复路径采用维护期间的有记录重建，不对同一失败网络状态反复 start，也不从请求配置推断实际端口。
 

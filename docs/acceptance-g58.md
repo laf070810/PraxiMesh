@@ -28,3 +28,5 @@
 `test-results/g58-resource-check.json` 独立确认测试标签下无遗留容器、网络或派生镜像，原基镜像仍在。已有 Web、worker、tutor 的完整容器 ID、镜像 ID 和启动时间与运行前一致。清理使用 `--no-prune`；没有重复 G44 的父镜像缓存删除。
 
 这补齐了端口恢复专项，不能替代实际 PostgreSQL、HTTPS、WASI、四代切换、曝光前后中断、用户写入/删除保留与 worker 自动重启矩阵。数据库组件的 77 项真实检查见 [G57](acceptance-g57.md)，两者均不证明整站或 GPU 部署完成。
+
+后续 [G59](acceptance-g59.md) 已使用新建的当前 CPU 制品通过上述完整发布恢复矩阵，包含额外的真实失败迁移；旧 F→当前 schema 升级与 GPU 验收仍分别待完成。本轮固定 HTTP 专项的范围保持不变。

@@ -33,8 +33,9 @@
 - [ADR-072：按持久曝光决定协调整站 GPU 发布与恢复](adr/072-coordinated-gpu-release-recovery.md)
 - [G56：整站 GPU 发布编排与恢复方向](acceptance-g56.md) — 内部安装、升级和恢复的组合；公共入口及真实环境验收待完成
 - [G57：真实 PostgreSQL 权限、冻结与复制验证](acceptance-g57.md) — 完整迁移 schema、数据库恢复与事务竞争；不执行 GPU
-- [G58：真实 Web 端口恢复与中断续跑](acceptance-g58.md) — 六项 Docker/HTTP 专项通过；完整发布矩阵待完成
-- [RFC-023：恢复时重建无状态 Web 容器](rfcs/023-web-container-recovery.md) — 真实 Web 专项通过，完整发布复验待完成
+- [G58：真实 Web 端口恢复与中断续跑](acceptance-g58.md) — 六项 Docker/HTTP 专项通过
+- [G59：当前 CPU 发布制品与完整恢复演练](acceptance-g59.md) — 修正私有构建的源码目录权限；真实迁移故障、曝光前后中断及自动重启恢复通过
+- [RFC-023：恢复时重建无状态 Web 容器](rfcs/023-web-container-recovery.md) — 真实 Web 专项及当前 CPU 发布恢复矩阵通过
 - [ADR-060：在原数据库恢复中重建无状态 Web](adr/060-web-container-recovery.md)
 - [G44：无状态 Web 持久重建的验证范围](acceptance-g44.md)
 - [G43 原节点绑定与中断重试](acceptance-g43.md) — 无设备验收；完整 GPU 升级待完成

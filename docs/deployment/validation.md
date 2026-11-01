@@ -17,6 +17,8 @@ uv sync --frozen --group judge --group browser
 
 下载器只获取固定摘要的官方 Caddy 2.11.7，并保留其 LICENSE；目标已存在时拒绝覆盖。已下载的可信版本可直接重用。Docker 按固定 digest 获取 PostgreSQL 17。需要离线运行时先准备这些工具、浏览器、数据库镜像和 WASI 制品。使用 rootless Docker 时，由调用环境设置已有 daemon 的 `DOCKER_HOST`，脚本不会修改 daemon 或登录配置。
 
+如果浏览器安装时设置过 `PLAYWRIGHT_BROWSERS_PATH`，验收进程也必须继承同一路径；否则 Playwright 会去默认缓存查找，可能在应用启动后才报浏览器不存在。先确认当前固定虚拟环境能实际启动并关闭 Chromium，再运行需要真实 worker 的长时演练。不要为此同步正在运行的服务环境。
+
 ## 验收内容
 
 - owner 仅用于迁移、静态资源收集、内容导入和测试账号准备；Web 与 worker 分别使用受限角色。检查 Web 不可创建表、worker 不可读取账号表。

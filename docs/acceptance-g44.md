@@ -1,6 +1,6 @@
 # G44：无状态 Web 的持久重建与恢复
 
-日期：2026-11-01。状态：实现及组件验证完成；真实容器、完整 CPU 发布复验尚待完成。对应 PRD R-09、AC-07；[设计](rfcs/023-web-container-recovery.md)、[决策](adr/060-web-container-recovery.md)、[集中操作入口](deployment/production.md#web-recovery-check)。
+日期：2026-11-01。本轮完成实现及组件验证；后续 [G58](acceptance-g58.md)、[G59](acceptance-g59.md) 已补齐真实容器专项及当前 CPU 发布恢复矩阵。对应 PRD R-09、AC-07；[设计](rfcs/023-web-container-recovery.md)、[决策](adr/060-web-container-recovery.md)、[集中操作入口](deployment/production.md#web-recovery-check)。
 
 ## 实现范围
 
@@ -30,3 +30,5 @@
 ## 后续实测
 
 2026-11-02 的 [G58](acceptance-g58.md) 改用本账号已有的 Compose Web 不可变镜像 ID，通过六项实际 Docker/HTTP 检查，包括四处真实 SIGKILL；原服务及基镜像均保留。没有导入旧 F 镜像，先前的缓存恢复审批限制仍保留。端口专项缺口已补齐，完整 PostgreSQL/HTTPS/WASI 发布矩阵仍待完成；本页原始失败记录不变。
+
+同日 [G59](acceptance-g59.md) 新建当前 CPU 制品，在真实 PostgreSQL/HTTPS/WASI 上通过五次代际尝试、迁移失败、曝光前后中断和 worker 自动重启恢复。当前版本的完整矩阵缺口已补齐，旧 F→当前 schema 升级仍独立待验收。
