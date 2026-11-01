@@ -202,13 +202,22 @@ PRAXIMESH_WEB_IMAGE=$(docker inspect --format '{{.Image}}' praximesh-web-1)
 
 当前结果见 [G57](../acceptance-g57.md)。这验证数据库组件，不替代 Web 端口专项、实际应用/worker 组合、HTTPS/WASI 发布矩阵或真实 GPU 升级验收。
 
+历史 F 数据库结构到当前结构的检查使用相同临时容器入口：
+
+```sh
+.venv/bin/python scripts/postgres_tests.py -q \
+    tests/test_deploy_schema_upgrade_postgres.py
+```
+
+它先核对冻结清单中的历史迁移、内容和 Django 版本，用当前仓库中逐字节相同的历史迁移建立空库，再写入合成账号、私有记录及固定题目版本。实际冻结、复制和升级后，比较原字段数据、序列、旧写入方式和角色权限。无需导入旧镜像或访问 GPU；已通过记录见 [G60](../acceptance-g60.md)。此项没有运行旧版应用，不能替代旧应用到当前版本的整站升级演练。
+
 <a id="full-deployment-validation"></a>
 
 ### 完整发布与数据库检查
 
 完整演练包含真实浏览器操作，先在独立验收环境按 [HTTPS 验收准备](validation.md#准备与运行)配置浏览器及系统库。使用自定义 `PLAYWRIGHT_BROWSERS_PATH` 时，安装和运行须使用同一路径；它与服务容器中的依赖无关。
 
-当前通过记录见 [G59](../acceptance-g59.md)：同一 CPU 发布包的代际替换、真实失败迁移、曝光前后中断与自动重启恢复均通过。旧 F→当前版本的 schema 升级、真实 GPU 发布和目标主机运维仍分别验收。
+当前通过记录见 [G59](../acceptance-g59.md)：同一 CPU 发布包的代际替换、真实失败迁移、曝光前后中断与自动重启恢复均通过。[G60](../acceptance-g60.md)另行验证了重建的历史 F 数据库结构到当前结构的实际迁移；旧 F 应用到当前版本的整站升级、真实 GPU 发布和目标主机运维仍分别验收。
 
 ```sh
 # PostgreSQL 并发矩阵；使用独立容器和显式数据库卷并自动清理。

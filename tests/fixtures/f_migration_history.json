@@ -1,0 +1,40 @@
+{
+  "content_files": {
+    "content/starter.json": "25e5d4ba1222f425cfa0569921e77ed0c8f722a3c5a8af5d015b32441344b02c"
+  },
+  "django_version": "5.2.18",
+  "framework_targets": [
+    [
+      "auth",
+      "0012_alter_user_first_name_max_length"
+    ],
+    [
+      "contenttypes",
+      "0002_remove_content_type_name"
+    ],
+    [
+      "sessions",
+      "0001_initial"
+    ]
+  ],
+  "project_migrations": {
+    "challenges/migrations/0001_initial.py": "3b84e359cc156c9bdc3c22681e974c2eb67a8eef26a33a300dd6116fd988026e",
+    "coaching/migrations/0001_initial.py": "1d0d072b97f6e7771857b56e4067e8dc205533c0c0c3d76ebbbb361765db40eb",
+    "coaching/migrations/0002_slot_lock.py": "5fb75ffcfd3b690ba321f1a96fb1ac323531ff8c619a687be5c77afa473ce6c0",
+    "community/migrations/0001_initial.py": "e02dac4b7a1463a5fd8868e72051c6c5c23f6dd84ebb87587b83f5f46b1e12cc",
+    "community/migrations/0002_post_blog_kind.py": "d64c764caf43937453e28953bc9154c15033edee83acf6684870d5e9099687ff",
+    "community/migrations/0003_problem_feedback.py": "90fe743bfc45a3fe27ca43fef6077d573701f7324b1abb7051aecab6adaef918",
+    "core/migrations/0001_initial.py": "03a1d96341652c70c01fb5f39fafae0eddad10b934e6c2711c1e451ca6098983",
+    "core/migrations/0002_admission_and_policy.py": "6734f25e11021b497f6adc5e89fb43134190d8e106e9ccfbe1da233cdd669c83",
+    "core/migrations/0003_cpu_reservations.py": "a032df9bd09f3a1128515d5ed2d3d417a729ce321c11260881776984580b9898",
+    "learning/migrations/0001_initial.py": "2fd88eacceae2b0f93a798fc427d47cb3c3929f88a2bd9fa8988d1ed2b231bcb",
+    "localization/migrations/0001_initial.py": "35291830286db3580d8ea3d16dadcfba75db156bc6d538f1fd0352cc1e8b64af",
+    "localization/migrations/0002_backfill_snapshots.py": "979e5837992801de2b855444262a17bf9890c059b4bffe95d268c4782f059be9",
+    "organizations/migrations/0001_initial.py": "01ba644d5c88237ef83a628180f7b02f1b9f022326a34e611e62d28b67279aca",
+    "organizations/migrations/0002_publication_lock.py": "13be9663acab660b205b8753b9e9173f95f30ae5c2a01991de68abefd3656ace",
+    "practice_api/migrations/0001_initial.py": "341e24c94c3d4db9ab9fc50979333f246837defb0c2fad3ea223f4ae49181817",
+    "projects/migrations/0001_initial.py": "837f0ff267677ae6d1406cea9500f05af50398691ad68b6b635ffa85ee6915f4",
+    "showcase/migrations/0001_initial.py": "bce8826ca5859d78c697e043adf57ac0386717d596e00598e6666e66ad4615cc"
+  },
+  "release_sha256": "896e1c1b605025376ed30786ea4e79d3fde008c97e7d114bf91febd86cc62482"
+}
