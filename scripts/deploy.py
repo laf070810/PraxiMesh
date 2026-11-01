@@ -714,7 +714,33 @@ class Deployment:
         check = GPUReadiness(self, generation, release)
         return check.wait() if wait else check.observe()
 
+    def recover_gpu_worker(self, generation, release):
+        """Internal original-database recovery; never changes configuration or exposure."""
+        from scripts.deploy_gpu_recovery import GPUWorkerRecovery
+
+        return GPUWorkerRecovery(self, generation, release).run()
+
+    def require_cpu_lifecycle(self, manifest=None):
+        """Until full GPU coordination is connected, CPU paths cannot retire its state."""
+        state = self.state or {}
+        operation = state.get("operation") or {}
+        generations = (state.get("current"), operation.get("previous"), operation.get("candidate"))
+        if (
+            (manifest is not None and "gpu" in manifest)
+            or any(value and "gpu" in value.get("manifest", {}) for value in generations)
+            or state.get("gpu_configuration")
+            or state.get("gpu_runtime")
+            or state.get("gpu_recoveries")
+            or state.get("gpu_workers")
+            or state.get("gpu_checks")
+        ):
+            raise DeploymentError(
+                "GPU release activation or recovery requires the coordinated GPU lifecycle; "
+                "the CPU path cannot replace its original database or worker"
+            )
+
     def expose(self, generation, token, phase="active"):
+        self.require_cpu_lifecycle(generation["manifest"])
         self.control(generation, "judge_admission", "resume", "--token", token)
         if not self.ready(generation):
             raise DeploymentError("Specific candidate worker lost readiness")
@@ -738,10 +764,7 @@ class Deployment:
         }:
             raise DeploymentError("An unfinished deployment requires recover")
         manifest = verify(release, digest)
-        if "gpu" in manifest:
-            raise DeploymentError(
-                "GPU release activation requires the coordinated GPU lifecycle; artifact import alone is insufficient"
-            )
+        self.require_cpu_lifecycle(manifest)
         self.run("image", "load", "--input", str(release / "images.tar"), timeout=900)
         inspect_images(manifest)
         self.proxy.probe()
@@ -826,6 +849,7 @@ class Deployment:
             ) from None
 
     def restore_previous(self):
+        self.require_cpu_lifecycle()
         operation = self.state["operation"]
         self.proxy.maintenance()
         self.cleanup_controls()
@@ -848,6 +872,7 @@ class Deployment:
         self.check_gpu_attachment()
         if not self.state or not self.state.get("operation"):
             raise DeploymentError("No interrupted deployment to recover")
+        self.require_cpu_lifecycle()
         try:
             self._recover()
         except Exception as error:

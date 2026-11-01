@@ -110,6 +110,26 @@ def require_stopped_workers(host, node, binding):
                 raise ValueError(
                     "Reconcile the original GPU worker lifecycle before publishing configuration"
                 )
+    recoveries = host.state.get("gpu_recoveries", {})
+    if type(recoveries) is not dict:
+        raise ValueError("Invalid GPU recovery journal")
+    if recoveries:
+        from scripts.deploy_gpu_recovery import validate_record as validate_recovery
+
+        for key, record in recoveries.items():
+            validate_recovery(record)
+            lifecycle = transitions.get(record["generation"]["gpu_worker"])
+            if (
+                key != record["operation"] + ":" + record["generation"]["gpu_worker"]
+                or record["phase"] != "ready"
+                or record["container"] not in known
+                or record["runtime_sha256"] != known[record["container"]][1]["runtime_sha256"]
+                or record["generation"]["id"] != known[record["container"]][0]
+                or lifecycle is None
+                or record["generation"] != lifecycle["generation"]
+                or record["metadata_sha256"] != digest(lifecycle["metadata"])
+            ):
+                raise ValueError("Finish original GPU recovery before publishing configuration")
     operation = host.state.get("operation") or {}
     for generation in (
         host.state.get("current"),

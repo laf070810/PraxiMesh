@@ -566,18 +566,27 @@ class WorkerRuntime:
             self.register(info)
             return info
 
-    def preflight(self):
+    def preflight(self, previous):
         check = WorkerRuntime(self.host, self.generation, mode="check")
         record = check.load()
         if (
             record is None
             or record["phase"] != "completed"
             or record["metadata"] != self.record["metadata"]
+            or record["operation"] != self.host.state["operation"]["id"]
         ):
             raise WorkerLifecycleError("A completed fixed no-device preflight is required")
         info = check.inspect()
         if not check.success(info) or info["State"]["StartedAt"] != record["started_at"]:
             raise WorkerLifecycleError("The original no-device preflight result changed")
+        if previous["State"]["StartedAt"] not in ZERO:
+            finished = started(previous["State"].get("FinishedAt"))
+            if finished in ZERO or datetime.fromisoformat(
+                record["started_at"].replace("Z", "+00:00")
+            ) < datetime.fromisoformat(finished.replace("Z", "+00:00")):
+                raise WorkerLifecycleError(
+                    "A fresh preflight after the previous worker stop is required"
+                )
 
     def success(self, info):
         state = info["State"]
@@ -657,7 +666,7 @@ class WorkerRuntime:
                     "Original worker was started outside its recorded intent"
                 )
             if self.mode == "worker":
-                self.preflight()
+                self.preflight(info)
             if record["phase"] != "start_requested":
                 record.update(launch_before=info["State"]["StartedAt"], operation=token)
                 self.save("start_requested")

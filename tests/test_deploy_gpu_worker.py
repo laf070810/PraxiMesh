@@ -763,3 +763,31 @@ def test_same_start_instance_with_changed_run_state_is_not_accepted(lifecycle, d
     )
     with pytest.raises(WorkerLifecycleError, match="running state"):
         lifecycle.act("start")
+
+
+def test_worker_restart_requires_preflight_after_its_previous_stop(lifecycle):
+    act = lifecycle.act
+    act("check", "check")
+    act("create")
+    act("start")
+    act("stop")
+    with pytest.raises(WorkerLifecycleError, match="preflight"):
+        act("start")
+    act("stop", "check")
+    act("check", "check")
+    assert act("start")["State"]["Running"]
+
+
+def test_preflight_from_another_operation_cannot_authorize_startup(lifecycle):
+    import uuid
+
+    item, act = lifecycle.item, lifecycle.act
+    act("check", "check")
+    act("create")
+    item.token = str(uuid.uuid4())
+    host = item.coordinator()
+    with host.locked():
+        host.state["operation"]["id"] = item.token
+        host.save()
+    with pytest.raises(WorkerLifecycleError, match="preflight"):
+        act("start")
