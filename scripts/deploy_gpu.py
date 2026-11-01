@@ -199,6 +199,12 @@ class GPUDeploymentNode:
 
     def require_owner(self, binding):
         self.validate_binding(binding)
+        if hashlib.sha256(read_private(self.fd, "mounts.json")).hexdigest() != self.snapshot[
+            "mounts_sha256"
+        ] or encoded(decode_frame(read_private(self.journal_fd, "installation.json"))) != encoded(
+            self.snapshot["installation"]
+        ):
+            raise ValueError("Original GPU mount or installation changed while locked")
         if encoded(self.owner()) != encoded(binding):
             raise ValueError("Original GPU ownership marker is missing or changed")
 

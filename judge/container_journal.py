@@ -77,6 +77,75 @@ def private(info, *, directory=False):
         raise SandboxUnavailable("Container journal must be private and owned")
 
 
+def validate_record(record, identity, device):
+    """Check original task identity without executing or adopting its image."""
+    try:
+        args = record["arguments"]
+        job, reservation = uuid.UUID(record["job"]), uuid.UUID(record["reservation"])
+        expected_owner = owner(identity, device, job, reservation, record["purpose"])
+        labels, security = record["labels"], record["security"]
+        version = record["version"]
+        if type(version) is not int or version not in {1, 2, 3}:
+            raise ValueError
+        profile = SUPERVISION_PROFILE if version == 1 else record["resource_profile"]
+        if version >= 2 and profile != WORKLOAD_PROFILE:
+            raise ValueError
+        keys = KEYS | ({"resource_profile"} if version >= 2 else set())
+        if version == 3:
+            keys.add("device_spec")
+            selection = validate_selection(record["device_spec"])
+            if selection["uuid"] != record["device"]:
+                raise ValueError
+        if (
+            set(record) != keys
+            or any(
+                record[key] != identity[key] for key in ("installation", "engine", "lock_namespace")
+            )
+            or record["device"] != device
+            or record["owner"] != expected_owner
+            or record["name"] != "praximesh-gpu-container-" + expected_owner[:40]
+            or record["purpose"] not in {"task", "maintenance", "recovery"}
+            or not IMAGE_ID.fullmatch(record["image"])
+            or set(labels) != {PREFIX + "protocol", PREFIX + "runtime"}
+            or labels[PREFIX + "protocol"] != PROTOCOL
+            or not HEX_ID.fullmatch(labels[PREFIX + "runtime"])
+            or type(security) is not list
+            or len(security) != 2
+            or security[0] != "no-new-privileges"
+            or type(security[1]) is not dict
+            or type(record["image_env"]) is not list
+            or any(type(item) is not str for item in record["image_env"])
+            or type(args) is not list
+            or len(args) < 5
+            or any(type(item) is not str or not item or "\0" in item for item in args)
+            or args[3] != resource_marker(profile)
+            or not NONCE.fullmatch(args[2])
+            or not Path(args[4]).is_absolute()
+            or not all(math.isfinite(float(x)) for x in args[:2])
+            or not 0 < float(args[1]) - float(args[0]) <= MAX_SECONDS
+            or record["phase"] not in {"intent", "created", "running", "removed"}
+            or (record["container_id"] is not None and not HEX_ID.fullmatch(record["container_id"]))
+            or (
+                record["started_at"] is not None
+                and (
+                    type(record["started_at"]) is not str
+                    or not 1 <= len(record["started_at"]) <= 128
+                )
+            )
+            or (
+                record["phase"] == "intent"
+                and (record["container_id"] is not None or record["started_at"] is not None)
+            )
+            or (record["phase"] in {"created", "running"} and record["container_id"] is None)
+            or (record["phase"] == "created" and record["started_at"] is not None)
+            or (record["phase"] == "running" and record["started_at"] is None)
+        ):
+            raise ValueError
+    except (KeyError, TypeError, ValueError, AttributeError):
+        raise SandboxUnavailable("Invalid or unsupported durable container record") from None
+    return record
+
+
 class ContainerJournal:
     def __init__(self, directory, guard, engine):
         if type(guard) is not DeviceLock:
@@ -246,77 +315,7 @@ class ContainerJournal:
         record = self.read(self.filename)
         if record is None:
             return None
-        try:
-            args = record["arguments"]
-            job, reservation = uuid.UUID(record["job"]), uuid.UUID(record["reservation"])
-            expected_owner = owner(
-                self.identity, self.guard.device_uuid, job, reservation, record["purpose"]
-            )
-            labels, security = record["labels"], record["security"]
-            version = record["version"]
-            if type(version) is not int or version not in {1, 2, 3}:
-                raise ValueError
-            profile = SUPERVISION_PROFILE if version == 1 else record["resource_profile"]
-            if version >= 2 and profile != WORKLOAD_PROFILE:
-                raise ValueError
-            keys = KEYS | ({"resource_profile"} if version >= 2 else set())
-            if version == 3:
-                keys.add("device_spec")
-                selection = validate_selection(record["device_spec"])
-                if selection["uuid"] != record["device"]:
-                    raise ValueError
-            if (
-                set(record) != keys
-                or any(
-                    record[key] != self.identity[key]
-                    for key in ("installation", "engine", "lock_namespace")
-                )
-                or record["device"] != self.guard.device_uuid
-                or record["owner"] != expected_owner
-                or record["name"] != "praximesh-gpu-container-" + expected_owner[:40]
-                or record["purpose"] not in {"task", "maintenance", "recovery"}
-                or not IMAGE_ID.fullmatch(record["image"])
-                or set(labels) != {PREFIX + "protocol", PREFIX + "runtime"}
-                or labels[PREFIX + "protocol"] != PROTOCOL
-                or not HEX_ID.fullmatch(labels[PREFIX + "runtime"])
-                or type(security) is not list
-                or len(security) != 2
-                or security[0] != "no-new-privileges"
-                or type(security[1]) is not dict
-                or type(record["image_env"]) is not list
-                or any(type(item) is not str for item in record["image_env"])
-                or type(args) is not list
-                or len(args) < 5
-                or any(type(item) is not str or not item or "\0" in item for item in args)
-                or args[3] != resource_marker(profile)
-                or not NONCE.fullmatch(args[2])
-                or not Path(args[4]).is_absolute()
-                or not all(math.isfinite(float(x)) for x in args[:2])
-                or not 0 < float(args[1]) - float(args[0]) <= MAX_SECONDS
-                or record["phase"] not in {"intent", "created", "running", "removed"}
-                or (
-                    record["container_id"] is not None
-                    and not HEX_ID.fullmatch(record["container_id"])
-                )
-                or (
-                    record["started_at"] is not None
-                    and (
-                        type(record["started_at"]) is not str
-                        or not 1 <= len(record["started_at"]) <= 128
-                    )
-                )
-                or (
-                    record["phase"] == "intent"
-                    and (record["container_id"] is not None or record["started_at"] is not None)
-                )
-                or (record["phase"] in {"created", "running"} and record["container_id"] is None)
-                or (record["phase"] == "created" and record["started_at"] is not None)
-                or (record["phase"] == "running" and record["started_at"] is None)
-            ):
-                raise ValueError
-        except (KeyError, TypeError, ValueError, AttributeError):
-            raise SandboxUnavailable("Invalid or unsupported durable container record") from None
-        return record
+        return validate_record(record, self.identity, self.guard.device_uuid)
 
     def begin(self, service, arguments):
         if self.load() is not None:

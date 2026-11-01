@@ -376,3 +376,25 @@ def test_partial_gpu_build_arguments_fail_before_building(monkeypatch, tmp_path)
     with pytest.raises(SystemExit) as error:
         release.main()
     assert error.value.code == 1
+
+
+def test_explicit_configuration_protocol_keeps_legacy_archive_compatibility(package):
+    release.verify(package.root, finish(package))
+    package.manifest["gpu"]["worker_configuration"] = "generation-pair-v1"
+    release.verify(package.root, finish(package))
+
+
+@pytest.mark.parametrize("value", [None, True, "unknown-protocol", {}, 1])
+def test_unknown_configuration_protocol_is_not_an_activation_capability(package, value):
+    package.manifest["gpu"]["worker_configuration"] = value
+    with pytest.raises(ValueError, match="GPU release identity"):
+        validate_metadata(package.manifest["gpu"], package.manifest["source_files"])
+
+
+def test_configuration_capability_requires_protocol_source_in_execution_scope(package):
+    package.manifest["gpu"]["worker_configuration"] = "generation-pair-v1"
+    package.manifest["gpu"]["source_scopes"]["execution"].remove(
+        "judge/container_deployment_config.py"
+    )
+    with pytest.raises(ValueError, match="publication protocol"):
+        validate_metadata(package.manifest["gpu"], package.manifest["source_files"])

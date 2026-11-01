@@ -272,3 +272,27 @@ def test_rendering_copies_private_configuration_and_requires_original_lock(bound
     bound.database["url"] = "postgresql://changed:p@db/changed"
     bound.generation["manifest"]["gpu"]["driver"]["libraries"].clear()
     assert config == bound.config and record == bound.record
+
+
+@pytest.mark.parametrize("raw", [b"", b"{", b"{}", b"unknown", b"{}\n"])
+def test_any_unfinished_publication_marker_prevents_worker_read(bound, raw):
+    path = bound.root / metadata.TRANSITION
+    path.write_bytes(raw)
+    path.chmod(0o600)
+    with pytest.raises(ValueError, match="publication is unfinished"):
+        read_config(bound.root)
+
+
+def test_transition_appearing_during_generation_read_is_refused(bound, monkeypatch):
+    original = metadata.read
+
+    def read(fd, name, **kwargs):
+        value = original(fd, name, **kwargs)
+        if name == metadata.GENERATION:
+            path = bound.root / metadata.TRANSITION
+            path.touch(mode=0o600)
+        return value
+
+    monkeypatch.setattr(metadata, "read", read)
+    with pytest.raises(ValueError, match="changed during"):
+        read_config(bound.root)

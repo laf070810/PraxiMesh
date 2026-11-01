@@ -98,6 +98,8 @@ export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
 
 该 format 2 保存同一冻结源码的四个角色：`web`、`worker`、`gpu_worker`、`gpu_task`。GPU 有序源码范围和契约来自冻结构建器；校验时从归档重新计算，不用当前源码代替旧版本，也不执行归档代码。数据库凭据、GPU UUID、私有状态与运行凭证都留在部署节点，不进入发布包。构建使用临时镜像标签，导入前按上面的 `verify` / `load` 命令核对独立可信摘要。
 
+新构建的 GPU 元数据另声明 `worker_configuration: generation-pair-v1`，对应[代际配置发布](container-gpu-worker.md#generation-configuration)中遇到未完成切换即拒绝读取的协议。校验器接受未声明此字段的旧包，但不会将旧镜像视为支持内部配置发布。声明必须匹配已归档的协议源码范围；不要修改旧清单补字段。
+
 导入后的无设备应用检查使用新的独立数据库和 Compose 项目：
 
 ```sh

@@ -18,6 +18,7 @@ sys.path.insert(0, str(ROOT))
 ROLES = {"gpu_worker", "gpu_task"}
 SCOPES = {"execution", "controller", "worker", "task"}
 HEX = re.compile(r"[a-f0-9]{64}")
+WORKER_CONFIGURATION = "generation-pair-v1"
 # These describe release schema 1, not the current contents of the working tree.
 REQUIRED = {
     "execution": {"judge/gpu_policy.py", "core/gpu_worker.py", "core/gpu_readiness.py"},
@@ -41,7 +42,12 @@ def validate_metadata(value, files):
 
     if (
         type(value) is not dict
-        or set(value) != {"schema", "profile", "contracts", "source_scopes", "driver", "management"}
+        or set(value) - {"worker_configuration"}
+        != {"schema", "profile", "contracts", "source_scopes", "driver", "management"}
+        or (
+            "worker_configuration" in value
+            and value["worker_configuration"] != WORKER_CONFIGURATION
+        )
         or type(value["schema"]) is not int
         or value["schema"] != 1
         or value["profile"] != "container-single-card-v1"
@@ -67,6 +73,11 @@ def validate_metadata(value, files):
         and set(scopes["controller"]) <= set(scopes["worker"])
     ):
         raise ValueError("GPU source scopes are inconsistent")
+    if "worker_configuration" in value and any(
+        "judge/container_deployment_config.py" not in scopes[name]
+        for name in ("execution", "controller", "worker")
+    ):
+        raise ValueError("GPU release omits its configuration publication protocol")
     application = {
         name for name in files if name.endswith(".py") and name.split("/", 1)[0] in APP_DIRECTORIES
     }
@@ -230,6 +241,7 @@ def main():
     metadata = {
         "schema": 1,
         "profile": "container-single-card-v1",
+        "worker_configuration": WORKER_CONFIGURATION,
         "contracts": {
             "execution": execution_digest(),
             "controller": controller_digest(),

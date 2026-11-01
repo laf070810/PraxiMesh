@@ -132,17 +132,26 @@ DOCKER_HOST="unix://$PRAXIMESH_DOCKER_SOCKET" \
 
 已绑定的节点要求私有 `deployment-generation.json` 与 `worker.json`、原所有权、原目录/锁和安装身份一致。代际记录还绑定数据库、worker 登录角色、发布包及 worker 镜像契约。命令会在 Django 初始化后、取得原设备锁后分别重读完整快照；配置或记录变化时停止，不进入启动探针或领取任务。
 
-目前已实现身份校验与原锁下的配置生成，尚未提供完成实际停止、原数据库预约清理和持久切换的发布入口。不要手工创建代际记录、修改摘要或对已绑定节点套用独立 Compose 的启用步骤。完整生命周期接通之前，`apply` 仍拒绝 GPU 发布。旧独立 worker 配置保持原行为；旧四镜像包仍可核验，但不支持新协议的镜像不能用于协调器代际配置。
+已实现身份校验、配置生成和协调器内部的双文件持久发布。发布必须持原协调器/设备锁，确认实际维护路由、原 worker 已停止且禁止自动重启、任务 journal 已清理，以及旧库与目标库都在本次暂停下排空并无物理预约。部署日志保存原目标；节点上的 `deployment-config-transition.json` 在整个切换中阻止 worker 读取，包括标记写到一半的情况。中断只可继续原意图，未知内容保留并失败。
+
+这仍是开发中的内部流程，尚无完成 worker 生命周期的发布命令。不要手工创建代际记录、移除发布中标记、修改摘要或对已绑定节点套用独立 Compose 的启用步骤。`apply` 继续拒绝 GPU 发布。旧独立 worker 配置保持原行为；旧四镜像包仍可核验，内部发布只接受显式声明 `worker_configuration: generation-pair-v1` 的新制品。
 
 文件/配置与启动边界的无设备组件检查可运行：
 
 ```sh
 .venv/bin/pytest -q tests/test_container_deployment_config.py \
   tests/test_container_worker_config.py tests/test_container_worker.py \
-  tests/test_deploy_gpu.py
+  tests/test_deploy_gpu.py tests/test_deploy_gpu_config.py \
+  tests/test_deploy_gpu_config_database.py
 ```
 
-这些检查使用临时私有文件、合成元数据和显式运行时替身，不能替代真实镜像、PostgreSQL、GPU 或部署验收。当前范围见 [G45](../acceptance-g45.md)。新协议已纳入 GPU/worker 源码契约，使用时必须构建并验证新镜像，不复用旧 GPU 凭证。
+上述检查使用实际临时文件、文件锁及 CPU 子进程中断，数据库、代理和容器状态使用显式替身。真实 PostgreSQL 行锁、暂停归属和孤立预约检查使用一次性数据库入口：
+
+```sh
+.venv/bin/python scripts/postgres_tests.py -q tests/test_deploy_gpu_config_postgres.py
+```
+
+当前实际范围见 [G45](../acceptance-g45.md) 与 [G46](../acceptance-g46.md)。跳过的 PostgreSQL 检查不算通过，文件中断结果也不能替代真实镜像、GPU 或完整部署验收。新协议已纳入 GPU/worker 源码契约，使用时必须构建并验证新镜像，不复用旧 GPU 凭证。
 
 ## Compose 预检与运行
 

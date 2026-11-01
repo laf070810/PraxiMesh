@@ -15,6 +15,7 @@ from judge.gpu_session import decode_frame
 
 OWNER = "deployment-owner.json"
 GENERATION = "deployment-generation.json"
+TRANSITION = "deployment-config-transition.json"
 MAX_METADATA = 32 * 1024
 SHA256 = re.compile(r"[a-f0-9]{64}")
 NONCE = re.compile(r"[a-f0-9]{32}")
@@ -127,6 +128,8 @@ def inode(info):
 
 
 def check_generation(directory_fd, config, *, worker_contract=None):
+    if read(directory_fd, TRANSITION, optional=True) is not None:
+        raise ValueError("GPU generation configuration publication is unfinished")
     owner_raw = read(directory_fd, OWNER, optional=True)
     record_raw = read(directory_fd, GENERATION, optional=True)
     if owner_raw is None and record_raw is None:
@@ -181,6 +184,10 @@ def check_generation(directory_fd, config, *, worker_contract=None):
                 raise ValueError("Original GPU directory changed during configuration read")
         finally:
             os.close(fd)
-    if read(directory_fd, OWNER) != owner_raw or read(directory_fd, GENERATION) != record_raw:
+    if (
+        read(directory_fd, OWNER) != owner_raw
+        or read(directory_fd, GENERATION) != record_raw
+        or read(directory_fd, TRANSITION, optional=True) is not None
+    ):
         raise ValueError("GPU generation metadata changed during configuration read")
     return record

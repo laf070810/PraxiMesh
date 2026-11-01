@@ -14,7 +14,7 @@ import stat
 import subprocess
 import time
 import uuid
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from urllib.parse import quote
 
@@ -906,10 +906,84 @@ class DeploymentDatabase:
             if "core_gpudevice" in worker_privileges(connection):
                 connection.execute("UPDATE core_gpudevice SET state='quarantined', checked_at=NULL")
 
-    def url(self, name, role):
+    def _url(self, name, role):
         self._validate_name(name)
         if role not in self.roles and role != "owner":
             raise DeploymentDatabaseError("Invalid database connection role")
         user = self.config["owner_user"] if role == "owner" else self.roles[role]
         password = self.config[role + "_password"]
-        return f"postgresql://{quote(user, safe='')}:{quote(password, safe='')}@{self.container}:5432/{name}?sslmode=disable"
+        return f"postgresql://{quote(user, safe='')}:{quote(password, safe='')}@{self.container}:5432/{name}"
+
+    def url(self, name, role):
+        return self._url(name, role) + "?sslmode=disable"
+
+    def worker_configuration(self, name):
+        """Private worker settings keep TLS selection outside the URL query."""
+        return {"url": self._url(name, "worker"), "sslmode": "disable"}
+
+    @contextmanager
+    def gpu_configuration_guard(self, names, token):
+        """Hold original/target admission and reservation rows across publication."""
+        try:
+            canonical_token = type(token) is str and str(uuid.UUID(token)) == token
+        except ValueError:
+            canonical_token = False
+        if (
+            type(names) not in (list, tuple)
+            or not 1 <= len(names) <= 2
+            or any(type(name) is not str for name in names)
+            or not canonical_token
+        ):
+            raise DeploymentDatabaseError("Expected the original databases and operation token")
+        self._require_operation_lock()
+        try:
+            with ExitStack() as scope:
+                connections = []
+                for name in sorted(set(names)):
+                    connection = scope.enter_context(self.connection(name))
+                    if "core_gpudevice" not in worker_privileges(connection):
+                        raise DeploymentDatabaseError(
+                            "GPU configuration requires the recorded GPU schema"
+                        )
+                    # Existing row locks cannot exclude a new device registration.
+                    # Hold this before row locks, so even inserts remain blocked.
+                    connection.execute(
+                        "LOCK TABLE public.core_gpudevice IN SHARE ROW EXCLUSIVE MODE"
+                    )
+                    connections.append(connection)
+
+                def check():
+                    self._require_operation_lock()
+                    for connection in connections:
+                        # Follow GPU claim order: physical device rows, then queue.
+                        devices = connection.execute(
+                            "SELECT job_id, reservation_token FROM public.core_gpudevice "
+                            "ORDER BY id FOR UPDATE"
+                        ).fetchall()
+                        row = connection.execute(
+                            "SELECT pause_token, paused_at FROM public.core_queuelock "
+                            "WHERE id=1 FOR UPDATE"
+                        ).fetchone()
+                        pending = connection.execute(
+                            "SELECT EXISTS (SELECT 1 FROM public.core_submission "
+                            "WHERE status IN ('queued', 'running'))"
+                        ).fetchone()[0]
+                        if (
+                            not row
+                            or str(row[0]) != token
+                            or row[1] is None
+                            or pending
+                            or any(
+                                job is not None or reservation is not None
+                                for job, reservation in devices
+                            )
+                        ):
+                            raise DeploymentDatabaseError(
+                                "GPU configuration requires the owned pause and fully drained original databases"
+                            )
+
+                check()
+                yield check
+                check()
+        except (psycopg.Error, OSError):
+            raise DeploymentDatabaseError("GPU configuration database checks failed") from None

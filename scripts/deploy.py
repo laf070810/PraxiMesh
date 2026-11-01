@@ -173,6 +173,7 @@ class Deployment:
         self.path = self.directory / "deployment.json"
         self.config_digest = hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()
         self.state = None
+        self._lock_descriptor = None
 
     @property
     def database(self):
@@ -191,6 +192,8 @@ class Deployment:
 
     @contextmanager
     def locked(self, *, attach_gpu=False):
+        if self._lock_descriptor is not None:
+            raise DeploymentError("Nested deployment operation is forbidden")
         self.proxy.ensure_directory()
         lock_path = self.directory / "deployment.lock"
         if lock_path.is_symlink():
@@ -201,6 +204,8 @@ class Deployment:
                 fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
                 raise DeploymentError("Another operation owns this deployment") from None
+            self._lock_descriptor = descriptor
+            self.require_locked()
             if self.path.exists():
                 private_file(self.path)
                 self.state = json.loads(self.path.read_text())
@@ -219,7 +224,23 @@ class Deployment:
                         )
             yield
         finally:
+            self._lock_descriptor = None
             os.close(descriptor)
+
+    def require_locked(self):
+        descriptor = self._lock_descriptor
+        if descriptor is None:
+            raise DeploymentError("GPU configuration requires the original deployment lock")
+        held = os.fstat(descriptor)
+        named = (self.directory / "deployment.lock").lstat()
+        if (
+            not stat.S_ISREG(held.st_mode)
+            or held.st_uid != os.getuid()
+            or stat.S_IMODE(held.st_mode) != 0o600
+            or held.st_nlink != 1
+            or (held.st_dev, held.st_ino) != (named.st_dev, named.st_ino)
+        ):
+            raise DeploymentError("Original deployment lock changed")
 
     def save(self, phase=None):
         if phase is not None:
@@ -663,6 +684,19 @@ class Deployment:
             type(attachment) is not dict or attachment.get("phase") != "attached"
         ):
             raise DeploymentError("Complete the durable attach-gpu operation first")
+
+    def publish_gpu_configuration(self, generation, *, enabled=False):
+        """Internal preparation only; apply still refuses GPU activation."""
+        from scripts.deploy_gpu_config import publish
+
+        self.require_locked()
+        self.check_gpu_attachment()
+        binding = self.state["gpu_attachment"]["binding"]
+        engine_id = self.run("info", "--format", "{{.ID}}").decode().strip()
+        with GPUDeploymentNode(
+            self.config["gpu"], self.directory, self.state["site_id"], engine_id
+        ).locked() as node:
+            return publish(self, node, binding, generation, enabled=enabled)
 
     def expose(self, generation, token, phase="active"):
         self.control(generation, "judge_admission", "resume", "--token", token)
