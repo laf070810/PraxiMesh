@@ -572,7 +572,8 @@ def test_failed_control_captures_real_process_output_privately_and_redacts_secre
         raise error
 
     controller = SimpleNamespace(
-        locked=nullcontext,
+        locked=lambda **kwargs: nullcontext(),
+        check_gpu_attachment=lambda: None,
         database=SimpleNamespace(operation_lock=nullcontext),
         maintain=raise_error,
     )

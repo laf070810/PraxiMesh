@@ -4,6 +4,7 @@ import copy
 
 import pytest
 
+from scripts import deploy_acceptance
 from scripts.deploy_acceptance import Rehearsal, parse_options, validate_upgrade_manifests
 
 
@@ -28,6 +29,32 @@ def upgrade_arguments(*extra):
         "b" * 64,
         *extra,
     )
+
+
+@pytest.mark.parametrize("enhanced", [False, True])
+def test_browser_contract_follows_verified_current_generation_not_inherited_override(
+    tmp_path,
+    monkeypatch,
+    enhanced,
+):
+    options = parse_options(arguments("--artifacts", str(tmp_path / "artifacts")))
+    options.artifacts.mkdir()
+    rehearsal = Rehearsal(options, tmp_path)
+    rehearsal.base, rehearsal.pin = "https://127.0.0.1:8443", "unused-test-pin"
+    files = {"static/editor/manifest.json": "a" * 64} if enhanced else {}
+    rehearsal.journal = lambda: {"current": {"manifest": {"source_files": files}}}
+    monkeypatch.setenv("BROWSER_EDITOR", "textarea" if enhanced else "codemirror")
+    captured = {}
+
+    def capture(*args, **kwargs):
+        captured.update(kwargs["env"])
+        raise InterruptedError("No browser or network in this boundary check")
+
+    monkeypatch.setattr(deploy_acceptance.subprocess, "run", capture)
+    with pytest.raises(InterruptedError):
+        rehearsal.browser()
+    assert captured["BROWSER_EDITOR"] == ("codemirror" if enhanced else "textarea")
+    assert captured["BROWSER_ARTIFACTS"] == str(options.artifacts / "browser")
 
 
 @pytest.mark.parametrize(

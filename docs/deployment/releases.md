@@ -111,4 +111,4 @@ export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
 
 第一个入口核对源码匹配、真实数据库最小权限、私有配置、默认关闭及失败拒绝，不映射 GPU、发布 ready 或执行任务。第二个入口沿用上文的浏览器/judge 依赖及匹配的本地 WASI 配置，验证包内 CPU 应用；输出目录必须是新目录。两者都不能作为 GPU 硬件验收。
 
-当前 `deploy.py apply` 会在任何服务/数据库变更前拒绝 format 2，直到 GPU 排空、停止、原状态保留与候选完整启动接入协调器。首次独立 worker 配置仍按 [GPU 容器指南](container-gpu-worker.md)操作；不要将制品校验成功解释为升级成功。设计与实际结果见 [ADR-058](../adr/058-gpu-release-artifacts.md)和 [G42](../acceptance-g42.md)。
+当前 `deploy.py apply` 会在任何服务/数据库变更前拒绝 format 2，直到 GPU 排空、停止、原状态保留与候选完整启动接入协调器。协调器已有[原节点绑定](container-gpu-worker.md#coordinator-binding)和中断重试入口；首次独立 worker 配置仍按 [GPU 容器指南](container-gpu-worker.md)操作。制品或绑定通过不能替代升级验收。制品设计与实际结果见 [ADR-058](../adr/058-gpu-release-artifacts.md)和 [G42](../acceptance-g42.md)，后续协调方案见 [RFC-022](../rfcs/022-gpu-release-coordination.md)。

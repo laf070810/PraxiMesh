@@ -589,8 +589,14 @@ class Rehearsal:
         )
 
     def browser(self, *, problem_feedback=False):
+        files = self.journal()["current"]["manifest"]["source_files"]
         environment = dict(
-            os.environ, BROWSER_URL=self.base, BROWSER_TEST_SPKI=self.pin, BROWSER_JUDGE="1"
+            os.environ,
+            BROWSER_URL=self.base,
+            BROWSER_TEST_SPKI=self.pin,
+            BROWSER_JUDGE="1",
+            BROWSER_EDITOR="codemirror" if "static/editor/manifest.json" in files else "textarea",
+            BROWSER_ARTIFACTS=str(self.options.artifacts / "browser"),
         )
         with (self.options.artifacts / "browser.log").open("wb") as stream:
             subprocess.run(

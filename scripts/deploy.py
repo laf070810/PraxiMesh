@@ -29,6 +29,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from scripts.deploy_database import DeploymentDatabase, DeploymentDatabaseError  # noqa: E402
+from scripts.deploy_gpu import GPUDeploymentNode  # noqa: E402
+from scripts.deploy_gpu import configuration as gpu_configuration  # noqa: E402
 from scripts.deploy_proxy import DeploymentProxy, ProxyError  # noqa: E402
 from scripts.release import initial_content_commands, inspect_images, verify  # noqa: E402
 
@@ -84,7 +86,7 @@ def configuration(path):
     if (
         not isinstance(config, dict)
         or not required <= config.keys()
-        or set(config) - required - {"health_ca"}
+        or set(config) - required - {"health_ca", "gpu"}
     ):
         raise DeploymentError("Unexpected deployment configuration fields")
     if (
@@ -149,6 +151,11 @@ def configuration(path):
             coaching_environment(app["coaching"])
         except ValueError:
             raise DeploymentError("Invalid optional HTTPS coaching configuration") from None
+    if "gpu" in config:
+        try:
+            gpu_configuration(config["gpu"])
+        except (ValueError, OSError):
+            raise DeploymentError("Invalid original GPU node configuration") from None
     return config
 
 
@@ -178,7 +185,7 @@ class Deployment:
         return self._database
 
     @contextmanager
-    def locked(self):
+    def locked(self, *, attach_gpu=False):
         self.proxy.ensure_directory()
         lock_path = self.directory / "deployment.lock"
         if lock_path.is_symlink():
@@ -193,9 +200,18 @@ class Deployment:
                 private_file(self.path)
                 self.state = json.loads(self.path.read_text())
                 if self.state.get("config_digest") != self.config_digest:
-                    raise DeploymentError(
-                        "Configuration changed; reconcile it explicitly before deployment"
-                    )
+                    original = {key: value for key, value in self.config.items() if key != "gpu"}
+                    original_digest = hashlib.sha256(
+                        json.dumps(original, sort_keys=True).encode()
+                    ).hexdigest()
+                    if (
+                        not attach_gpu
+                        or "gpu" not in self.config
+                        or self.state.get("config_digest") != original_digest
+                    ):
+                        raise DeploymentError(
+                            "Configuration changed; reconcile it explicitly before deployment"
+                        )
             yield
         finally:
             os.close(descriptor)
@@ -562,6 +578,51 @@ class Deployment:
         }
         self.save()
 
+    def attach_gpu(self):
+        if not self.state or "gpu" not in self.config:
+            raise DeploymentError(
+                "Initialize the site and explicitly configure the original GPU node"
+            )
+        operation = self.state.get("operation")
+        if operation and operation["phase"] not in {"active", "rolled_back", "failed_initial"}:
+            raise DeploymentError("Finish the existing deployment before attaching a GPU node")
+        if not self.state.get("gpu_attachment") and "gpu" in (
+            (self.state.get("current") or {}).get("manifest") or {}
+        ):
+            raise DeploymentError("An existing GPU generation cannot use first-time attachment")
+        engine_id = self.run("info", "--format", "{{.ID}}").decode().strip()
+        with GPUDeploymentNode(
+            self.config["gpu"], self.directory, self.state["site_id"], engine_id
+        ).locked() as node:
+            attachment = self.state.get("gpu_attachment")
+            if attachment is None:
+                node.require_fresh()
+                attachment = {"phase": "prepared", "binding": node.proposal(uuid.uuid4().hex)}
+                self.state["gpu_attachment"] = attachment
+                self.save()  # Durable intent before publishing ownership in the original state.
+            elif (
+                type(attachment) is not dict
+                or set(attachment) != {"phase", "binding"}
+                or attachment["phase"] not in {"prepared", "attached"}
+            ):
+                raise DeploymentError("Unrecognized GPU attachment journal")
+            node.validate_binding(attachment["binding"])
+            if attachment["phase"] == "attached":
+                node.require_owner(attachment["binding"])
+                return
+            node.require_fresh(attachment["binding"])
+            node.publish_owner(attachment["binding"])
+            attachment["phase"] = "attached"
+            self.state["config_digest"] = self.config_digest
+            self.save()
+
+    def check_gpu_attachment(self):
+        attachment = self.state.get("gpu_attachment") if self.state else None
+        if ("gpu" in self.config or attachment is not None) and (
+            type(attachment) is not dict or attachment.get("phase") != "attached"
+        ):
+            raise DeploymentError("Complete the durable attach-gpu operation first")
+
     def expose(self, generation, token, phase="active"):
         self.control(generation, "judge_admission", "resume", "--token", token)
         if not self.ready(generation):
@@ -577,6 +638,7 @@ class Deployment:
     def apply(self, release, digest, initial_content=False):
         if not self.state:
             raise DeploymentError("Run init first")
+        self.check_gpu_attachment()
         previous_operation = self.state.get("operation")
         if previous_operation and previous_operation["phase"] not in {
             "active",
@@ -698,6 +760,7 @@ class Deployment:
         self.expose(previous, operation["id"], "rolled_back")
 
     def recover(self):
+        self.check_gpu_attachment()
         if not self.state or not self.state.get("operation"):
             raise DeploymentError("No interrupted deployment to recover")
         self.cleanup_controls()
@@ -750,6 +813,7 @@ class Deployment:
             self.restore_previous()
 
     def maintain(self):
+        self.check_gpu_attachment()
         if (
             self.state
             and self.state.get("current")
@@ -763,7 +827,7 @@ def main():
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--state", type=Path, required=True)
     commands = parser.add_subparsers(dest="action", required=True)
-    for action in ["init", "status", "recover", "serve-proxy", "maintain"]:
+    for action in ["init", "status", "recover", "serve-proxy", "maintain", "attach-gpu"]:
         commands.add_parser(action)
     apply = commands.add_parser("apply")
     apply.add_argument("--release", type=Path, required=True)
@@ -779,7 +843,9 @@ def main():
                 command = deployment.proxy.command()
                 environment = deployment.proxy.environment()
             os.execvpe(command[0], command, environment)
-        with deployment.locked():
+        with deployment.locked(attach_gpu=options.action == "attach-gpu"):
+            if options.action in {"apply", "recover", "maintain"}:
+                deployment.check_gpu_attachment()
             if options.action == "apply":
                 with deployment.database.operation_lock():
                     deployment.apply(
@@ -788,6 +854,8 @@ def main():
             elif options.action in {"recover", "maintain"}:
                 with deployment.database.operation_lock():
                     getattr(deployment, options.action)()
+            elif options.action == "attach-gpu":
+                deployment.attach_gpu()
             elif options.action != "status":
                 getattr(deployment, options.action)()
             state = deployment.state or {}
@@ -798,6 +866,7 @@ def main():
                         "phase": (state.get("operation") or {}).get("phase", "initialized"),
                         "current_generation": (state.get("current") or {}).get("id"),
                         "current_release": (state.get("current") or {}).get("release_sha256"),
+                        "gpu_attachment": (state.get("gpu_attachment") or {}).get("phase"),
                     },
                     indent=2,
                 )

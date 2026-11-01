@@ -74,6 +74,58 @@ export PRAXIMESH_GPU_TASK_IMAGE="$(.venv/bin/python -c 'import json,sys; print(j
 
 使用 `verify-full` 时，初始化后将可信数据库 CA 写入 `$PRAXIMESH_GPU_STATE/database-ca.pem`，权限 0600。配置工具和 worker 不迁移数据库、不发布题目、不创建账号，也不会把检查结果设为正式成绩。
 
+<a id="coordinator-binding"></a>
+
+## 将原节点绑定到发布协调器
+
+此入口面向准备使用 PostgreSQL/HTTPS [发布协调器](production.md)管理 GPU 的新安装，与上文独立 Compose worker 配置二选一。当前已支持节点认领及中断重试；代际数据库切换、GPU worker 生命周期和真实升级仍在接入，`apply` 继续拒绝四镜像 GPU 包。绑定成功不会开放 GPU 提交。
+
+已有 worker、任务或预约的状态不能使用首次绑定。保留其原目录、锁和数据库，由原后端恢复；不能删除 `worker.json`、活动记录或另建锁目录来通过检查。
+
+尚未初始化的新节点，可在已获设备读取授权、确认独占条件后，只准备原私有身份，暂不写 worker 数据库连接。沿用上文构建产生的 `PRAXIMESH_GPU_BUILD` 和原 rootless socket；这条命令会读取 GPU 元数据，**不属于无设备检查**：
+
+```sh
+.venv/bin/python scripts/configure_container_worker.py \
+  --initialize --prepare-only \
+  --gpu "$PRAXIMESH_GPU_UUID" \
+  --docker-socket "$PRAXIMESH_DOCKER_SOCKET" \
+  --worker-image-manifest "$PRAXIMESH_GPU_BUILD/worker-image.json" \
+  --state "$PRAXIMESH_GPU_STATE"
+```
+
+在已初始化站点的私有部署配置中增加以下 `gpu` 对象，填实际绝对路径及规范 UUID（`GPU-` 前缀、其余十六进制字母小写），保留所有原字段和密钥：
+
+```json
+"gpu": {
+  "state": "/absolute/path/to/original-gpu-state",
+  "docker_socket": "/run/user/UID/docker.sock",
+  "device": "GPU-填写已授权设备的完整UUID"
+}
+```
+
+显式使用与 CPU 协调器相同的 daemon、配置及部署状态目录：
+
+```sh
+DOCKER_HOST="unix://$PRAXIMESH_DOCKER_SOCKET" \
+  .venv/bin/python scripts/deploy.py \
+  --config /absolute/path/to/deployment-config.json \
+  --state /absolute/path/to/deployment-state attach-gpu
+```
+
+`attach-gpu` 本身只核对已有私有文件和 Docker 身份，不查询或映射 GPU，不启动 worker、连接数据库或切换代理。它先保存部署侧意图，再写入原节点的 `deployment-owner.json`，最后确认配置摘要；成功状态为 `gpu_attachment: attached`。不能借此修改数据库密码、网络或其他配置。绑定后独立配置工具拒绝写入该节点。
+
+中途退出时，用完全相同的配置和路径重跑 `attach-gpu`。它只接受原意图、原锁及原安装身份；遇到其他所有权记录、未知文件或已存在的 worker 配置会保留记录并失败。绑定未确认前不执行 `apply`、`recover` 或 `maintain`。常规 `status` 仍遵守配置摘要，不能据此绕过未完成的绑定。不要手工修改摘要或认领记录。
+
+不占 GPU 的绑定验收使用合成元数据、自有临时状态、真实 rootless daemon 和进程锁，四个实际 SIGKILL 位置覆盖意图、临时文件、所有权记录及确认；只允许 Docker `info`，不启动数据库、代理或任何容器：
+
+```sh
+.venv/bin/python scripts/deploy_gpu_acceptance.py \
+  --docker-socket "$PRAXIMESH_DOCKER_SOCKET" \
+  --output "test-results/gpu-attachment-$(date +%Y%m%d-%H%M%S)"
+```
+
+输出目录必须是新目录。此检查不执行上面的元数据初始化，也不证明 CUDA、GPU 队列或升级成功。设计见 [RFC-022](../rfcs/022-gpu-release-coordination.md)。
+
 ## Compose 预检与运行
 
 准备非敏感连接参数。数据库网络须是现有 PostgreSQL 容器所在网络；这里不会新建或改写应用数据库。`PRAXIMESH_GPU_MINOR` 从挂载清单读取物理 minor，不能用 CUDA 逻辑序号代替。

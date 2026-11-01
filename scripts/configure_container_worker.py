@@ -24,6 +24,7 @@ from judge.gpu_device_lock import DeviceLock  # noqa: E402
 from judge.gpu_monitor import identify, processes, query  # noqa: E402
 from judge.gpu_session import decode_frame  # noqa: E402
 from judge.nvml_artifacts import validate_manifest as validate_management  # noqa: E402
+from scripts.deploy_gpu import OWNER  # noqa: E402
 
 
 def read_private(path, *, artifact=False):
@@ -125,6 +126,12 @@ def configure(directory, worker_id, task_image, driver_manifest, database, *, en
     )
     # Never replace a live worker's configuration or create a second lock namespace.
     with DeviceLock(directory / "locks", value["gpu"]):
+        try:
+            (directory / OWNER).lstat()
+        except FileNotFoundError:
+            pass
+        else:
+            raise ValueError("This GPU state belongs to a deployment coordinator")
         create_json(directory / "worker.json", value)
     return value
 
@@ -132,15 +139,20 @@ def configure(directory, worker_id, task_image, driver_manifest, database, *, en
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--state", required=True, type=Path)
-    parser.add_argument("--worker-id", required=True)
-    parser.add_argument("--task-image", required=True)
-    parser.add_argument("--driver-manifest", required=True, type=Path)
+    parser.add_argument("--worker-id")
+    parser.add_argument("--task-image")
+    parser.add_argument("--driver-manifest", type=Path)
     parser.add_argument(
         "--initialize",
         action="store_true",
         help="New installation only: explicitly read selected idle GPU metadata and create persistent mount identities.",
     )
     parser.add_argument("--gpu", help="Full UUID authorized for --initialize; never an index.")
+    parser.add_argument(
+        "--prepare-only",
+        action="store_true",
+        help="With --initialize, explicitly read authorized GPU metadata and prepare original state for deployment attachment; do not create worker settings.",
+    )
     parser.add_argument("--docker-socket", help="Private rootless socket for --initialize.")
     parser.add_argument(
         "--worker-image-manifest",
@@ -149,7 +161,6 @@ def main():
     )
     parser.add_argument(
         "--database-file",
-        required=True,
         type=Path,
         help="Private 0600 JSON with url and sslmode; never pass credentials on CLI.",
     )
@@ -160,25 +171,59 @@ def main():
     )
     args = parser.parse_args()
     try:
-        driver = validate_manifest(decode_frame(read_private(args.driver_manifest, artifact=True)))
-        database = decode_frame(read_private(args.database_file))
+        settings = (args.worker_id, args.task_image, args.driver_manifest, args.database_file)
+        if args.prepare_only:
+            if not args.initialize or any(settings) or args.enable:
+                raise ValueError(
+                    "Prepare-only needs initialization without worker or database options"
+                )
+        else:
+            if not all(settings):
+                raise ValueError(
+                    "Worker ID, fixed task image, driver and private database are required"
+                )
+            driver = validate_manifest(
+                decode_frame(read_private(args.driver_manifest, artifact=True))
+            )
+            database = decode_frame(read_private(args.database_file))
         if args.initialize:
             if not all((args.gpu, args.docker_socket, args.worker_image_manifest)):
                 raise ValueError(
                     "New installation needs a selected UUID, socket and worker image manifest"
                 )
             image = decode_frame(read_private(args.worker_image_manifest, artifact=True))
-            if image.get("schema") != 1 or not IMAGE_ID.fullmatch(image.get("image", "")):
+            if (
+                type(image) is not dict
+                or type(image.get("schema")) is not int
+                or image["schema"] != 1
+                or not IMAGE_ID.fullmatch(image.get("image", ""))
+            ):
                 raise ValueError("Invalid pinned worker image manifest")
+            if not args.prepare_only:
+                # Reject malformed settings before any explicitly selected device read.
+                validate_config(
+                    {
+                        "schema": 1,
+                        "enabled": args.enable,
+                        "gpu": args.gpu,
+                        "worker_id": args.worker_id,
+                        "task_image": args.task_image,
+                        "driver_manifest": driver,
+                        "database": database,
+                    }
+                )
             initialize_state(
                 args.state, LocalEngine(args.docker_socket), args.gpu, image["management_manifest"]
             )
         elif any((args.gpu, args.docker_socket, args.worker_image_manifest)):
             raise ValueError("Metadata initialization options require --initialize")
-        configure(
-            args.state, args.worker_id, args.task_image, driver, database, enabled=args.enable
-        )
-        print("Private worker configuration created; no workload or readiness was started.")
+        if args.prepare_only:
+            print("Original GPU state prepared; no worker configuration or readiness was created.")
+        else:
+            configure(
+                args.state, args.worker_id, args.task_image, driver, database, enabled=args.enable
+            )
+            print("Private worker configuration created; no workload or readiness was started.")
     except Exception as error:
         print("Container worker configuration failed: " + type(error).__name__, file=sys.stderr)
         return 1

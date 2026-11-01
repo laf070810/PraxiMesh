@@ -3,6 +3,7 @@
 import copy
 import json
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,7 @@ import pytest
 from judge.container_worker_config import database_settings, read_config, validate_config
 from judge.container_worker_image import source_files, worker_digest
 from judge.sandbox import SandboxUnavailable
+from scripts import configure_container_worker as preparation
 from scripts.configure_container_worker import configure
 from tests.test_container_adapter import configured as configured
 from tests.test_container_driver import bundle as bundle
@@ -31,6 +33,122 @@ def configuration(configured):
 def write_private(path, value):
     path.write_text(json.dumps(value))
     path.chmod(0o600)
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["--prepare-only"],
+        ["--prepare-only", "--initialize", "--enable"],
+        ["--prepare-only", "--initialize", "--worker-id", "unexpected"],
+        ["--prepare-only", "--initialize", "--database-file", "unused.json"],
+        ["--prepare-only", "--initialize"],
+        ["--initialize"],
+        [],
+    ],
+)
+def test_invalid_preparation_options_do_not_read_a_device(tmp_path, monkeypatch, arguments):
+    monkeypatch.setattr(preparation, "initialize_state", lambda *a: pytest.fail("Device read"))
+    monkeypatch.setattr(preparation, "LocalEngine", lambda *a: pytest.fail("Engine access"))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "configure_container_worker.py",
+            "--state",
+            str(tmp_path / "new"),
+            *arguments,
+        ],
+    )
+    assert preparation.main() == 1
+    assert not (tmp_path / "new").exists()
+
+
+def test_prepare_only_delegates_explicit_metadata_initialization_without_worker_settings(
+    tmp_path,
+    monkeypatch,
+    configuration,
+    configured,
+):
+    metadata = tmp_path / "worker-image.json"
+    write_private(
+        metadata,
+        {
+            "schema": 1,
+            "image": "sha256:" + "c" * 64,
+            "management_manifest": configured.adapter.environment["artifacts"][
+                "management_manifest"
+            ],
+        },
+    )
+    engine = object()
+    calls = []
+    monkeypatch.setattr(preparation, "LocalEngine", lambda *a: engine)
+    monkeypatch.setattr(preparation, "initialize_state", lambda *args: calls.append(args))
+    monkeypatch.setattr(preparation, "configure", lambda *a, **kw: pytest.fail("Worker settings"))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "configure_container_worker.py",
+            "--state",
+            str(tmp_path / "new"),
+            "--initialize",
+            "--prepare-only",
+            "--gpu",
+            configuration["gpu"],
+            "--docker-socket",
+            str(tmp_path / "docker.sock"),
+            "--worker-image-manifest",
+            str(metadata),
+        ],
+    )
+    assert preparation.main() == 0
+    assert len(calls) == 1 and calls[0][1] is engine and calls[0][2] == configuration["gpu"]
+    assert calls[0][3] == json.loads(metadata.read_text())["management_manifest"]
+    assert not (tmp_path / "new" / "worker.json").exists()
+
+
+def test_malformed_database_is_rejected_before_new_installation_device_read(
+    tmp_path,
+    monkeypatch,
+    configuration,
+):
+    driver = tmp_path / "driver.json"
+    database = tmp_path / "database.json"
+    metadata = tmp_path / "worker-image.json"
+    write_private(driver, configuration["driver_manifest"])
+    write_private(
+        database, {"url": "postgresql://worker@db/without_password", "sslmode": "disable"}
+    )
+    write_private(metadata, {"schema": 1, "image": "sha256:" + "c" * 64})
+    monkeypatch.setattr(preparation, "initialize_state", lambda *a: pytest.fail("Device read"))
+    monkeypatch.setattr(preparation, "LocalEngine", lambda *a: pytest.fail("Engine access"))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "configure_container_worker.py",
+            "--state",
+            str(tmp_path / "new"),
+            "--initialize",
+            "--gpu",
+            configuration["gpu"],
+            "--docker-socket",
+            str(tmp_path / "docker.sock"),
+            "--worker-image-manifest",
+            str(metadata),
+            "--worker-id",
+            "test",
+            "--task-image",
+            configuration["task_image"],
+            "--driver-manifest",
+            str(driver),
+            "--database-file",
+            str(database),
+        ],
+    )
+    assert preparation.main() == 1
 
 
 @pytest.mark.parametrize(
@@ -166,6 +284,27 @@ def test_configuration_uses_original_lock_and_never_overwrites_existing_state(
         configure(*args, enabled=True)
     assert (tmp_path / "worker.json").read_bytes() == before
     assert not (tmp_path / "receipts").exists()
+
+
+def test_standalone_configuration_cannot_write_coordinator_owned_state(
+    tmp_path,
+    configured,
+    configuration,
+):
+    (tmp_path / "locks").mkdir(mode=0o700)
+    observer = copy.deepcopy(configured.control.saved["device_observer"])
+    observer.update(schema=2, minor=0)
+    write_private(tmp_path / "mounts.json", {"version": 4, "device_observer": observer})
+    write_private(tmp_path / preparation.OWNER, {"synthetic": "already assigned"})
+    with pytest.raises(ValueError, match="deployment coordinator"):
+        configure(
+            tmp_path,
+            configuration["worker_id"],
+            configuration["task_image"],
+            configuration["driver_manifest"],
+            configuration["database"],
+        )
+    assert not (tmp_path / "worker.json").exists()
 
 
 def test_worker_image_scope_includes_application_entry_and_every_controller_source():

@@ -6,6 +6,9 @@
 
 - [阶段计划与安全发布门槛](plan.md)
 - [完整 PRD 需求追踪](requirements.md) — 全目标实施中，当前 F 自部署制品及版本题目反馈已验证
+- [RFC-022：GPU 发布协调与原数据库恢复](rfcs/022-gpu-release-coordination.md) — 实施中
+- [ADR-059：GPU 协调器绑定原节点身份](adr/059-gpu-deployment-attachment.md)
+- [G43 原节点绑定与中断重试](acceptance-g43.md) — 无设备验收；完整 GPU 升级待完成
 - [ADR-058：同一冻结源码的四镜像 GPU 发布制品](adr/058-gpu-release-artifacts.md)
 - [G42 四镜像 GPU 发布制品](acceptance-g42.md)
 - [RFC-006：阶段 B/C 的完整产品实施](rfcs/006-complete-product.md) — 实施中

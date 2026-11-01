@@ -28,6 +28,7 @@
 - 数据库结构变化追加迁移，保留已交付迁移文件。新增表/应用时核对 `scripts/deploy_database.py` 的角色权限、`scripts/release.py` 的源码范围和 `Dockerfile` 的复制范围；Web/worker 不获得全表权限来规避授权错误。
 - 发布包不可原地改写。新控制器必须能校验需要升级的旧制品；新增开发文档不得无意变成旧清单的必填项。schema 升级、失败恢复和内容发布分别说明验证范围。
 - GPU 发布使用同一冻结源码的四镜像 format 2，默认 CPU format 1 保持兼容。构建与核验在 `scripts/release.py`、`scripts/release_gpu.py`；有序源码契约从归档字节计算，导入前核对完整镜像层、角色和入口，不能执行归档代码或借用当前工作树/daemon 缓存。按[发布指南](docs/deployment/releases.md#gpu-release)串行验证导入后的无设备 worker 和 CPU 应用。制品通过不代表 GPU 激活或升级通过；未接入完整 GPU 生命周期的协调器必须拒绝激活。
+- GPU 协调器节点绑定在 `scripts/deploy_gpu.py`，操作集中在[原节点绑定](docs/deployment/container-gpu-worker.md#coordinator-binding)。先保存意图再认领同一私有状态和锁，只允许 `attach-gpu` 为原配置增加 GPU 字段；不得借此改密钥或接管已有 worker/任务。绑定未确认前不得触及数据库或执行发布变更。`--prepare-only --initialize` 仍读取真实 GPU，需要授权；`deploy_gpu_acceptance.py` 才是合成元数据与实际文件锁/SIGKILL 的无设备检查，不生成就绪证据。
 - 界面字符串使用 Django 翻译，维护 `.po` 和编译后的 `.mo`；内容译文绑定准确的源版本。缺少译文明确回退，不能借用另一版本文本。
 - 编辑器源码在 `frontend/`，按 [编辑器指南](docs/editor.md)更新 npm 锁文件、预构建静态资源和许可证；不能只改源码而遗留旧 bundle。保留 textarea 回退、私有草稿、异步修订保护及 CSP nonce，分析工具不得执行源码或外发代码。界面改动用 `scripts/browser_acceptance.py --interface` 验证中英、多种宽度、键盘操作与失败回退。
 - 标题、列表、表单与选项须共用页面边距。无独立页头的内容页继承 `workspace_base.html`；带 `.page-heading` 的正文使用 `.section.compact`，避免正文直接落在无边距的 main 下。布局检查应比较正文和标题的实际起点，并包含 320 像素手机页、多行标题及两种 Django 复选框结构，不能只检查横向溢出。账号说明、长笔记、连续卡片和令牌选项也要覆盖；比较栅格容器时计入其内边距，卡片间距规则不能改变多列布局。
