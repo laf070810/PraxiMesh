@@ -36,7 +36,7 @@
 - [G58：真实 Web 端口恢复与中断续跑](acceptance-g58.md) — 六项 Docker/HTTP 专项通过
 - [G59：当前 CPU 发布制品与完整恢复演练](acceptance-g59.md) — 修正私有构建的源码目录权限；真实迁移故障、曝光前后中断及自动重启恢复通过
 - [G60：历史 F 数据库结构到当前版本的迁移验证](acceptance-g60.md) — 实际复制、旧数据/序列保留和最小权限通过；旧应用整站升级待验收
-- [G61：无头浏览器绘制环境与发布包复验](acceptance-g61.md) — 桌面会话隔离、实际截图预检与源码浏览器通过；发布包待重放
+- [G61：无头浏览器绘制环境与发布包复验](acceptance-g61.md) — 桌面会话隔离、实际截图预检、200 组布局及冻结 CPU 发布包复验通过；托管 CI 待验收
 - [RFC-023：恢复时重建无状态 Web 容器](rfcs/023-web-container-recovery.md) — 真实 Web 专项及当前 CPU 发布恢复矩阵通过
 - [ADR-060：在原数据库恢复中重建无状态 Web](adr/060-web-container-recovery.md)
 - [G44：无状态 Web 持久重建的验证范围](acceptance-g44.md)

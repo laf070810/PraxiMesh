@@ -24,7 +24,18 @@
 
 - `g61-runtime-preflight.json`：在原显示与 D-Bus 环境仍存在的调用进程中完成真实截图，父进程环境完全不变。
 - `g61-components.xml/.log`：**73 passed、0 skipped**，覆盖验收控制、组织夹具和发布包规则。
-- `g61-browser-fixed.log`：完整源码浏览器退出码 0；编辑器、草稿、学习记录、社区审核/举报/申诉/撤回/导出、账号删除、英文和工程项目流程通过。`g61-browser-fixed/editor/layouts.json` 的中英 25 页、4 种宽度共 **200 组**通过。
+- `g61-browser-fixed.log`：完整源码浏览器退出码 0；编辑器、草稿、学习记录、社区审核/举报/申诉/撤回/导出、账号删除、英文和工程项目流程通过。`g61-browser-fixed/editor/layouts.json` 的中英 25 页、320/390/768/1440 四种宽度共 **200 组**通过，覆盖标题/正文边界、筛选控件和复选框对齐及横向溢出检查。
+- `g61-gpu-render-run.json` 与 `px-gpu-results-c572304ae28f/result.json`：统一启动器的补充渲染通过，包含 24 组结果页、6 组关闭状态、2 组 CUDA 编辑器、6 组发现入口、38 组分享/榜单检查及跨账号拒绝。仅使用合成数据，没有 GPU 执行；一次性数据库已清理。实际查看了英文 390px 分享页和中文 CUDA 编辑器截图。
 - 源码浏览器使用一次性 SQLite 和回环服务，评测关闭；结束后由原入口清理数据库及服务。全仓库 Ruff、格式检查通过。
 
-完整冻结发布包待按修复后的验收脚本重放；目前不能将首次失败记录标为通过。此次没有修改默认题库、应用 schema 或 CPU/GPU 执行策略；托管 CI、旧 F 应用跨版本升级和真实 GPU 的门槛继续保留。
+## 冻结发布包复验
+
+修复提交 `d3989925079504b9afb1334fce7700ae4b26be19` 的验收脚本已完整重放上述 G59 发布包，`test-results/g61-release-fixed/release-acceptance.json` 记录 **passed=true**。归档仍是原不可变制品；复验前纳入对比的 375 个归档源码文件中，372 个与当前工作树一致，只有三个宿主验收脚本不同（`browser_organizations.py`、`compose_acceptance.py`、`release_acceptance.py`）。应用和 worker 源码未改；宿主使用新的统一浏览器启动器。具体对比和原服务身份见 `g61-release-fixed-before.json`。
+
+镜像内重新完成 **129 个真实 WASI 启动探针**，随后浏览器完成真实 Run、错误提交、Accepted、学习进度和账号删除。中英、工程项目、筛选，以及专业题型、博客、版本反馈、组织课程、规则辅导、挑战、类/API 流程全部通过；不同功能流程使用独立限流窗口，没有在流程内重置计数。准入超时关闭、真实队列排空与恢复，以及错误 WASI bundle 在 worker 启动前拒绝也通过。
+
+本次使用私有 Docker 网络、回环 HTTP 和合成 PostgreSQL 数据库，保留 owner/Web/worker 分权、非 root 只读容器、Web 无执行运行时、无 Docker socket/宿主绑定和 worker 内部网络。AI 关闭；不将规则辅导当作模型验证，也不将此次 HTTP 复验当作新的 HTTPS 或 Compose 全栈验收。
+
+`g61-release-fixed-resource-check.json` 确认退出码 0、临时容器/网络/卷全部清理、原三个服务 ID/镜像/启动时间未变、发布镜像保留。首次失败目录和日志仍保留；独立下载用于诊断的浏览器缓存已清理，原缓存未变，见 `g61-browser-cache-cleanup.json`。
+
+此次没有修改默认题库、应用 schema 或 CPU/GPU 执行策略，没有访问 GPU、加载旧 F 镜像或推送。托管 CI、旧 F 应用跨版本升级和真实 GPU 的门槛继续保留；远端旧失败是否同因仍无日志证据。
