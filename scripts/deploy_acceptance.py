@@ -661,10 +661,9 @@ class Rehearsal:
             if problem_feedback
             else "community_moderation_via_https_browser"
         ] = True
-        receipt = (
-            self.directory
-            / "test-results"
-            / ("problem-feedback-browser.json" if problem_feedback else "community-browser.json")
+        browser_artifacts = Path(environment["BROWSER_ARTIFACTS"])
+        receipt = browser_artifacts / (
+            "problem-feedback-browser.json" if problem_feedback else "community-browser.json"
         )
         community_result = json.loads(receipt.read_text())
         assert (
@@ -672,7 +671,7 @@ class Rehearsal:
             and community_result["https" if problem_feedback else "https_transport_tested"]
         )
         (self.options.artifacts / receipt.name).write_bytes(receipt.read_bytes())
-        for screenshot in (self.directory / "test-results").glob("*.png"):
+        for screenshot in browser_artifacts.glob("*.png"):
             (self.options.artifacts / screenshot.name).write_bytes(screenshot.read_bytes())
 
     def interrupted_apply(self, checkpoint, expected_phase):

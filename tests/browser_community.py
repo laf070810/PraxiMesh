@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from browser_smoke import editor
 from playwright.sync_api import expect, sync_playwright
 
 MODERATOR_PREFIX = "community-reviewer-"
@@ -147,7 +148,7 @@ def run_workflow(browser, base, accounts, result, artifacts, progress, errors):
     private_source = "def solve(values): return 0\n# PRIVATE-COMMUNITY-SOURCE-" + suffix
     phase("private_draft_and_explicit_review_request")
     author_page.goto(base + "/problems/sum-positive/")
-    author_page.locator(".cm-content[contenteditable]").fill(private_source)
+    editor(author_page, private_source)
     author_page.get_by_role("button", name="保存草稿", exact=True).click()
     expect(author_page.locator("#editor-status")).to_have_text("草稿已私密保存")
     author_page.get_by_role("link", name="写题解", exact=True).click()
@@ -323,8 +324,8 @@ def main():
             "Explicit synthetic moderator credentials are required in the environment."
         )
     arguments = launch_arguments(base, os.environ.get("BROWSER_TEST_SPKI", ""))
-    artifacts = Path("test-results")
-    artifacts.mkdir(exist_ok=True)
+    artifacts = Path(os.environ.get("BROWSER_ARTIFACTS", "test-results"))
+    artifacts.mkdir(parents=True, exist_ok=True)
     suffix = uuid.uuid4().hex[:12]
     accounts = [
         {"username": "browser-community-author-" + suffix, "password": secrets.token_urlsafe(36)},

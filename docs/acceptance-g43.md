@@ -8,7 +8,7 @@
 
 `test-results/g43-attachment-real/result.json` 的九项真实无设备检查通过：首次绑定和幂等重试、跨进程原锁竞争、复制协调器拒绝、意图/临时文件/所有权记录/确认四处实际 SIGKILL 后按原意图继续，以及旧 worker 配置和未知活动记录拒绝。原锁和挂载字节保留，私有测试状态清理完成。记录中的 Docker 调用只包含实际 `info`；没有启动容器、数据库或代理。设备元数据与已初始化站点记录是明确的合成夹具，不能作为真实 GPU 身份、硬件或部署成功的证据。
 
-276 项绑定、旧 CPU 协调器、配置、发布格式和代理检查通过，见 `test-results/g43-binding-final.xml`。后续补充的独立配置所有权检查通过，见 `g43-owner-config.xml`；新旧编辑器的显式验收契约、绑定与私有配置专项 109 项通过，见 `g43-compatibility.xml`。这些集合有重叠，不累计成独立用例数。
+276 项绑定、旧 CPU 协调器、配置、发布格式和代理检查通过，见 `test-results/g43-binding-final.xml`。后续补充的独立配置所有权检查通过，见 `g43-owner-config.xml`；新旧编辑器的显式验收契约、绑定与私有配置专项 109 项通过，见 `g43-compatibility.xml`。社区兼容修复后，当前八个相关模块的 304 项检查与验收工具的 23 项检查分别通过，均无跳过，见 `g43-components-final.xml`、`g43-harness.xml`；此前模块名误写的命令未运行用例，保留在 `g43-components-current.log`。前后检查有重叠，不累计成独立用例数。
 
 新准备模式只增加 `--prepare-only` 参数分支，真实设备初始化未执行。参数冲突或不完整设置在设备访问前拒绝，正常 worker 配置也先校验数据库 URL；正向委派使用替身验证，不宣称完成元数据初始化验收。
 
@@ -18,7 +18,11 @@
 
 使用独立可信 F 发布包 `896e1c1b605025376ed30786ea4e79d3fde008c97e7d114bf91febd86cc62482` 和固定 Caddy 2.11.7 重放当前 CPU 协调器。首轮真实 WASI 启动及应用安装通过，浏览器脚本随后要求旧 F 包不存在的 CodeMirror 而失败；不是 GPU 或部署成功。失败及完整清理记录在 `test-results/g43-cpu-coordinator/`。
 
-已让浏览器契约由实际当前代的已验证源码清单决定：旧包明确使用 textarea，新包仍强制 CodeMirror，没有“加载失败就算旧版”的自动回退。截图保存到本次演练目录。完整重放进程与结果位于 `test-results/g43-cpu-coordinator-fixed/`；待其结束再记录升级、曝光前后恢复与数据保留结论，当前不计作通过。
+第二轮的真实 HTTPS Run、错误 Submit、正确 Submit 和学习流程通过，社区浏览器仍使用独立的 CodeMirror 选择器，随后在保存私有草稿前失败。日志和完整资源清理记录在 `test-results/g43-cpu-coordinator-fixed/`；社区详细 JSON 当时仍写入临时目录，已随清理删除，不能冒称留存。
+
+已让两个流程复用同一编辑器操作，并由实际当前代的已验证源码清单决定契约：旧包明确使用 textarea，新包仍强制 CodeMirror，没有“加载失败就算旧版”的自动回退。社区报告、截图及源码浏览器日志均写入显式验收目录。当前源码的编辑器、25 个页面 × 两种语言 × 四种宽度的 200 组布局，以及学习、社区审核、英文和项目浏览器流程通过，记录在 `test-results/g43-current-browser/` 与同名 `.log`，临时数据库和服务已清理；此源码检查未运行评测或使用 GPU。
+
+修复后的完整 CPU 重放位于 `test-results/g43-cpu-coordinator-final/`；待其结束再记录升级、曝光前后恢复与数据保留结论，当前不计作通过。
 
 ## 继续完成的范围
 

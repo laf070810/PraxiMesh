@@ -66,7 +66,7 @@ uv sync --frozen --group browser
 .venv/bin/python scripts/browser_acceptance.py
 ```
 
-浏览器还需要相应系统依赖，CI 使用受支持的 Ubuntu。验收脚本创建并删除合成账号，结束时清理自有进程和数据库。真实沙箱、HTTPS、发布制品检查分别按 [WASI](docs/deployment/wasi.md)、[HTTPS 验收](docs/deployment/validation.md)和[发布指南](docs/deployment/releases.md)执行。
+浏览器还需要相应系统依赖，CI 使用受支持的 Ubuntu。验收脚本创建并删除合成账号，结束时清理自有进程和数据库。需要保留多轮结果时，将 `BROWSER_ARTIFACTS` 设置为独立目录，日志、截图和报告都会写入该目录。真实沙箱、HTTPS、发布制品检查分别按 [WASI](docs/deployment/wasi.md)、[HTTPS 验收](docs/deployment/validation.md)和[发布指南](docs/deployment/releases.md)执行。
 
 修改依赖后运行 `.venv/bin/pip-audit` 并按[贡献指南](CONTRIBUTING.md)更新锁文件。不要在正在运行的 Web/worker 环境中执行会增删依赖的 `uv sync`；服务使用固定环境，更新在独立环境准备。
 

@@ -89,7 +89,7 @@
 - 完整启动编排在 `core/gpu_readiness.py`，私有凭证在 `judge/gpu_receipt.py`。只有二十四个必需阶段和完整报告均通过，才能发布本次所有者的凭证并在行锁下确认原预约恢复；不从外部 JSON、部分报告或 CPU 结果生成运行凭证。保留双时钟期限、主机 boot ID、锁所有权和私有文件检查；空闲心跳核对实际设备并在同一事务内锁定身份和刷新健康。相关改动需真实 PostgreSQL 验证发布/就绪竞争；测试替身及临时文档不能作为 GPU 验收证据。
 - GPU worker 生命周期在 `core/gpu_worker.py`，命令与配置统一见 [GPU 指南](docs/deployment/gpu.md#gpu-worker)。每次进程启动完整重检，领取和结算在设备身份行锁下核对当前凭证。信号处理器只设置标志；退出沿原服务实例清理、撤销就绪并保留尚未恢复的预约。取消后恢复前后均核对原预约，正常到期才可完整续检，损坏或身份变化不能当续期处理。修改后验证真实 PostgreSQL 竞争及自有子进程信号；不以运行时替身证明 CUDA 或容器化部署成功。
 - GPU 持久成绩在 `core/gpu_evidence.py`，复用 `core/result_evidence.py` 的私有学习入口。按保存的版本化配置验证历史环境和摘要，不把旧执行摘要强制改为当前代码；既有 `PROFILES` 定义不可改写。GPU 正确性全部通过后重复批次仍可能失败，正式性能必须来自完整正确 Submit 的控制器采样。页面与导出只用已验证反馈，GPU 整卡秒数不能显示为 CPU 调用单位。真实浏览器检查入口见 [GPU 成绩展示](docs/deployment/gpu.md#gpu-results)；合成数据库和计时只证明展示与状态，不能签发运行凭证或声称 GPU 性能通过。
-- 浏览器、HTTPS、发布包和升级用现有 `scripts/*acceptance.py` 入口。使用一次性数据库、合成账号和明确属于本次测试的容器/卷；默认使用回环地址，按用户明确要求验证直接 IP 访问时使用独立测试端口。完成后核对清理，不删除未知资源。
+- 浏览器、HTTPS、发布包和升级用现有 `scripts/*acceptance.py` 入口。使用一次性数据库、合成账号和明确属于本次测试的容器/卷；默认使用回环地址，按用户明确要求验证直接 IP 访问时使用独立测试端口。完成后核对清理，不删除未知资源。源码浏览器通过 `BROWSER_ARTIFACTS` 分开保存每轮日志、截图和报告；旧发布包的编辑器契约由已验证的当前代清单决定，新版仍须验证 CodeMirror，不能用自动 textarea 回退掩盖加载失败。
 - Compose 单机入口为 `core/selfhost.py`，复用 `core/preview.py` 的原子数据库初始化；默认包括真实 WASI worker，可选 `compose.ai.yaml` 启动本地模型。修改时重放 `python3 scripts/compose_acceptance.py`；涉及模型或界面时使用 `--ai --browsers`。核对真实探针与七种题型、worker 离线关闭提交、直接 IP/CSRF、初始化恢复、旧内容不重导及成绩/会话跨重建保留。不得用旧 receipt 或宿主缓存代替镜像内自检。此入口不替代生产发布协调器。
 - 重型 WASI/worker 验收按资源预算串行安排，避免争用造成假超时。长进程须跟踪原进程或工具句柄；观察超时不代表进程结束，不据此重复启动。
 - 托管 CI、部署 runner 与 GPU 评测 worker 分别验证；接入步骤见 [CI 指南](docs/deployment/ci.md)。自定义 runner 标签不构成权限隔离，公开 PR 不能接触持有站点权限的 runner。GitHub 管理 API 查询失败不得当作 runner 不存在；部署 `status` 只验证记录读取，不证明站点健康。

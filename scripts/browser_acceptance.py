@@ -99,8 +99,8 @@ def main():
     if options.gpu_results and (options.judge or options.interface):
         parser.error("--gpu-results is a separate rendering check without a judge")
     root = Path(__file__).resolve().parent.parent
-    artifacts = root / "test-results"
-    artifacts.mkdir(exist_ok=True)
+    artifacts = Path(os.environ.get("BROWSER_ARTIFACTS", root / "test-results")).resolve()
+    artifacts.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="praximesh-browser-") as temporary:
         env = dict(os.environ)
         env.update(
@@ -115,6 +115,8 @@ def main():
                 "JUDGE_GPU_DEVICES": "",
                 "JUDGE_RECEIPT": str(Path(temporary) / "receipt.json"),
                 "BROWSER_JUDGE": "1" if options.judge else "0",
+                "BROWSER_EDITOR": "codemirror",
+                "BROWSER_ARTIFACTS": str(artifacts),
             }
         )
         # This launcher owns a new local HTTP endpoint, not an inherited TLS fixture.
