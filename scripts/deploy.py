@@ -717,6 +717,19 @@ class Deployment:
         runtime = WorkerRuntime(self, generation, mode=mode)
         return getattr(runtime, action)()
 
+    def retire_gpu_configuration(self, generation):
+        """Internal pre-exposure retirement; full GPU-to-CPU release is still gated."""
+        from scripts.deploy_gpu_retirement import GPURetirement
+
+        self.require_locked()
+        self.check_gpu_attachment()
+        binding = self.state["gpu_attachment"]["binding"]
+        engine_id = self.run("info", "--format", "{{.ID}}").decode().strip()
+        with GPUDeploymentNode(
+            self.config["gpu"], self.directory, self.state["site_id"], engine_id
+        ).locked() as node:
+            return GPURetirement(self, node, binding, generation).run()
+
     def gpu_worker_ready(self, generation, release, *, wait=False):
         """Internal observation only; full GPU apply/exposure remains closed."""
         from scripts.deploy_gpu_readiness import GPUReadiness
@@ -773,6 +786,7 @@ class Deployment:
             or state.get("gpu_candidate_checks")
             or state.get("gpu_preparations")
             or state.get("gpu_exposures")
+            or state.get("gpu_retirements")
             or state.get("gpu_workers")
             or state.get("gpu_checks")
         ):

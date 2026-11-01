@@ -223,6 +223,22 @@ GPU 数据库冻结持有排空锁，直到 runtime 连接权限撤销和现有�
 
 当前验证范围见 [G51](../acceptance-g51.md)。停止/冻结调用点已衔接，完整 GPU apply、候选失败回滚与曝光后恢复仍在开发，公共 GPU 激活继续关闭；不能从内部组件检查推断真实部署成功。
 
+<a id="configuration-retirement"></a>
+### 回到 CPU 前退出原 GPU 配置
+
+完整发布流程在回到 CPU 版本前，须先在原 GPU 库完成恢复、排空、停止与冻结，再调用内部配置退出。`scripts/deploy_gpu_retirement.py` 在原设备锁和数据库排空锁下保存退出意图，通过原过渡标记有序移除匹配的两份配置；完成后不再有有效 GPU 配置，节点锁、容器登记、数据库和任务/验证历史仍保留。
+
+曝光决定存在、原库未冻结、worker 未停止、存在任务/预约或未知文件时拒绝退出。中断只能继续同一原配置；不能手工删文件或日志来模拟完成。后续新操作发布新代时不接管退休库的旧暂停 token。此步骤不自行切换 CPU 站点，完整 GPU→CPU 与候选失败回退仍须连接并实际验收。
+
+不访问实际服务或 GPU 的检查：
+
+```sh
+.venv/bin/pytest -q tests/test_deploy_gpu_retirement.py \
+  tests/test_deploy_gpu_config.py tests/test_deploy_gpu_quiescence.py
+```
+
+范围与八处实际 CPU 进程中断见 [G55](../acceptance-g55.md)。数据库保护仍需上文 PostgreSQL 专项，模型结果不能替代真实排空与冻结。
+
 <a id="candidate-preparation"></a>
 ### 协调器内部的连续候选准备
 

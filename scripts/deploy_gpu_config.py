@@ -296,7 +296,7 @@ class Publication:
         for name in FILES:
             if intent is not None and self.temporary(intent, name) in present:
                 raw = read_private(self.node.fd, self.temporary(intent, name))
-                if not target[name].startswith(raw):
+                if target[name] is None or not target[name].startswith(raw):
                     raise ValueError("GPU configuration temporary differs from the original intent")
 
     def marker(self, intent):
@@ -350,6 +350,18 @@ class Publication:
             return
         if current != previous:
             raise ValueError("GPU configuration file differs from the original transition")
+        if expected is None:
+            # Only a confirmed retirement uses removal; no temporary is valid.
+            if read_private(self.node.fd, self.temporary(intent, name), optional=True) is not None:
+                raise ValueError("Unexpected temporary during GPU configuration retirement")
+            self.check()
+            if read_private(self.node.fd, name) != current or read_private(
+                self.node.fd, TRANSITION
+            ) != self.marker(intent):
+                raise ValueError("GPU configuration changed before retirement")
+            os.unlink(name, dir_fd=self.node.fd)
+            os.fsync(self.node.fd)
+            return
         temporary = self.temporary(intent, name)
         leftover = read_private(self.node.fd, temporary, optional=True)
         if leftover is not None:
@@ -376,6 +388,13 @@ class Publication:
         os.fsync(self.node.fd)
 
     def run(self, generation, enabled):
+        return self._run(generation, enabled, retiring=False)
+
+    def unpublish(self, generation):
+        """Internal ordered removal; caller retains the original retirement journal."""
+        return self._run(generation, False, retiring=True)
+
+    def _run(self, generation, enabled, *, retiring):
         self.check()
         operation = self.host.state.get("operation") or {}
         token = operation.get("id")
@@ -395,7 +414,33 @@ class Publication:
             raise ValueError(
                 "GPU configuration target must belong to the original deployment operation"
             )
-        target = self.snapshot(generation, enabled)
+        from scripts.deploy_gpu_retirement import record_key
+        from scripts.deploy_gpu_retirement import validate_record as validate_retirement
+
+        retirements = self.host.state.get("gpu_retirements", {})
+        if type(retirements) is not dict:
+            raise ValueError("Invalid GPU retirement registry")
+        for key, record in retirements.items():
+            validate_retirement(record)
+            if key != record_key(record) or record["phase"] != "retired" and not retiring:
+                raise ValueError("Finish original GPU retirement before publishing configuration")
+        if retiring:
+            record = retirements.get(token + ":" + generation["gpu_worker"])
+            if (
+                record is None
+                or record["generation"] != generation
+                or record["binding_sha256"] != digest(self.binding)
+                or any(
+                    value["phase"] != "retired" and value != record
+                    for value in retirements.values()
+                )
+            ):
+                raise ValueError("GPU retirement requires its exact original durable intent")
+        if retiring:
+            if operation.get("exposure_target"):
+                raise ValueError("Cannot retire a GPU configuration after an exposure decision")
+            self.host.database._require_frozen(generation["database"])
+        target = None if retiring else self.snapshot(generation, enabled)
         state = self.host.state.get(
             "gpu_configuration", {"schema": 1, "active": None, "transition": None}
         )
@@ -435,9 +480,21 @@ class Publication:
                     "GPU configuration recovery requires the exact original intent and target"
                 )
             old = intent["from"]
+        if retiring:
+            if (
+                old is not None
+                and old != record["from"]
+                or record["phase"] == "retired"
+                and (old is not None or intent is not None)
+            ):
+                raise ValueError("GPU files no longer match the original retirement decision")
+            self.render(record["from"])
         before, after = self.render(old), self.render(target)
+        if retiring and old is not None and old["generation"] != context(generation):
+            raise ValueError("GPU retirement must retain its original generation")
         if (
             old
+            and target
             and old["generation"]["id"] == target["generation"]["id"]
             and old["generation"] != target["generation"]
         ):
@@ -449,7 +506,7 @@ class Publication:
         if intent is not None and intent["files"] != hashes:
             raise ValueError("GPU configuration intent file digests changed")
         self.validate_temporaries(intent, after)
-        names = [target["generation"]["database"]]
+        names = [generation["database"]]
         if old is not None:
             names.append(old["generation"]["database"])
         with self.host.database.gpu_configuration_guard(names, token) as check:
@@ -464,7 +521,7 @@ class Publication:
                             "Existing GPU files do not match the recorded active configuration"
                         )
                     if old == target:
-                        return target["metadata"]
+                        return None if target is None else target["metadata"]
                     intent = {
                         "schema": 1,
                         "id": uuid.uuid4().hex,
@@ -513,7 +570,7 @@ class Publication:
                     temporary = self.temporary(intent, name)
                     raw = read_private(self.node.fd, temporary, optional=True)
                     if raw is not None:
-                        if not after[name].startswith(raw):
+                        if after[name] is None or not after[name].startswith(raw):
                             raise ValueError(
                                 "GPU configuration temporary changed before confirmation"
                             )
@@ -521,7 +578,7 @@ class Publication:
                 os.fsync(self.node.fd)
                 state["transition"] = None
                 self.host.save()
-                return target["metadata"]
+                return None if target is None else target["metadata"]
             finally:
                 self.database_check = None
 
