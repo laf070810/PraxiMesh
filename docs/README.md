@@ -26,6 +26,8 @@
 - [G52：GPU 恢复后的独立候选验证轮次](acceptance-g52.md) — 原任务重试与轮次隔离；真实 GPU 验收待完成
 - [ADR-069：可中断恢复的 GPU 候选准备](adr/069-recoverable-gpu-candidate-preparation.md)
 - [G53：GPU 候选准备与原库恢复串接](acceptance-g53.md) — 连续流程及实际 CPU 进程中断；整站 GPU 发布仍未开放
+- [ADR-070：先保存数据库决定，再开放 GPU 站点](adr/070-durable-gpu-exposure-decision.md)
+- [G54：GPU 曝光决定与中断后的原库保留](acceptance-g54.md) — 内部曝光及实际 CPU 进程中断；完整发布和真实环境仍待完成
 - [RFC-023：恢复时重建无状态 Web 容器](rfcs/023-web-container-recovery.md) — 已实施，真实复验待完成
 - [ADR-060：在原数据库恢复中重建无状态 Web](adr/060-web-container-recovery.md)
 - [G44：无状态 Web 持久重建的验证范围](acceptance-g44.md)

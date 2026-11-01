@@ -137,7 +137,8 @@ class WorkerRuntime:
         self.node.engine.check_socket()
         return output
 
-    def common(self, *, current=True):
+    def configuration(self, *, current=True):
+        """Read-only original identity; this does not authorize lifecycle mutations."""
         self.host.require_locked()
         operation = self.host.state.get("operation") or {}
         token = operation.get("id")
@@ -145,7 +146,7 @@ class WorkerRuntime:
             valid = type(token) is str and str(uuid.UUID(token)) == token
         except ValueError:
             valid = False
-        if not valid or self.host.proxy.probe()["port"] is not None:
+        if not valid:
             raise WorkerLifecycleError(
                 "Worker lifecycle requires the original operation and maintenance route"
             )
@@ -175,6 +176,14 @@ class WorkerRuntime:
             raise WorkerLifecycleError("Finish the original GPU configuration publication first")
         if current and active["active"]["generation"] != self.generation:
             raise WorkerLifecycleError("Worker must use its exact published generation")
+        return config, metadata, token
+
+    def common(self, *, current=True):
+        config, metadata, token = self.configuration(current=current)
+        if self.host.proxy.probe()["port"] is not None:
+            raise WorkerLifecycleError(
+                "Worker lifecycle requires the original operation and maintenance route"
+            )
         self.host.database.gpu_worker_pause(self.generation["database"], token)
         return config, metadata, token
 

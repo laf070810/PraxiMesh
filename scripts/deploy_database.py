@@ -1052,6 +1052,17 @@ class DeploymentDatabase:
 
     def gpu_worker_snapshot(self, name, token, device):
         """One read-only MVCC view; never hold rows while the worker starts."""
+        return self._gpu_worker_snapshot(name, token, device, exposure=False)
+
+    def gpu_exposure_snapshot(self, name, token, device):
+        """Read only, after the host has fenced its durable exposure decision.
+
+        Open admission is observed, never created here. A foreign/inconsistent
+        pause still refuses; this snapshot alone is not a health credential.
+        """
+        return self._gpu_worker_snapshot(name, token, device, exposure=True)
+
+    def _gpu_worker_snapshot(self, name, token, device, *, exposure):
         from judge.gpu_device_lock import GPU_UUID
 
         try:
@@ -1080,7 +1091,9 @@ class DeploymentDatabase:
                     "ON d.id=%s WHERE q.id=1",
                     (device,),
                 ).fetchone()
-                if row is None or str(row[1]) != token or row[2] is None:
+                paused = row is not None and str(row[1]) == token and row[2] is not None
+                opened = row is not None and row[1] is None and row[2] is None
+                if not paused and not (exposure and opened):
                     raise DeploymentDatabaseError(
                         "GPU observation lost its original admission pause"
                     )
@@ -1108,6 +1121,8 @@ class DeploymentDatabase:
                     if row[3] is not None
                     else None,
                 }
+                if exposure:
+                    result["admission"] = "paused" if paused else "open"
             self._require_operation_lock()
             return result
         except (psycopg.Error, OSError):

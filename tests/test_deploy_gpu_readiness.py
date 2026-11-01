@@ -42,6 +42,7 @@ def readiness(lifecycle, configured, monkeypatch, tmp_path):
     root = Path(__file__).resolve().parents[1]
     contents = {name: (root / name).read_bytes() for name in CONTROLLER_SOURCES}
     manifest = item.generation["manifest"]
+    manifest["judge"] = {"bundle_sha256": "a" * 64, "policy_sha256": "b" * 64}
     manifest["source_files"] = {n: hashlib.sha256(v).hexdigest() for n, v in contents.items()}
     manifest["gpu"]["source_scopes"].update(controller=list(contents), task=list(TASK_SOURCES))
     environment = copy.deepcopy(configured.adapter.environment)

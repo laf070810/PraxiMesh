@@ -125,8 +125,11 @@ class GPUReadiness:
         self.artifacts = release_artifacts(generation, directory)
 
     def instance(self):
+        return self.running_instance(*self.runtime.common())
+
+    def running_instance(self, config, metadata, token):
+        """Read-only instance identity, without granting preparation or exposure."""
         runtime = self.runtime
-        config, metadata, token = runtime.common()
         record = runtime.load()
         if (
             not config["enabled"]
@@ -164,7 +167,7 @@ class GPUReadiness:
         ):
             raise GPUReadinessError("Published GPU environment differs from its frozen generation")
 
-    def valid_snapshot(self, value, instance, elapsed, *, verify_environment=True):
+    def valid_device(self, value, instance, elapsed, *, verify_environment=True):
         config, _, _, _, started = instance
         device, now = value["device"], value["observed_at"]
         if (
@@ -176,13 +179,8 @@ class GPUReadiness:
         start = datetime.fromisoformat(started.replace("Z", "+00:00"))
         if (
             device is None
-            or value["pending"]
-            or value["reservations"]
-            or device["state"] != "ready"
             or device["id"] != config["gpu"]
             or device["worker_id"] != config["worker_id"]
-            or device["job_id"] is not None
-            or device["reservation_token"] is not None
             or not aware(device["checked_at"])
             or not start <= device["checked_at"] <= now
             or not 0 <= (now - device["checked_at"]).total_seconds() + elapsed < FRESH_SECONDS
@@ -197,6 +195,24 @@ class GPUReadiness:
         except (KeyError, TypeError, ValueError, OverflowError):
             raise GPUReadinessError("Published GPU readiness evidence is invalid") from None
         return True
+
+    def valid_snapshot(self, value, instance, elapsed, *, verify_environment=True):
+        device = value["device"]
+        if (
+            not aware(value["observed_at"])
+            or type(value["pending"]) is not bool
+            or type(value["reservations"]) is not bool
+        ):
+            raise GPUReadinessError("GPU database observation has no timezone-aware clock")
+        return bool(
+            device is not None
+            and not value["pending"]
+            and not value["reservations"]
+            and device["state"] == "ready"
+            and device["job_id"] is None
+            and device["reservation_token"] is None
+            and self.valid_device(value, instance, elapsed, verify_environment=verify_environment)
+        )
 
     def observe(self):
         """Always re-read: a prior success is never an exposure credential."""

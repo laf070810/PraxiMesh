@@ -237,7 +237,23 @@ GPU 数据库冻结持有排空锁，直到 runtime 连接权限撤销和现有�
   tests/test_deploy_gpu_check.py tests/test_deploy.py
 ```
 
-验证范围见 [G53](../acceptance-g53.md)。目前仍是内部流程，没有完整 GPU apply/回退/曝光命令；实际 Docker、PostgreSQL 和 GPU 需要另行验收。
+验证范围见 [G53](../acceptance-g53.md)。准备已连接下方内部曝光步骤，但目前没有完整 GPU apply/回退/恢复命令；实际 Docker、PostgreSQL 和 GPU 需要另行验收。
+
+<a id="durable-exposure"></a>
+### 协调器内部的持久曝光
+
+`scripts/deploy_gpu_exposure.py` 接受已完成且仍然新鲜的原候选准备，在恢复准入前原子保存当前数据库及曝光决定，然后确认正式准入、切换代理并检查外部 CPU/GPU 健康。决定绑定原验证轮次、GPU 启动、配置、owner、冻结环境和 Web 端口；响应丢失时重试保留原库，不复制旧快照、不重新提交测试或重启 worker。
+
+开放后可能已有合法用户任务，观察会复用冻结应用的正式准入检查，不要求先清空队列；未知预约、不兼容工作或就绪变化仍拒绝继续。已确认开放后再次暂停或撤回路由，须在原库完成恢复和新的候选验证轮次，再保存新的曝光记录，保留旧记录和用户数据。此流程不放宽普通准备、配置发布与启停的维护路由及原暂停保护。
+
+不访问实际服务或 GPU 的检查：
+
+```sh
+.venv/bin/pytest -q tests/test_deploy_gpu_exposure.py \
+  tests/test_deploy_gpu_exposure_database.py tests/test_deploy_gpu_candidate.py
+```
+
+实际 PostgreSQL 开放准入与预约快照检查复用上文 `tests/test_deploy_gpu_config_postgres.py` 入口，不能用 SQLite 的跳过结果代替。验证范围见 [G54](../acceptance-g54.md)。这是内部流程；公共 `apply/recover` 仍拒绝 GPU 状态，完整失败回退、GPU→CPU 及真实升级还需完成，不应手工修改私有日志来开放。
 
 <a id="candidate-verification"></a>
 ### 协调器内部的候选队列检查

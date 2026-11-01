@@ -178,3 +178,25 @@ def test_readiness_snapshot_is_read_only_and_does_not_block_worker_heartbeat(
     with database.operation_lock():
         result = database.gpu_worker_snapshot("owned-test-database", token, device.pk)
     assert result["device"]["checked_at"] is None
+
+
+def test_exposure_snapshot_observes_open_admission_and_uuid_reservations_without_clearing(
+    guarded_pg,
+):
+    database, device, token = guarded_pg
+    job, reservation = uuid.uuid4(), uuid.uuid4()
+    GPUDevice.objects.filter(pk=device.pk).update(job_id=job, reservation_token=reservation)
+    QueueLock.objects.filter(pk=1).update(pause_token=None, paused_at=None)
+    with database.operation_lock():
+        result = database.gpu_exposure_snapshot("owned-test-database", token, device.pk)
+        with pytest.raises(DeploymentDatabaseError, match="original admission pause"):
+            database.gpu_worker_snapshot("owned-test-database", token, device.pk)
+        QueueLock.objects.filter(pk=1).update(pause_token=uuid.uuid4(), paused_at=timezone.now())
+        with pytest.raises(DeploymentDatabaseError, match="original admission pause"):
+            database.gpu_exposure_snapshot("owned-test-database", token, device.pk)
+    assert result["admission"] == "open" and result["reservations"] is True
+    assert (
+        result["device"]["job_id"] == job and result["device"]["reservation_token"] == reservation
+    )
+    device.refresh_from_db()
+    assert device.job_id == job and device.reservation_token == reservation

@@ -611,7 +611,7 @@ class Deployment:
         )
         self.health(generation, external=False)
 
-    def health(self, generation, *, external):
+    def health(self, generation, *, external, require_gpu=False):
         origin = urllib.parse.urlparse(self.config["proxy"]["origin"])
         headers = {}
         if external:
@@ -628,6 +628,10 @@ class Deployment:
                 result = json.load(response)
                 if result["status"] != "ok" or (external and result["evaluation"] != "available"):
                     raise DeploymentError("Application health check failed")
+                if require_gpu and (
+                    result["evaluation"] != "available" or result["gpu_evaluation"] != "available"
+                ):
+                    raise DeploymentError("Application CPU/GPU health check failed")
         except (OSError, ValueError, KeyError, http.client.HTTPException):
             raise DeploymentError("Application health check failed") from None
 
@@ -768,6 +772,7 @@ class Deployment:
             or state.get("gpu_recoveries")
             or state.get("gpu_candidate_checks")
             or state.get("gpu_preparations")
+            or state.get("gpu_exposures")
             or state.get("gpu_workers")
             or state.get("gpu_checks")
         ):
@@ -775,6 +780,12 @@ class Deployment:
                 "GPU release activation or recovery requires the coordinated GPU lifecycle; "
                 "the CPU path cannot replace its original database or worker"
             )
+
+    def expose_gpu(self, generation, release, phase="active"):
+        """Internal durable exposure; public GPU apply/recover still refuse."""
+        from scripts.deploy_gpu_exposure import GPUExposure
+
+        return GPUExposure(self, generation, release, phase=phase).run()
 
     def expose(self, generation, token, phase="active"):
         self.require_cpu_lifecycle(generation["manifest"])
