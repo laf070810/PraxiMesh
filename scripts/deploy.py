@@ -698,6 +698,15 @@ class Deployment:
         ).locked() as node:
             return publish(self, node, binding, generation, enabled=enabled)
 
+    def gpu_worker_runtime(self, generation, action, *, mode="worker"):
+        """Internal lifecycle; no CLI or GPU activation bypass is exposed."""
+        from scripts.deploy_gpu_worker import WorkerRuntime
+
+        if action not in {"create", "start", "stop", "check"}:
+            raise DeploymentError("Unknown GPU worker lifecycle action")
+        runtime = WorkerRuntime(self, generation, mode=mode)
+        return getattr(runtime, action)()
+
     def expose(self, generation, token, phase="active"):
         self.control(generation, "judge_admission", "resume", "--token", token)
         if not self.ready(generation):

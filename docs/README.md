@@ -12,6 +12,8 @@
 - [G45：GPU worker 的发布代配置身份](acceptance-g45.md) — 无设备组件与旧制品读取
 - [ADR-062：GPU 私有配置的有序持久发布](adr/062-durable-gpu-configuration-publication.md)
 - [G46：GPU 配置持久发布与进程中断恢复](acceptance-g46.md) — 文件与原锁验证；真实数据库及完整 GPU 升级待完成
+- [ADR-063：GPU worker 容器的原实例生命周期](adr/063-durable-gpu-worker-lifecycle.md)
+- [G47：GPU worker 生命周期与协调器中断恢复](acceptance-g47.md) — 实际文件/进程与 Docker 模型；真实容器及完整 GPU 部署待验收
 - [RFC-023：恢复时重建无状态 Web 容器](rfcs/023-web-container-recovery.md) — 已实施，真实复验待完成
 - [ADR-060：在原数据库恢复中重建无状态 Web](adr/060-web-container-recovery.md)
 - [G44：无状态 Web 持久重建的验证范围](acceptance-g44.md)

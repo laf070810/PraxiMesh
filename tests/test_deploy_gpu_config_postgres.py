@@ -112,3 +112,19 @@ def test_lost_live_operation_lock_invalidates_held_publication_guard(guarded_pg)
                     "SELECT pg_advisory_unlock(%s)", (database._lock_key,)
                 )
                 recheck()
+
+
+def test_worker_pause_allows_original_reservation_and_releases_its_connection(guarded_pg):
+    database, device, token = guarded_pg
+    job, reservation = uuid.uuid4(), uuid.uuid4()
+    GPUDevice.objects.filter(pk=device.pk).update(job_id=job, reservation_token=reservation)
+    with database.operation_lock():
+        database.gpu_worker_pause("owned-test-database", token)
+        with database._connect("probe", autocommit=True) as probe:
+            probe.execute("SET lock_timeout = '150ms'")
+            assert (
+                probe.execute("UPDATE core_queuelock SET paused_at=paused_at WHERE id=1").rowcount
+                == 1
+            )
+    device.refresh_from_db()
+    assert device.job_id == job and device.reservation_token == reservation

@@ -63,29 +63,53 @@ def require_idle_journal(node):
 
 def require_stopped_workers(host, node, binding):
     """Observe all containers; never adopt an unrecorded ID or mutate an object."""
-    records = host.state.get("gpu_workers", {})
-    if type(records) is not dict:
-        raise ValueError("Invalid GPU worker runtime journal")
     known, names = {}, set()
-    for generation_id, value in records.items():
-        if (
-            type(generation_id) is not str
-            or not GENERATION_ID.fullmatch(generation_id)
-            or type(value) is not dict
-            or set(value) != {"id", "name", "image", "binding_sha256", "runtime_sha256"}
-            or type(value["id"]) is not str
-            or not HEX.fullmatch(value["id"])
-            or type(value["image"]) is not str
-            or not IMAGE_ID.fullmatch(value["image"])
-            or value["binding_sha256"] != digest(binding)
-            or type(value["runtime_sha256"]) is not str
-            or not HEX.fullmatch(value["runtime_sha256"])
-            or value["name"] != f"px-{host.config['instance']}-{generation_id}-gpu-worker"
-            or value["id"] in known
-        ):
-            raise ValueError("GPU worker runtime has no complete original identity")
-        known[value["id"]] = (generation_id, value)
-        names.add("/" + value["name"])
+    for role, key, suffix in (
+        ("gpu_worker", "gpu_workers", ""),
+        ("gpu_check", "gpu_checks", "-check"),
+    ):
+        records = host.state.get(key, {})
+        if type(records) is not dict:
+            raise ValueError("Invalid GPU worker runtime journal")
+        for generation_id, value in records.items():
+            if (
+                type(generation_id) is not str
+                or not GENERATION_ID.fullmatch(generation_id)
+                or type(value) is not dict
+                or set(value) != {"id", "name", "image", "binding_sha256", "runtime_sha256"}
+                or type(value["id"]) is not str
+                or not HEX.fullmatch(value["id"])
+                or type(value["image"]) is not str
+                or not IMAGE_ID.fullmatch(value["image"])
+                or value["binding_sha256"] != digest(binding)
+                or type(value["runtime_sha256"]) is not str
+                or not HEX.fullmatch(value["runtime_sha256"])
+                or value["name"]
+                != f"px-{host.config['instance']}-{generation_id}-gpu-worker{suffix}"
+                or value["id"] in known
+            ):
+                raise ValueError("GPU worker runtime has no complete original identity")
+            known[value["id"]] = (generation_id, value, role)
+            names.add("/" + value["name"])
+    transitions = host.state.get("gpu_runtime", {})
+    if type(transitions) is not dict:
+        raise ValueError("Invalid GPU worker lifecycle journal")
+    if transitions:
+        from scripts.deploy_gpu_worker import WorkerRuntime
+
+        for name, transition in transitions.items():
+            current = WorkerRuntime(host, transition["generation"], mode=transition["mode"])
+            record = current.load()
+            if (
+                current.name != name
+                or record is None
+                or record["phase"] not in {"created", "stopped", "completed"}
+                or record["id"] not in known
+                or record["runtime_sha256"] != known[record["id"]][1]["runtime_sha256"]
+            ):
+                raise ValueError(
+                    "Reconcile the original GPU worker lifecycle before publishing configuration"
+                )
     operation = host.state.get("operation") or {}
     for generation in (
         host.state.get("current"),
@@ -130,7 +154,7 @@ def require_stopped_workers(host, node, binding):
                 or touches_node
                 or (
                     labels.get("org.praximesh.site") == host.state["site_id"]
-                    and labels.get("org.praximesh.role") == "gpu_worker"
+                    and labels.get("org.praximesh.role") in {"gpu_worker", "gpu_check"}
                 )
             )
             if not related:
@@ -139,7 +163,7 @@ def require_stopped_workers(host, node, binding):
                 raise ValueError(
                     "An unrecorded container refers to the GPU worker or original state"
                 )
-            generation_id, expected = known[info["Id"]]
+            generation_id, expected, role = known[info["Id"]]
             state = info["State"]
             if (
                 info["Name"] != "/" + expected["name"]
@@ -147,7 +171,7 @@ def require_stopped_workers(host, node, binding):
                 or fingerprint(info) != expected["runtime_sha256"]
                 or labels.get("org.praximesh.site") != host.state["site_id"]
                 or labels.get("org.praximesh.generation") != generation_id
-                or labels.get("org.praximesh.role") != "gpu_worker"
+                or labels.get("org.praximesh.role") != role
                 or labels.get("org.praximesh.gpu-binding") != digest(binding)
                 or state.get("Running") is not False
                 or state.get("Paused") is not False

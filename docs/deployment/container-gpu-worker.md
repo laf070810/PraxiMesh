@@ -134,7 +134,7 @@ DOCKER_HOST="unix://$PRAXIMESH_DOCKER_SOCKET" \
 
 已实现身份校验、配置生成和协调器内部的双文件持久发布。发布必须持原协调器/设备锁，确认实际维护路由、原 worker 已停止且禁止自动重启、任务 journal 已清理，以及旧库与目标库都在本次暂停下排空并无物理预约。部署日志保存原目标；节点上的 `deployment-config-transition.json` 在整个切换中阻止 worker 读取，包括标记写到一半的情况。中断只可继续原意图，未知内容保留并失败。
 
-这仍是开发中的内部流程，尚无完成 worker 生命周期的发布命令。不要手工创建代际记录、移除发布中标记、修改摘要或对已绑定节点套用独立 Compose 的启用步骤。`apply` 继续拒绝 GPU 发布。旧独立 worker 配置保持原行为；旧四镜像包仍可核验，内部发布只接受显式声明 `worker_configuration: generation-pair-v1` 的新制品。
+这仍是开发中的内部流程，尚无完成 GPU 生命周期的发布命令；内部容器控制组件见[下节](#worker-lifecycle)。不要手工创建代际记录、移除发布中标记、修改摘要或对已绑定节点套用独立 Compose 的启用步骤。`apply` 继续拒绝 GPU 发布。旧独立 worker 配置保持原行为；旧四镜像包仍可核验，内部发布只接受显式声明 `worker_configuration: generation-pair-v1` 的新制品。
 
 文件/配置与启动边界的无设备组件检查可运行：
 
@@ -152,6 +152,22 @@ DOCKER_HOST="unix://$PRAXIMESH_DOCKER_SOCKET" \
 ```
 
 当前实际范围见 [G45](../acceptance-g45.md) 与 [G46](../acceptance-g46.md)。跳过的 PostgreSQL 检查不算通过，文件中断结果也不能替代真实镜像、GPU 或完整部署验收。新协议已纳入 GPU/worker 源码契约，使用时必须构建并验证新镜像，不复用旧 GPU 凭证。
+
+<a id="worker-lifecycle"></a>
+### 协调器内部的容器生命周期
+
+`scripts/deploy_gpu_worker.py` 提供固定预检和 worker 的创建、启动、停止与原意图重试，尚未接入完整 GPU 发布命令。预检只读挂载私有配置并连接内部数据库网络；正式 worker 使用原状态、socket、递归只读 procfs 和所选单卡管理映射。凭证不进入参数或容器环境，Docker 客户端使用临时空配置。
+
+创建前保存意图，核验完整运行契约后登记 ID，再允许启动。启动前确认本代预检并保存启动意图，随后释放设备锁，由 worker 取得原锁；同一启动实例被暂停或重启时不算成功。停止只操作原 ID、契约与启动时间，不抢 worker 的设备锁、不持队列行锁等待、不清空任务或预约。原对象丢失、未知同名对象和未确认的生命周期都须保留现场，不能以删除日志或手工运行 Docker 来绕过。
+
+不访问 Docker 或设备的组件检查：
+
+```sh
+.venv/bin/pytest -q tests/test_deploy_gpu_worker.py \
+  tests/test_deploy_gpu_config.py tests/test_deploy_gpu_config_database.py
+```
+
+此入口使用真实私有文件、文件锁和协调器 CPU 子进程，Docker、数据库及代理为显式测试模型。真实 PostgreSQL 使用上节的一次性数据库命令；实际 Docker 契约、镜像入口、完整 GPU 启动、清理、队列及部署恢复仍待验收，不能从模型通过推断已可运行。当前证据和跳过项见 [G47](../acceptance-g47.md)，设计约束见 [ADR-063](../adr/063-durable-gpu-worker-lifecycle.md)。
 
 ## Compose 预检与运行
 

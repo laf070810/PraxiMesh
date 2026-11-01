@@ -162,3 +162,33 @@ def test_database_error_cannot_expose_connection_credentials(databases, monkeypa
         with database.gpu_configuration_guard(names, token):
             pytest.fail("Connection error accepted")
     assert "password" not in str(error.value)
+
+
+def test_worker_pause_does_not_require_or_clear_physical_reservations(databases):
+    database, model, names, token = databases
+    model.rows[names[0]]["devices"] = [(uuid.uuid4(), uuid.uuid4())]
+    model.rows[names[0]]["pending"] = True
+    original = model.rows[names[0]]["devices"][:]
+    database.gpu_worker_pause(names[0], token)
+    assert model.rows[names[0]]["devices"] == original
+    assert model.acquired == model.released == [names[0]]
+    assert len(model.calls) == 1 and "core_queuelock" in model.calls[0][1]
+    assert "FOR UPDATE" not in model.calls[0][1]
+
+
+@pytest.mark.parametrize("defect", ["token", "missing", "unpaused", "schema", "operation"])
+def test_worker_lifecycle_pause_rejects_wrong_operation_without_writes(databases, defect):
+    database, model, names, token = databases
+    if defect == "token":
+        model.rows[names[0]]["queue"] = (uuid.uuid4(), "paused")
+    elif defect == "missing":
+        model.rows[names[0]]["queue"] = None
+    elif defect == "unpaused":
+        model.rows[names[0]]["queue"] = (uuid.UUID(token), None)
+    elif defect == "schema":
+        model.schemas = False
+    else:
+        model.lock = False
+    with pytest.raises(DeploymentDatabaseError):
+        database.gpu_worker_pause(names[0], token)
+    assert all(statement.startswith("SELECT") for _, statement in model.calls)

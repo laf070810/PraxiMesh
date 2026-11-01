@@ -921,6 +921,30 @@ class DeploymentDatabase:
         """Private worker settings keep TLS selection outside the URL query."""
         return {"url": self._url(name, "worker"), "sslmode": "disable"}
 
+    def gpu_worker_pause(self, name, token):
+        """Check the original pause without holding rows across worker shutdown."""
+        try:
+            valid_token = type(token) is str and str(uuid.UUID(token)) == token
+        except ValueError:
+            valid_token = False
+        if not valid_token:
+            raise DeploymentDatabaseError("GPU worker requires the original operation token")
+        self._require_operation_lock()
+        try:
+            with self.connection(name) as connection:
+                if "core_gpudevice" not in worker_privileges(connection):
+                    raise DeploymentDatabaseError("GPU worker requires the recorded GPU schema")
+                row = connection.execute(
+                    "SELECT pause_token, paused_at FROM public.core_queuelock WHERE id=1"
+                ).fetchone()
+                if not row or str(row[0]) != token or row[1] is None:
+                    raise DeploymentDatabaseError(
+                        "GPU worker requires the original admission pause"
+                    )
+            self._require_operation_lock()
+        except (psycopg.Error, OSError):
+            raise DeploymentDatabaseError("GPU worker pause check failed") from None
+
     @contextmanager
     def gpu_configuration_guard(self, names, token):
         """Hold original/target admission and reservation rows across publication."""
