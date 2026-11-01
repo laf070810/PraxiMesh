@@ -1,0 +1,62 @@
+# Separate from SQLite self-hosting. Credentials live only in private worker.json.
+x-worker: &worker
+  image: ${PRAXIMESH_GPU_WORKER_IMAGE:?immutable worker image required}
+  pull_policy: never
+  user: "0:0"
+  runtime: runc
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  ipc: private
+  cgroup: private
+  cpus: 1
+  mem_limit: 512m
+  memswap_limit: 512m
+  pids_limit: 128
+  restart: "no"
+  stop_grace_period: 4m
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=16777216,mode=1777
+  logging:
+    driver: local
+    options: {max-size: 1m, max-file: "1", compress: "false"}
+  networks: [database]
+
+services:
+  gpu-check:
+    <<: *worker
+    profiles: [check]
+    command: [--check]
+    volumes:
+      - type: bind
+        source: ${PRAXIMESH_GPU_STATE:?private state directory required}
+        target: /var/lib/praximesh-control
+        read_only: true
+        bind: {create_host_path: false}
+
+  gpu-worker:
+    <<: *worker
+    profiles: [gpu]
+    volumes:
+      - type: bind
+        source: ${PRAXIMESH_GPU_STATE:?private state directory required}
+        target: /var/lib/praximesh-control
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${PRAXIMESH_DOCKER_SOCKET:?private rootless socket required}
+        target: /run/praximesh-engine/docker.sock
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: /proc
+        target: /run/praximesh-host-proc
+        read_only: true
+        bind: {create_host_path: false, propagation: rprivate}
+    devices:
+      - /dev/nvidia${PRAXIMESH_GPU_MINOR:?selected physical minor required}:/dev/nvidia${PRAXIMESH_GPU_MINOR:?selected physical minor required}:rw
+      - /dev/nvidiactl:/dev/nvidiactl:rw
+
+networks:
+  database:
+    external: true
+    name: ${PRAXIMESH_GPU_DB_NETWORK:?existing PostgreSQL network required}

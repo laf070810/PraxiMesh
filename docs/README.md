@@ -102,6 +102,8 @@
 - [G39 容器控制器故障与新实例恢复](acceptance-g39.md) — 退出、断连、独立硬期限及新调用；未运行 GPU
 - [ADR-056：容器完整启动、私有凭证与就绪发布](adr/056-container-complete-startup.md)
 - [G40 容器完整启动与就绪发布](acceptance-g40.md) — 当前验证范围及容器部署剩余交付
+- [ADR-057：容器 worker 镜像、私有配置与 PostgreSQL 入口](adr/057-container-worker-deployment.md)
+- [G41 容器 worker 命令、镜像与数据库部署](acceptance-g41.md) — 非 GPU 验证及真实部署边界
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

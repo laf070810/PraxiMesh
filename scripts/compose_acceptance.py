@@ -17,6 +17,8 @@ from http.cookies import SimpleCookie
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+from judge.gpu_policy import execution_digest  # noqa: E402
 
 # Trusted synthetic fixtures, never learner code. The session key is kept only
 # in controller memory; command output containing it is not saved to logs.
@@ -81,6 +83,7 @@ def main():
     parser.add_argument("--ai", action="store_true", help="Build and test the real CPU tutor")
     parser.add_argument("--browsers", action="store_true", help="Also run Playwright journeys")
     options = parser.parse_args()
+    expected_gpu_policy = execution_digest()
     options.browsers = options.browsers or options.ai
     if options.browsers:
         from playwright.sync_api import sync_playwright
@@ -146,6 +149,21 @@ def main():
             *arguments,
             **kwargs,
         )
+
+    def check_policy_sources(phase):
+        observed = {}
+        for service in ("web", "worker"):
+            observed[service] = compose(
+                "exec",
+                "-T",
+                service,
+                "python",
+                "-B",
+                "-c",
+                "from judge.gpu_policy import execution_digest; print(execution_digest())",
+            )
+            assert observed[service] == expected_gpu_policy, (phase, service)
+        report.setdefault("gpu_policy_source_checks", {})[phase] = observed
 
     def address():
         published = compose("port", "web", "8000")
@@ -334,6 +352,7 @@ def main():
         assert config["services"]["web"]["ports"][0]["host_ip"] == "0.0.0.0"
         print("Building and starting full Compose with real WASI checks", flush=True)
         compose("up", "--build", "--detach", "--wait", "--wait-timeout", "900")
+        check_policy_sources("initial")
         container = compose("ps", "--quiet", "web")
         info = json.loads(run("inspect", container, private=True))[0]
         assert info["Config"]["User"] == "65532:65532"
@@ -437,6 +456,7 @@ def main():
         compose("down")
         print("Recreating the service with the preserved data volume", flush=True)
         compose("up", "--detach", "--no-build", "--wait", "--wait-timeout", "900")
+        check_policy_sources("recreated")
         second = json.loads(
             compose("exec", "-T", "web", "python", "-c", FIXTURE, "verify", private=True)
         )
@@ -449,6 +469,7 @@ def main():
                 get(address(), "/api/submissions/" + job["id"] + "/", first["session_key"])
             )
             assert retained["status"] == "finished" and retained["verdict"] == job["verdict"]
+        assert execution_digest() == expected_gpu_policy, "GPU policy sources changed during replay"
         report.update(
             passed=True,
             initial_catalog=first["counts"],
@@ -470,6 +491,8 @@ def main():
                     "core/preview.py",
                     "core/selfhost.py",
                     "Dockerfile",
+                    "scripts/compose_acceptance.py",
+                    "judge/gpu_policy.py",
                     "deploy/tutor.Dockerfile",
                     "scripts/build_compose_wasi.py",
                     "scripts/build_compose_tutor.py",

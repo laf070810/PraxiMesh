@@ -25,8 +25,10 @@ COPY vendor/quickjs ./vendor/quickjs
 COPY content ./content
 COPY templates ./templates
 COPY static ./static
+COPY scripts/container_worker_entry.py scripts/gpu_environment_probe.py scripts/gpu_kernel_probe.py scripts/gpu_service_entry.py ./scripts/
 COPY manage.py gunicorn.conf.py ./
 COPY LICENSES.md ./
+RUN python -c "from judge.gpu_policy import execution_digest; print('GPU policy:', execution_digest())"
 RUN python manage.py collectstatic --noinput && mkdir /data && chown 65532:65532 /data && chmod 700 /data
 USER 65532:65532
 EXPOSE 8000
