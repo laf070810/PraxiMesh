@@ -391,7 +391,7 @@ def test_english_controls_and_discovery(published, user):
     assert "Project plans" not in client.get(url("detail", published.pk)).content.decode()
     assert "My achievements" in client.get("/learning/achievements/").content.decode()
     body = client.get("/practice/", {"evaluator": "python-ml-linear-v1"}).content.decode()
-    assert "ML training" in body and "Maximum reservation units per formal submission" in body
+    assert "ML training" in body and "Maximum CPU invocation units per submission" in body
 
 
 def test_leaving_and_rejoining_same_revision_does_not_restore_previous_progress(
