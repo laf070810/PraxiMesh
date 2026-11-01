@@ -1,7 +1,8 @@
-"""Download public exercises, test in WASI, and submit to a trusted server.
+"""Download exercises, test in WASI, compile CUDA, and submit to a trusted server.
 
 Network commands use only the Python standard library. Local tests additionally
-require this checkout's locked judge dependencies and a verified WASI bundle.
+require this checkout's locked judge dependencies and a verified WASI bundle;
+CUDA compilation uses an explicitly configured device-free runsc compiler image.
 No downloaded or submitted program is executed by the host interpreter.
 """
 
@@ -432,7 +433,8 @@ def local_test(directory, bundle, digest):
     if package["problem"]["evaluator"] == "cuda-kernel-v1":
         raise PracticeError(
             "CUDA public tests cannot run in WASI. Use submit --mode run against a server "
-            "with verified GPU evaluation; local CUDA execution is not available."
+            "with verified GPU evaluation; local CUDA execution is not available. "
+            "The compile command checks CUDA compilation only, without a GPU."
         )
     sys.path.insert(0, str(ROOT))
     from judge.evaluator import EVALUATORS, evaluate
@@ -484,6 +486,54 @@ def local_test(directory, bundle, digest):
     }
 
 
+def compute_architecture(value):
+    if not re.fullmatch(r"[1-9][0-9]?\.[0-9]", value):
+        raise argparse.ArgumentTypeError("Use an explicit compute architecture, for example 8.6.")
+    return [int(part) for part in value.split(".")]
+
+
+def local_compiler(args):
+    # Validate the complete public package before constructing a Docker client or state.
+    package = source = None
+    if args.command == "compile":
+        _, package, source = load_exercise(args.directory)
+        if package["problem"]["evaluator"] != "cuda-kernel-v1":
+            raise PracticeError("compile accepts CUDA exercises only; use test for WASI.")
+    sys.path.insert(0, str(ROOT))
+    from judge.container_compilation import CompilationCancelled
+    from judge.gpu_device_lock import DeviceLockError
+    from judge.sandbox import SandboxUnavailable
+    from scripts.practice_cuda import LocalCompilerError, compile_source, recover_compiler
+
+    try:
+        options = {"state": args.state, "socket": args.docker_socket}
+        if args.command == "recover-compiler":
+            return recover_compiler(**options)
+        result = compile_source(
+            source,
+            package["problem"]["operation"],
+            args.architecture,
+            image=args.compiler_image,
+            **options,
+        )
+        return {**result, "version_id": package["version_id"]}
+    except LocalCompilerError as exc:
+        raise PracticeError(str(exc)) from None
+    except CompilationCancelled:
+        raise PracticeError(
+            "Compilation cancelled. Retain the state for recover-compiler."
+        ) from None
+    except DeviceLockError:
+        raise PracticeError(
+            "Compiler state is busy or its original lock changed. Retain it."
+        ) from None
+    except (OSError, SandboxUnavailable, ValueError):
+        raise PracticeError(
+            "Isolated compilation is unavailable. Check the compiler image, rootless Docker "
+            "and private state. Retain existing state; use recover-compiler for interrupted tasks."
+        ) from None
+
+
 def submit(client, directory, token, key, mode):
     server, package, source = load_exercise(directory)
     if server != client.origin:
@@ -514,6 +564,24 @@ def main(argv=None):
     run.add_argument("directory", type=Path)
     run.add_argument("--bundle", required=True)
     run.add_argument("--bundle-sha256", required=True)
+    compile_command = commands.add_parser(
+        "compile", help="Check CUDA compilation inside runsc without executing public examples"
+    )
+    compile_command.add_argument("directory", type=Path)
+    compile_command.add_argument(
+        "--compiler-image", required=True, help="Immutable sha256 image ID"
+    )
+    compile_command.add_argument("--architecture", required=True, type=compute_architecture)
+    recover = commands.add_parser(
+        "recover-compiler", help="Clean up only the original interrupted local compiler task"
+    )
+    for command in (compile_command, recover):
+        command.add_argument(
+            "--state", type=Path, required=True, help="Absolute private state path"
+        )
+        command.add_argument(
+            "--docker-socket", required=True, help="Explicit rootless Docker socket"
+        )
     send = commands.add_parser(
         "submit", help="Submit source to the server's trusted evaluation queue"
     )
@@ -528,6 +596,8 @@ def main(argv=None):
     try:
         if args.command == "test":
             result = local_test(args.directory, args.bundle, args.bundle_sha256)
+        elif args.command in {"compile", "recover-compiler"}:
+            result = local_compiler(args)
         else:
             if not args.server:
                 raise PracticeError("Network commands require an explicit --server origin.")
@@ -549,6 +619,10 @@ def main(argv=None):
                 else:
                     result = client.request(f"/api/v1/submissions/{args.submission}/", token=token)
         print(json.dumps(result, ensure_ascii=False, indent=2))
+        if args.command == "compile":
+            if result["status"] == "platform_error":
+                return 2
+            return 0 if result["status"] == "compiled" else 1
         return 0 if args.command != "test" or result["result"]["verdict"] == "accepted" else 1
     except (PracticeError, ImportError) as exc:
         message = (

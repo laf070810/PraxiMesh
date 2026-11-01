@@ -9,6 +9,7 @@
 | **Docker Compose 单机自部署** | 自己使用、内网体验或小规模使用，希望少配置、通过服务器 IP 做题 | Web + worker；SQLite 命名卷；默认 HTTP `0.0.0.0:8000` | 默认七种 CPU/WASI 评测；可选本地 CPU 模型或已有 HTTPS 模型服务 | [Compose 完整操作](compose.md) |
 | **发布协调器单机部署** | 需要域名/HTTPS、PostgreSQL、分离数据库权限、受控升级和失败恢复的长期站点 | Caddy + 固定 Web/worker 镜像 + PostgreSQL；私有配置、部署状态与备份 | worker 通过真实检查后开放评测；AI 使用预先配置的 HTTPS 服务 | [生产部署完整操作](production.md) |
 | **源码开发环境** | 修改应用、调试页面、编写内容或开发评测器 | Python/uv + Django 开发服务器；默认仓库内 SQLite；回环访问 | 默认不启动评测或 AI；按需单独配置 WASI worker 和模型 | [下方源码开发](#development) |
+| **本地 CUDA 编译工具** | 用自己的编辑器写 CUDA，需要编译检查且不占 GPU | 私有 rootless Docker + 固定 gVisor/NVRTC 镜像；独立状态目录 | 只编译，不运行样例；不需要网站或数据库 | [构建、使用与恢复](local-compiler.md) |
 | **GPU 宿主 worker（开发验收）** | 已获得独占单卡、准备验证完整 CUDA 控制流程 | 普通用户 systemd + RootlessKit/Podman/runsc；持久私有目录与同一应用数据库 | 每次启动完整检查；新 CUDA 路径尚未验收，网站 GPU 提交关闭 | [配置与生命周期](gpu.md#gpu-worker) |
 | **GPU 容器 worker（开发验收）** | 已有 PostgreSQL，准备使用固定镜像和 Compose 验证专用 GPU 节点 | 原私有 rootless Docker、锁/journal、数据库网络；可制作统一四镜像发布包 | 无设备预检与完整启动分开；真实 GPU、队列及升级仍待验收 | [构建、配置和 Compose](container-gpu-worker.md)、[统一发布包](releases.md#gpu-release) |
 

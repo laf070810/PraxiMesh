@@ -46,6 +46,26 @@ CUDA 下载与提交适用于维护者提供的固定版本题目；默认题库
 
 `test` 仅支持 CPU/WASI 题，CUDA 会明确报错并保留本地文件。当前没有本地 GPU 执行入口；可用下面的 `submit --mode run` 请求具有已验收 GPU 环境的服务器执行公开样例。服务器不可用时返回 503，不会改用宿主编译器或普通容器。
 
+<a id="cuda-compilation"></a>
+
+## 本地检查 CUDA 编译
+
+按[本地编译环境](deployment/local-compiler.md)构建并验证编译镜像后，编辑下载包中的 `solution.cu`，执行：
+
+```sh
+.venv/bin/python scripts/practice.py compile ./cuda-work \
+  --compiler-image sha256:REPLACE_WITH_COMPLETE_IMAGE_ID \
+  --architecture 8.6 \
+  --state "$PWD/var/cuda-practice-state" \
+  --docker-socket /run/user/$(id -u)/docker.sock
+```
+
+首次使用的状态目录必须不存在，父目录必须存在；后续沿用同一目录。`8.6` 是显式 NVRTC 编译目标，按所需计算架构填写，不会探测或使用 GPU。命令校验完整公开包，只把源码交给已验证的 gVisor 编译任务，不向服务器发送代码。
+
+`status: compiled` 表示生成 PTX，退出码为 0；语法错误等源码编译失败退出码为 1；不支持的编译目标、镜像/环境故障和取消退出码为 2。输出包含源码摘要、题目版本和编译器身份，并标明 `formal_result: false`、`executed: false`、`ready: false`。它不运行公开样例，也不检查数值正确性或性能；语义错误的代码仍可能编译成功。当前返回错误类别，不返回 NVRTC 原始诊断文本或 PTX。
+
+Ctrl+C 走原任务清理路径。强制中断后若要求恢复，保留原状态并按[恢复步骤](deployment/local-compiler.md#使用与恢复)运行 `recover-compiler`；不要删除状态来开始下一次任务。
+
 ## 正式提交与查询
 
 ```sh

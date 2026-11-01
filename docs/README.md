@@ -6,6 +6,8 @@
 
 - [阶段计划与安全发布门槛](plan.md)
 - [完整 PRD 需求追踪](requirements.md) — 全目标实施中，当前 F 自部署制品及版本题目反馈已验证
+- [RFC-024：本地 CUDA 练习工具](rfcs/024-local-cuda-practice.md) — 无设备隔离编译已接入；完整本地 GPU 运行仍待实现和验收
+- [ADR-073：本地 CUDA 编译复用无设备隔离任务](adr/073-local-device-free-cuda-compilation.md)
 - [RFC-022：GPU 发布协调与原数据库恢复](rfcs/022-gpu-release-coordination.md) — 实施中
 - [ADR-059：GPU 协调器绑定原节点身份](adr/059-gpu-deployment-attachment.md)
 - [ADR-061：协调器 worker 配置绑定原节点与发布代](adr/061-generation-bound-worker-config.md)
