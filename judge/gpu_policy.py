@@ -112,6 +112,7 @@ EXECUTION_SOURCES = (
     "core/management/commands/container_gpu_worker.py",
     "core/container_worker_database.py",
     "judge/container_worker_config.py",
+    "judge/container_deployment_config.py",
     "judge/container_worker_image.py",
     "praximesh/container_worker_settings.py",
     "scripts/container_worker_entry.py",

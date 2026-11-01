@@ -58,7 +58,10 @@ def worker_digest(root=ROOT):
 
 
 def verify_image():
-    if (ROOT / "worker-contract").read_text().strip() != worker_digest() or (
-        ROOT / "controller-contract"
-    ).read_text().strip() != controller_digest():
+    contract = (ROOT / "worker-contract").read_text().strip()
+    if (
+        contract != worker_digest()
+        or (ROOT / "controller-contract").read_text().strip() != controller_digest()
+    ):
         raise ValueError("Container worker image source identity changed")
+    return contract

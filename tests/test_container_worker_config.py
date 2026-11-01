@@ -35,6 +35,13 @@ def write_private(path, value):
     path.chmod(0o600)
 
 
+def test_coordinator_owned_configuration_requires_generation_record(tmp_path, configuration):
+    write_private(tmp_path / "worker.json", configuration)
+    write_private(tmp_path / "deployment-owner.json", {"schema": 1, "site_id": "a" * 32})
+    with pytest.raises(ValueError, match="generation"):
+        read_config(tmp_path)
+
+
 @pytest.mark.parametrize(
     "arguments",
     [
@@ -316,6 +323,7 @@ def test_worker_image_scope_includes_application_entry_and_every_controller_sour
         "praximesh/settings.py",
         "core/models.py",
         "core/management/commands/container_gpu_worker.py",
+        "judge/container_deployment_config.py",
         "scripts/container_worker_entry.py",
         "requirements.lock",
         "deploy/compose.gpu-worker.yaml",

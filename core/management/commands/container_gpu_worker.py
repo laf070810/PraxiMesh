@@ -30,10 +30,14 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         stage = "image"
         try:
-            verify_image()
+            image_contract = verify_image()
             stage = "configuration"
-            config = read_config()
-            if getattr(settings, "WORKER_CONFIGURATION", None) != config:
+            snapshot = read_config(worker_contract=image_contract, with_generation=True)
+            config = snapshot[0]
+            if (
+                getattr(settings, "WORKER_CONFIGURATION", None),
+                getattr(settings, "WORKER_GENERATION", None),
+            ) != snapshot:
                 raise ValueError(
                     "The fixed container worker settings and private configuration are required"
                 )
@@ -50,6 +54,12 @@ class Command(BaseCommand):
             stop = StopFlag()
             stage = "controller"
             with stop_signals(stop), ContainerController(config["gpu"]) as control:
+                stage = "configuration"
+                if read_config(worker_contract=image_contract, with_generation=True) != snapshot:
+                    raise ValueError(
+                        "Worker configuration changed before acquiring the original lock"
+                    )
+                stage = "controller"
                 if control.saved["version"] != 4:
                     raise ValueError(
                         "Container GPU workers require the full v4 observation contract"

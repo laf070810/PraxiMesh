@@ -5,7 +5,7 @@ import secrets
 
 from judge.container_worker_config import database_settings, read_config
 
-WORKER_CONFIGURATION = read_config()
+WORKER_CONFIGURATION, WORKER_GENERATION = read_config(with_generation=True)
 os.environ.clear()
 os.environ.update(
     {

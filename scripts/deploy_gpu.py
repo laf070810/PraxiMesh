@@ -12,12 +12,13 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from judge.container_controller import identity, manifest
+from judge.container_deployment_config import OWNER, generation_record
 from judge.container_journal import private
 from judge.container_service import LocalEngine
+from judge.container_worker_config import validate_config
 from judge.gpu_device_lock import GPU_UUID, DeviceLock
 from judge.gpu_session import decode_frame
 
-OWNER = "deployment-owner.json"
 MAX_BYTES = 32 * 1024
 NONCE = re.compile(r"[a-f0-9]{32}")
 
@@ -200,6 +201,48 @@ class GPUDeploymentNode:
         self.validate_binding(binding)
         if encoded(self.owner()) != encoded(binding):
             raise ValueError("Original GPU ownership marker is missing or changed")
+
+    def generation_configuration(self, binding, generation, database, *, enabled=False):
+        """Render private values under the original lock; never publish or start."""
+        self.require_owner(binding)
+        release = generation["manifest"]
+        if type(release.get("format")) is not int or release["format"] != 2:
+            raise ValueError("A verified four-image release is required")
+        protocol_source = "judge/container_deployment_config.py"
+        if protocol_source not in release.get("source_files", {}) or any(
+            protocol_source not in release["gpu"].get("source_scopes", {}).get(scope, [])
+            for scope in ("execution", "controller", "worker")
+        ):
+            raise ValueError("This frozen release does not support deployment generation binding")
+        mounts = decode_frame(read_private(self.fd, "mounts.json"))
+        observer = mounts["device_observer"]
+        if (
+            encoded(release["gpu"]["management"]) != encoded(observer["library"])
+            or release["gpu"]["driver"]["driver_version"] != observer["target"]["driver"]
+        ):
+            raise ValueError(
+                "Release driver and management artifacts differ from the original node"
+            )
+        # JSON round-trip prevents the caller mutating a referenced release/config
+        # object after the exact private configuration digest has been derived.
+        value = validate_config(
+            json.loads(
+                encoded(
+                    {
+                        "schema": 1,
+                        "enabled": enabled,
+                        "gpu": self.config["device"],
+                        "worker_id": generation["gpu_worker"],
+                        "task_image": release["images"]["gpu_task"],
+                        "driver_manifest": release["gpu"]["driver"],
+                        "database": database,
+                    }
+                )
+            )
+        )
+        record = generation_record(binding, generation, value)
+        self.require_owner(binding)
+        return value, record
 
     @staticmethod
     def temporary(binding):

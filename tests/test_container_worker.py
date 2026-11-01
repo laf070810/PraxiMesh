@@ -36,7 +36,8 @@ def worker(startup, configured, settings, monkeypatch):
     }
     settings.JUDGE_ENABLED = True
     settings.WORKER_CONFIGURATION = value
-    monkeypatch.setattr(command, "read_config", lambda: copy.deepcopy(value))
+    settings.WORKER_GENERATION = None
+    monkeypatch.setattr(command, "read_config", lambda **kwargs: (copy.deepcopy(value), None))
     monkeypatch.setattr(command, "verify_image", lambda: None)
     monkeypatch.setattr(command, "check_database", lambda: None)
     monkeypatch.setattr(command, "STATE", startup.directory.parent)
@@ -133,6 +134,49 @@ def test_readonly_check_never_opens_controller_or_changes_database(worker):
     call_command("container_gpu_worker", check=True, stdout=output)
     assert "GPU readiness was not checked" in output.getvalue()
     assert before == list(GPUDevice.objects.values())
+    assert not worker.entered and not worker.events and not worker.path.exists()
+
+
+def test_configuration_change_before_device_lock_prevents_any_startup(worker, monkeypatch):
+    reads = []
+
+    def changed_configuration(**kwargs):
+        reads.append(worker.entered)
+        value = copy.deepcopy(worker.config)
+        if worker.entered:
+            value["worker_id"] += "-changed"
+        return value, None
+
+    monkeypatch.setattr(command, "read_config", changed_configuration)
+    with pytest.raises(CommandError, match="configuration"):
+        call_command("container_gpu_worker", once=True)
+    assert reads == [0, 1]
+    assert worker.entered == worker.closed == 1
+    assert not worker.events and not worker.path.exists()
+
+
+def test_generation_only_change_before_lock_prevents_startup(worker, settings, monkeypatch):
+    generation = {"release_sha256": "a" * 64}
+    settings.WORKER_GENERATION = generation
+
+    def snapshot(**kwargs):
+        selected = generation if not worker.entered else {"release_sha256": "b" * 64}
+        return copy.deepcopy(worker.config), copy.deepcopy(selected)
+
+    monkeypatch.setattr(command, "read_config", snapshot)
+    with pytest.raises(CommandError, match="configuration"):
+        call_command("container_gpu_worker", once=True)
+    assert worker.entered == worker.closed == 1
+    assert not worker.events and not worker.path.exists()
+
+
+def test_generation_change_after_django_setup_is_rejected_before_database(worker, monkeypatch):
+    monkeypatch.setattr(
+        command, "read_config", lambda **kwargs: (worker.config, {"new": "generation"})
+    )
+    monkeypatch.setattr(command, "check_database", lambda: pytest.fail("Database access"))
+    with pytest.raises(CommandError, match="configuration"):
+        call_command("container_gpu_worker", check=True)
     assert not worker.entered and not worker.events and not worker.path.exists()
 
 

@@ -126,6 +126,24 @@ DOCKER_HOST="unix://$PRAXIMESH_DOCKER_SOCKET" \
 
 输出目录必须是新目录。此检查不执行上面的元数据初始化，也不证明 CUDA、GPU 队列或升级成功。设计见 [RFC-022](../rfcs/022-gpu-release-coordination.md)。
 
+<a id="generation-configuration"></a>
+
+### 协调器管理的代际配置
+
+已绑定的节点要求私有 `deployment-generation.json` 与 `worker.json`、原所有权、原目录/锁和安装身份一致。代际记录还绑定数据库、worker 登录角色、发布包及 worker 镜像契约。命令会在 Django 初始化后、取得原设备锁后分别重读完整快照；配置或记录变化时停止，不进入启动探针或领取任务。
+
+目前已实现身份校验与原锁下的配置生成，尚未提供完成实际停止、原数据库预约清理和持久切换的发布入口。不要手工创建代际记录、修改摘要或对已绑定节点套用独立 Compose 的启用步骤。完整生命周期接通之前，`apply` 仍拒绝 GPU 发布。旧独立 worker 配置保持原行为；旧四镜像包仍可核验，但不支持新协议的镜像不能用于协调器代际配置。
+
+文件/配置与启动边界的无设备组件检查可运行：
+
+```sh
+.venv/bin/pytest -q tests/test_container_deployment_config.py \
+  tests/test_container_worker_config.py tests/test_container_worker.py \
+  tests/test_deploy_gpu.py
+```
+
+这些检查使用临时私有文件、合成元数据和显式运行时替身，不能替代真实镜像、PostgreSQL、GPU 或部署验收。当前范围见 [G45](../acceptance-g45.md)。新协议已纳入 GPU/worker 源码契约，使用时必须构建并验证新镜像，不复用旧 GPU 凭证。
+
 ## Compose 预检与运行
 
 准备非敏感连接参数。数据库网络须是现有 PostgreSQL 容器所在网络；这里不会新建或改写应用数据库。`PRAXIMESH_GPU_MINOR` 从挂载清单读取物理 minor，不能用 CUDA 逻辑序号代替。

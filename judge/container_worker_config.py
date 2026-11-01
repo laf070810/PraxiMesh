@@ -6,6 +6,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 from judge.container_controller import STATE
+from judge.container_deployment_config import check_generation
 from judge.container_journal import private
 from judge.container_service import IMAGE_ID
 from judge.driver_artifacts import validate_manifest
@@ -77,7 +78,7 @@ def database_settings(value):
     }
 
 
-def read_config(directory=STATE):
+def read_config(directory=STATE, *, worker_contract=None, with_generation=False):
     directory = Path(directory)
     if not directory.is_absolute() or directory.resolve() != directory:
         raise ValueError("Worker state must use an absolute path without links")
@@ -95,6 +96,7 @@ def read_config(directory=STATE):
             if len(data) > MAX_CONFIG:
                 raise ValueError("Worker configuration exceeds its size limit")
             value = validate_config(decode_frame(data))
+        generation = check_generation(fd, value, worker_contract=worker_contract)
         if value["database"]["sslmode"] == "verify-full":
             ca_fd = os.open(
                 "database-ca.pem", os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=fd
@@ -106,6 +108,6 @@ def read_config(directory=STATE):
         opened, named = os.fstat(fd), directory.lstat()
         if (opened.st_dev, opened.st_ino) != (named.st_dev, named.st_ino):
             raise ValueError("Worker state changed while reading configuration")
-        return value
+        return (value, generation) if with_generation else value
     finally:
         os.close(fd)
