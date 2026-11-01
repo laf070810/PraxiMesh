@@ -167,6 +167,12 @@ def snapshot(source, destination):
         data = path.read_bytes()
         target = destination / relative
         target.parent.mkdir(parents=True, exist_ok=True)
+        # Docker preserves nested source directory modes. A private caller's
+        # umask must not hide commands/migrations from the non-root runtime.
+        # Keep the enclosing workspace private; normalize only source parents.
+        for parent in PurePosixPath(relative).parents:
+            if parent != PurePosixPath("."):
+                (destination / parent).chmod(0o755)
         target.write_bytes(data)
         target.chmod(0o644)
         files[relative] = hashlib.sha256(data).hexdigest()

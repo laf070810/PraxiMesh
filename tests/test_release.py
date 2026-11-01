@@ -3,6 +3,8 @@
 import hashlib
 import io
 import json
+import os
+import stat
 import tarfile
 
 import pytest
@@ -200,6 +202,42 @@ def test_snapshot_omits_state_and_rejects_config_or_links(tmp_path):
     (source / "core/link.py").symlink_to(source / "manage.py")
     with pytest.raises(ReleaseError, match="symlink"):
         snapshot(source, tmp_path / "refused-link")
+
+
+@pytest.mark.parametrize("mask", [0o077, 0o000])
+def test_snapshot_source_is_readable_by_runtime_user_inside_private_workspace(tmp_path, mask):
+    source, private = tmp_path / "source", tmp_path / "private"
+    source.mkdir(mode=0o700)
+    private.mkdir(mode=0o700)
+    captured = private / "captured"
+    captured.mkdir(mode=0o700)
+    names = SOURCE_FILES | {
+        "core/management/commands/content_import.py",
+        "core/migrations/0001_initial.py",
+        "static/editor/editor.js",
+    }
+    for name in names:
+        path = source / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(name)
+        path.chmod(0o600)
+    original = os.umask(mask)
+    try:
+        files = snapshot(source, captured)
+    finally:
+        restored = os.umask(original)
+    assert restored == mask
+    assert stat.S_IMODE(private.stat().st_mode) == 0o700
+    assert stat.S_IMODE(captured.stat().st_mode) == 0o700
+    for name in names:
+        path = captured / name
+        assert path.read_text() == name and sha256(path) == files[name]
+        assert stat.S_IMODE(path.stat().st_mode) == 0o644
+        assert stat.S_IMODE((source / name).stat().st_mode) == 0o600
+        for parent in path.parents:
+            if parent == captured:
+                break
+            assert stat.S_IMODE(parent.stat().st_mode) == 0o755
 
 
 @pytest.mark.parametrize("target_exists", [False, True], ids=["dangling", "existing"])
