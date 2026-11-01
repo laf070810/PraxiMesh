@@ -2,6 +2,12 @@
 
 日期：2026-10-31。设计：[RFC-020](rfcs/020-browser-editor.md)、[ADR-021](adr/021-browser-editor.md)。使用和构建说明集中在 [编辑器指南](editor.md)。本轮在维护者要求的不占 GPU 范围内进行。
 
+## 当前界面复查
+
+2026-11-02，在 `934670a` 的界面源码上重放 `scripts/browser_acceptance.py --interface`；同一工作树正在开发的部署脚本不参与此次检查。`test-results/g56-interface.log` 及 `g56-interface/editor/layouts.json` 确认中英界面、25 个页面、320/390/768/1440 四种宽度的 **200 组布局全部通过**。标题和正文边距、筛选控件底边、卡片与表格后标题间距、两种复选框结构及键盘切换均通过，没有页面横向溢出。
+
+编辑器同时通过 Python/JavaScript 高亮、补全、本地检查、格式化、快捷键、私有草稿和失败回退。实际查看桌面中文社区、768 px 英文目标选项和 320 px 英文令牌页截图，本次未发现新增错位。未更改界面源码或资源，未运行评测、Docker 或 GPU；一次性数据库和回环测试进程由原入口清理，现有站点容器未重建。这次源码检查不能说明正在运行的旧镜像已更新。
+
 ## 学习表格后的标题间距
 
 2026-11-01 复查 `g43-current-browser` 的桌面学习页截图时，发现“按概念查看”和“近期错误结果”紧贴上一张表格。新增实际几何检查在旧样式上失败：两处间距均为 0 px，原始错误与截图保留在 `test-results/g43-table-spacing-before.log` 和 `g43-table-spacing-before/editor/`。
