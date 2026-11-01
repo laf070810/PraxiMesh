@@ -168,7 +168,8 @@ def test_container_history_is_valid_without_opening_admission(configured, user, 
     device = GPUDevice(
         id=env["target"]["uuid"], environment=env, fingerprint=job.evaluation_fingerprint
     )
-    assert not valid_environment(device, policy=env["execution_digest"])
+    assert valid_environment(device, policy=env["execution_digest"])
+    assert not valid_environment(device, policy=configured.adapter.environment["execution_digest"])
     # Keeping a valid historical record never publishes a current GPU device.
     assert not GPUDevice.objects.exists()
     job.environment["artifacts"]["task_image"] = "sha256:" + "f" * 64

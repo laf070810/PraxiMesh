@@ -48,6 +48,19 @@ def recover_controller(
     The caller holds the device lock throughout later readiness checks as well.
     Successful return is physical recovery only, never admission authorization.
     """
+    from core.container_startup import recover_controller as recover_container
+    from judge.container_adapter import ContainerGPUAdapter
+
+    if type(adapter) is ContainerGPUAdapter:
+        return recover_container(
+            guard,
+            worker_id,
+            adapter,
+            deadline=deadline,
+            on_tick=on_tick,
+            expected_slot=expected_slot,
+            container_journal=container_journal,
+        )
     if type(guard) is not DeviceLock or type(adapter) is not GPUExecutionAdapter:
         raise ValueError("A held device lock and supervised adapter are required")
     guard.assert_held()

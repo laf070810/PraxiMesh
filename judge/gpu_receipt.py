@@ -45,21 +45,36 @@ def host_identity():
 
 
 def binding(guard, worker_id, adapter):
-    if type(guard) is not DeviceLock or type(adapter) is not GPUExecutionAdapter:
+    from judge.container_adapter import ContainerGPUAdapter
+    from judge.container_readiness import private_identity
+
+    container = type(adapter) is ContainerGPUAdapter
+    if type(guard) is not DeviceLock or type(adapter) not in {
+        GPUExecutionAdapter,
+        ContainerGPUAdapter,
+    }:
         raise ValueError("GPU readiness requires an owned lock and supervised adapter")
     guard.assert_held()
     if type(worker_id) is not str or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,80}", worker_id):
         raise ValueError("An explicit GPU worker identity is required")
+    identity = private_identity(guard, adapter) if container else {"host": host_identity()}
     require(
         guard.device_uuid == adapter.target["uuid"]
-        and environment_identity(adapter.target, adapter.identity) == adapter.environment
+        and (
+            container
+            or environment_identity(adapter.target, adapter.identity) == adapter.environment
+        )
         and canonical_digest(adapter.environment) == adapter.fingerprint,
         "GPU startup environment changed",
     )
     return {
-        "schema": 1,
+        "schema": 2 if container else 1,
         "suite": canonical_digest(
-            {"id": "gpu-startup-v1", "checks": CHECKS, "check_seconds": CHECK_SECONDS}
+            {
+                "id": "gpu-container-startup-v1" if container else "gpu-startup-v1",
+                "checks": CHECKS,
+                "check_seconds": CHECK_SECONDS,
+            }
         ),
         "checks": list(CHECKS),
         "environment": copy.deepcopy(adapter.environment),
@@ -67,7 +82,7 @@ def binding(guard, worker_id, adapter):
         "device": guard.device_uuid,
         "worker": worker_id,
         "owner_token": str(guard.owner_token),
-        "host": host_identity(),
+        **identity,
         "valid_for_seconds": TTL_SECONDS,
     }
 

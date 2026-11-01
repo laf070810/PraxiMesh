@@ -10,6 +10,8 @@ from core.gpu_evidence import ENVIRONMENT_FIELDS, environment_profile
 from core.gpu_resources import FRESH_SECONDS
 from core.models import GPUDevice, Submission
 from core.resources import GPU_BUDGET_POLICY, GPU_EVALUATOR, reservation_units
+from judge.container_environment import BACKEND as CONTAINER_BACKEND
+from judge.container_environment import FIELDS as CONTAINER_FIELDS
 from judge.gpu_policy import execution_digest
 
 
@@ -22,7 +24,12 @@ def valid_environment(device, *, policy):
         environment = device.environment
         if (
             type(environment) is not dict
-            or set(environment) != ENVIRONMENT_FIELDS
+            or set(environment)
+            != (
+                CONTAINER_FIELDS
+                if environment.get("backend") == CONTAINER_BACKEND
+                else ENVIRONMENT_FIELDS
+            )
             or environment["execution_digest"] != policy
             or environment["target"]["uuid"] != device.pk
         ):

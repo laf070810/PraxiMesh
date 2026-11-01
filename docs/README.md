@@ -100,6 +100,8 @@
 - [G38 容器资源与隔离启动检查](acceptance-g38.md) — 固定九项资源维护与原任务清理；GPU 和完整启动仍待验收
 - [ADR-055：容器控制器故障与新实例恢复](adr/055-container-controller-faults.md)
 - [G39 容器控制器故障与新实例恢复](acceptance-g39.md) — 退出、断连、独立硬期限及新调用；未运行 GPU
+- [ADR-056：容器完整启动、私有凭证与就绪发布](adr/056-container-complete-startup.md)
+- [G40 容器完整启动与就绪发布](acceptance-g40.md) — 当前验证范围及容器部署剩余交付
 - [Compose 真实评测、模型与数据保留验收](acceptance-compose.md)
 - [类/API 契约与内容编写](object-api-contract.md)
 - [挑战、成就与题库筛选指南](challenges.md)

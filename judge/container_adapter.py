@@ -147,14 +147,17 @@ class ContainerGPUAdapter:
         return deepcopy(completed["report"]), deepcopy(self.environment)
 
     def check_resources(self, task, *, deadline, on_tick):
+        request = resource_request(uuid4().hex)
         completed = self.exchange(
             task,
-            resource_request(uuid4().hex),
+            request,
             deadline=deadline,
             on_tick=on_tick,
             on_begin=lambda: None,
         )
-        return deepcopy(completed["report"]), deepcopy(self.environment)
+        return {**deepcopy(completed["report"]), "challenge": request["canary"]}, deepcopy(
+            self.environment
+        )
 
     def check_controller(self, task, name, *, deadline, on_tick):
         request = fault_request(name, uuid4().hex)

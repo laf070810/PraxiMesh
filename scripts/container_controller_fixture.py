@@ -17,7 +17,9 @@ from judge.container_environment import engine_identity  # noqa: E402
 from judge.container_journal import PersistentRuntimeService, private  # noqa: E402
 from judge.container_monitor import ContainerDeviceMonitor, validate_observation  # noqa: E402
 from judge.container_processes import OwnedProcesses  # noqa: E402
+from judge.container_readiness import SCOPE as STARTUP_SCOPE  # noqa: E402
 from judge.gpu_policy import execution_digest  # noqa: E402
+from judge.gpu_receipt import CHECKS as STARTUP_CHECKS  # noqa: E402
 from judge.gpu_session import decode_frame  # noqa: E402
 from judge.sandbox import SandboxUnavailable  # noqa: E402
 
@@ -196,6 +198,7 @@ def main():
             "name": service.name,
             "gpu_executed": False,
             "execution_digest": execution_digest(),
+            "startup_module": {"scope": STARTUP_SCOPE, "checks": list(STARTUP_CHECKS)},
             "engine_environment": engine_identity(control.engine.verify()),
         }
         monitor = None

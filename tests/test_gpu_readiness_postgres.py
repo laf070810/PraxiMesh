@@ -11,10 +11,18 @@ from core import gpu_resources
 from core.gpu_readiness import heartbeat_ready
 from core.models import GPUDevice
 from judge.gpu_receipt import ReceiptStore
-from tests.test_gpu_readiness import startup as startup
+from tests.test_container_adapter import configured as configured
+from tests.test_container_driver import bundle as bundle
+from tests.test_container_readiness import startup as container_startup  # noqa: F401
+from tests.test_gpu_readiness import startup as host_startup  # noqa: F401
 from tests.test_gpu_resources import gpu_version as gpu_version
 
 pytestmark = pytest.mark.django_db(transaction=True)
+
+
+@pytest.fixture(params=["host_startup", "container_startup"], ids=["host", "container"])
+def startup(request):
+    return request.getfixturevalue(request.param)
 
 
 def test_row_lock_after_file_publication_cannot_publish_ready(startup, monkeypatch):

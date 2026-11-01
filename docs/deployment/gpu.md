@@ -42,6 +42,26 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 单卡设备传入任务/guest、新版记录与控制器中断恢复 | [设备节点检查](#container-device-nodes)；需要明确授权映射真实设备；固定 CPU guest 只读节点元信息，修复后实测待重放 |
 | 容器内核协议、固定启动/资源检查、结果扣留与独立恢复 | [无设备调用链检查](#container-kernel-flow)；固定 CPU 夹具，不编译学员源码，不接入 GPU |
 | 控制器退出、通信断开、独立硬期限及新实例恢复 | [无设备控制器故障检查](#container-controller-faults)；固定 CPU 正确性准备与新恢复，不执行 GPU |
+| 容器完整启动、私有凭证与就绪/领取事务 | [容器启动组件检查](#container-startup)；实际数据库配合 GPU 运行时替身，不是 GPU 部署入口 |
+
+<a id="container-startup"></a>
+
+## 容器完整启动的组件检查
+
+适用于修改启动次序、原预约恢复、凭证身份、发布事务或网页准入。共同入口 `core.gpu_readiness.initialize_controller` 按精确适配器类型选择后端；容器使用原 `ContainerController` 和私有 journal。它串行完成初始正确恢复、九项资源检查、十九项内核检查和三项控制器故障，最后才发布凭证与环境。开发验证不使用 GPU：
+
+```sh
+.venv/bin/pytest -q tests/test_container_readiness.py tests/test_gpu_readiness.py tests/test_gpu_receipt.py
+.venv/bin/python scripts/postgres_tests.py -q \
+  tests/test_container_readiness.py tests/test_gpu_readiness_postgres.py \
+  tests/test_gpu_admission_postgres.py tests/test_gpu_container_recovery.py
+```
+
+第二条命令创建并清理自有 PostgreSQL 容器和卷，检查宿主与容器的发布竞争、预约保留以及 Web 只读权限；GPU 方法仍是测试替身。不得将临时测试文档复制到实际 receipt 目录。实际无设备控制镜像依赖与锁/恢复重放沿用[控制端映射入口](#container-controller)。结果与范围见 [G40](../acceptance-g40.md)。
+
+宿主到容器的切换必须先由原宿主控制器完成恢复并停止，留下无预约的已恢复状态；不能让容器清理 systemd 服务或把未完成的宿主任务改成容器指纹。已有容器升级继续使用同一私有锁和 journal，由冻结的原记录识别旧实例。
+
+容器凭证采用独立 schema，绑定宿主 boot ID、映射操作者、原安装/daemon/挂载和全部环境身份。当前还没有专用容器 GPU worker 命令或 Compose 部署入口；不要通过现有宿主命令、旧 receipt 或手工修改数据库状态开放提交。实际设备与完整 CUDA 验收仍待完成。
 
 <a id="container-controller-faults"></a>
 
@@ -85,7 +105,7 @@ CPU 专项给故障任务 45 秒预算，其中监督器硬期限为 40 秒；�
 
 每个场景按原 journal 恢复并核对进程退出；临时数据保存在自有目录，待恢复记录存在时保留现场。原报告在 `test-results/px-container-kernel-*/result.json`。这里不执行 [G34 设备节点检查](#container-device-nodes)，也不替代真实 CUDA、完整启动凭证或 GPU Compose 验收。
 
-容器调用现在也有独立环境身份，并接入原有任务结算和历史成绩校验，设计见 [ADR-052](../adr/052-container-gpu-environment.md)。完整控制镜像包含 GPU 策略所需的全部源码，[控制端映射检查](#container-controller)会在镜像内计算策略并核对实际 Docker 引擎身份。当前 `gpu_worker` 命令仍使用宿主适配器；容器固定内核、资源与控制器故障检查已连接，完整启动发布尚未接通，因此这些组件不能通过现有命令、环境变量或旧 receipt 开放 GPU 提交。
+容器调用现在也有独立环境身份，并接入原有任务结算和历史成绩校验，设计见 [ADR-052](../adr/052-container-gpu-environment.md)。完整控制镜像包含 GPU 策略所需的全部源码，[控制端映射检查](#container-controller)会在镜像内计算策略并核对实际 Docker 引擎身份。固定内核、资源、控制器故障与[完整启动组件](#container-startup)已连接；当前 `gpu_worker` 命令仍使用宿主适配器，专用容器命令/Compose 尚未交付，实际 GPU 验收仍待完成。
 
 <a id="container-device-nodes"></a>
 

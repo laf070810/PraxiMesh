@@ -13,13 +13,29 @@ from core import gpu_admission, gpu_resources, queue
 from core.models import GPUDevice, Submission
 from core.resources import GPU_BUDGET_POLICY, usage
 from judge.gpu_device_lock import DeviceLock
+from judge.gpu_execution_contract import canonical_digest
 from scripts.deploy_database import WEB_READ, WEB_WRITE, worker_privileges
-from tests.test_gpu_admission import gpu_ready as gpu_ready
+from tests.test_container_adapter import configured as configured
+from tests.test_container_driver import bundle as bundle
+from tests.test_container_readiness import startup as container_startup  # noqa: F401
+from tests.test_gpu_admission import gpu_ready as host_ready  # noqa: F401
 from tests.test_gpu_admission import version as version
-from tests.test_gpu_readiness import startup as startup
+from tests.test_gpu_readiness import startup as host_startup  # noqa: F401
+from tests.test_gpu_readiness_postgres import startup as startup
 from tests.test_gpu_resources import gpu_version as gpu_version
 
 pytestmark = pytest.mark.django_db(transaction=True)
+
+
+@pytest.fixture(params=["host", "container"])
+def gpu_ready(request):
+    device = request.getfixturevalue("host_ready")
+    if request.param == "container":
+        adapter = request.getfixturevalue("configured").adapter
+        device.environment = adapter.environment
+        device.fingerprint = canonical_digest(adapter.environment)
+        device.save(update_fields=["environment", "fingerprint"])
+    return device
 
 
 def require_postgres():
@@ -126,6 +142,32 @@ def test_ready_and_environment_become_visible_in_same_transaction(startup, setti
         startup.run()
     assert observed == [("quarantined", {}, False)]
     assert [device.pk for device in gpu_admission.candidates()] == [startup.guard.device_uuid]
+
+
+def test_complete_startup_uses_existing_worker_grants(startup):
+    require_postgres()
+    role = connection.ops.quote_name("px_startup_" + uuid.uuid4().hex[:16])
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(f"CREATE ROLE {role} NOLOGIN")
+            cursor.execute(f"GRANT USAGE ON SCHEMA public TO {role}")
+            for table, privileges in worker_privileges(connection.connection).items():
+                cursor.execute(
+                    f"GRANT {privileges} ON {connection.ops.quote_name(table)} TO {role}"
+                )
+            cursor.execute(f"SET ROLE {role}")
+        try:
+            value = startup.run()
+            device = GPUDevice.objects.get(pk=startup.guard.device_uuid)
+            assert device.state == "ready" and device.job_id is None
+            assert device.environment == value["environment"]
+        finally:
+            with connection.cursor() as cursor:
+                cursor.execute("RESET ROLE")
+    finally:
+        with connection.cursor() as cursor:
+            cursor.execute(f"DROP OWNED BY {role}")
+            cursor.execute(f"DROP ROLE {role}")
 
 
 def test_upgrade_preserves_old_slot_but_requires_full_startup_environment(settings):

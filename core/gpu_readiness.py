@@ -10,6 +10,11 @@ from core import gpu_resources
 from core.gpu_control import bounded_database
 from core.gpu_startup import recover_controller, startup_identity
 from core.models import GPUDevice
+from judge.container_adapter import ContainerGPUAdapter
+from judge.container_monitor import ContainerDeviceMonitor
+from judge.container_readiness import SCOPE as CONTAINER_SCOPE
+from judge.container_readiness import stage_report as container_stage_report
+from judge.container_readiness import task_identity
 from judge.gpu_execution_contract import canonical_digest
 from judge.gpu_isolation import validate_structure
 from judge.gpu_kernel_checks import CHECKS as KERNEL_CHECKS
@@ -45,6 +50,9 @@ def _identity(guard, worker_id, adapter):
 
 
 def _stage_report(name, report, adapter):
+    if type(adapter) is ContainerGPUAdapter:
+        container_stage_report(name, report, adapter)
+        return
     require(type(report) is dict, "GPU startup stage did not return a report")
     if name == "initial-recovery":
         stopped = report.get("stopped")
@@ -175,6 +183,7 @@ def initialize_controller(
     """
     if deadline is None:
         deadline = time.monotonic() + SUITE_SECONDS
+    container = type(adapter) is ContainerGPUAdapter
     completed, evidence = [], []
 
     def record(name, report):
@@ -236,7 +245,7 @@ def initialize_controller(
 
             def run(name, method, *args):
                 tick()
-                service = OwnedJobService(
+                service = (adapter.task if container else OwnedJobService)(
                     guard, startup_job, startup_reservation, purpose="maintenance"
                 )
                 try:
@@ -247,9 +256,19 @@ def initialize_controller(
                         on_tick=tick,
                     )
                 finally:
-                    service.stop()
+                    if container:
+                        if service.cleanup is None:
+                            service.recover()
+                    else:
+                        service.stop()
                 tick()
                 require(environment == adapter.environment, "GPU startup check changed environment")
+                if container:
+                    report = {
+                        "scope": CONTAINER_SCOPE,
+                        "task": task_identity(service),
+                        "report": report,
+                    }
                 record(name, report)
 
             run("resources", adapter.check_resources)
@@ -293,8 +312,17 @@ def initialize_controller(
 def _idle(guard, worker_id, adapter, receipt_directory, *, claim, on_check):
     try:
         check_receipt(receipt_directory, guard, worker_id, adapter)
-        require(identify(guard.device_uuid) == adapter.target, "GPU identity changed after startup")
-        DeviceMonitor(adapter.target).observe()
+        if type(adapter) is ContainerGPUAdapter:
+            adapter.check()
+            require(
+                adapter.control.journal.load() is None, "Ready container has a pending task record"
+            )
+            ContainerDeviceMonitor(adapter.control).observe()
+        else:
+            require(
+                identify(guard.device_uuid) == adapter.target, "GPU identity changed after startup"
+            )
+            DeviceMonitor(adapter.target).observe()
         with bounded_database():
             _identity(guard, worker_id, adapter)
             check_receipt(receipt_directory, guard, worker_id, adapter)

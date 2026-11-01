@@ -198,8 +198,8 @@ def test_maintenance_reuses_kernel_recovery_without_publishing_ready(configured)
     task = adapter.task(configured.control.guard, "job", "reservation", purpose="maintenance")
     assert adapter.recover(task, deadline=100, on_tick=lambda: None) == adapter.environment
     assert "ready" not in adapter.environment
-    # The complete startup suite has not been ported. No type/config shortcut
-    # may turn an execution adapter or a saved identity into an operational receipt.
+    # A synthetic lock cannot turn this component fixture or its saved identity
+    # into an operational startup receipt.
     with pytest.raises(ValueError, match="readiness"):
         binding(configured.control.guard, "synthetic-worker", adapter)
 
@@ -265,6 +265,7 @@ def test_resource_adapter_uses_fresh_challenge_and_original_maintenance_task(con
         task = adapter.task(configured.control.guard, "job", "reservation", purpose="maintenance")
         report, environment = adapter.check_resources(task, deadline=180, on_tick=lambda: None)
         assert report["gpu"] == adapter.target["uuid"] and environment == adapter.environment
+        assert report["challenge"] == requests[-1]["canary"]
         report["checks"].clear()
         assert environment.get("ready") is None
     assert requests[0]["canary"] != requests[1]["canary"]

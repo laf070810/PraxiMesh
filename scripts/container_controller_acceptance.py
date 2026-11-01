@@ -474,9 +474,12 @@ def main():
         value = wait_report(held, path, "held")
         same_identity(value, config)
         from judge.container_environment import engine_identity
+        from judge.container_readiness import SCOPE as STARTUP_SCOPE
         from judge.gpu_policy import execution_digest
+        from judge.gpu_receipt import CHECKS as STARTUP_CHECKS
 
         assert value["execution_digest"] == execution_digest()
+        assert value["startup_module"] == {"scope": STARTUP_SCOPE, "checks": list(STARTUP_CHECKS)}
         assert value["engine_environment"] == engine_identity(engine.verify())
         try:
             DeviceLock(path / "locks", config["device"]).acquire()
