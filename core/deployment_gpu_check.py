@@ -30,7 +30,7 @@ from core.result_evidence import InvalidResult, verified_evidence
 from judge.container_environment import BACKEND
 from judge.gpu_policy import execution_digest
 
-PROTOCOL = "gpu-deployment-check-v1"
+PROTOCOL = "gpu-deployment-check-v2"
 WAIT_SECONDS = 2 * GPU_SLOT_SECONDS["submit"] + 120
 CORRECT = (
     'extern "C" __global__ void solve(const float* a, const float* b, float* out, int n) {\n'
@@ -43,8 +43,8 @@ SOURCES = (CORRECT, WRONG)
 VERDICTS = ("accepted", "wrong_answer")
 
 
-def identifier(token, worker, fingerprint):
-    value = uuid.uuid5(uuid.NAMESPACE_URL, f"{PROTOCOL}:{token}:{worker}:{fingerprint}")
+def identifier(token, worker, fingerprint, round_id):
+    value = uuid.uuid5(uuid.NAMESPACE_URL, f"{PROTOCOL}:{token}:{worker}:{fingerprint}:{round_id}")
     return "gpu-deploy-check-" + value.hex
 
 
@@ -97,9 +97,10 @@ def unrelated_relations(value, allowed):
 
 
 class CandidateProbe:
-    def __init__(self, *, token, worker, cpu_worker, device, owner, fingerprint, started):
+    def __init__(self, *, token, round_id, worker, cpu_worker, device, owner, fingerprint, started):
         try:
             self.token, self.owner = uuid.UUID(str(token)), uuid.UUID(str(owner))
+            self.round_id = uuid.UUID(str(round_id))
             self.started = datetime.fromisoformat(started.replace("Z", "+00:00"))
             if (
                 not timezone.is_aware(self.started)
@@ -130,7 +131,7 @@ class CandidateProbe:
             )
         self.worker, self.cpu_worker, self.device = worker, cpu_worker, device
         self.fingerprint = fingerprint
-        self.name = identifier(self.token, worker, fingerprint)
+        self.name = identifier(self.token, worker, fingerprint, self.round_id)
         self.data = problem_data(self.name)
         self.policy = execution_digest()
 
@@ -299,6 +300,7 @@ class CandidateProbe:
             problem.delete()
         return {
             "protocol": PROTOCOL,
+            "round_id": str(self.round_id),
             "action": "cleanup" if cleanup else "check",
             "passed": not cleanup,
             "token": str(self.token),

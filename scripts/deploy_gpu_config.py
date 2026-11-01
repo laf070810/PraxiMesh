@@ -134,13 +134,14 @@ def require_stopped_workers(host, node, binding):
     if type(checks) is not dict:
         raise ValueError("Invalid GPU candidate verification journal")
     if checks:
+        from scripts.deploy_gpu_check import record_key
         from scripts.deploy_gpu_check import validate_record as validate_candidate
 
         for key, record in checks.items():
             validate_candidate(record)
             lifecycle = transitions.get(record["generation"]["gpu_worker"])
             if (
-                key != record["operation"] + ":" + record["generation"]["gpu_worker"]
+                key != record_key(record)
                 or record["phase"] not in {"verified", "cleaned"}
                 or lifecycle is None
                 or record["generation"] != lifecycle["generation"]

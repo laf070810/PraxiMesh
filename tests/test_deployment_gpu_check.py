@@ -62,6 +62,7 @@ def candidate(configured, settings):
     QueueLock.objects.create(pk=1, pause_token=token, paused_at=timezone.now())
     kwargs = {
         "token": token,
+        "round_id": uuid.uuid4(),
         "worker": device.worker_id,
         "cpu_worker": cpu.pk,
         "device": device.pk,
@@ -309,6 +310,32 @@ def test_cleanup_after_original_worker_recovery_uses_new_owner_but_original_fixt
     assert candidate.probe().run(cleanup=True)["passed"] is False
 
 
+def test_round_cleanup_keeps_another_rounds_exact_records(candidate):
+    first = candidate.probe()
+    prepare(candidate)
+    settle(candidate)
+    first_ids = set(Submission.objects.values_list("id", flat=True))
+    candidate.kwargs["round_id"] = uuid.uuid4()
+    second = candidate.probe()
+    assert first.name != second.name
+    prepare(candidate)
+    settle(candidate)
+    second_ids = set(
+        Submission.objects.filter(user__username=second.name).values_list("id", flat=True)
+    )
+    assert first_ids.isdisjoint(second_ids) and len(second_ids) == 2
+    assert first.run(cleanup=True)["round_id"] == str(first.round_id)
+    assert set(Submission.objects.values_list("id", flat=True)) == second_ids
+    assert second.run()["round_id"] == str(second.round_id)
+
+
+def test_invalid_round_cannot_create_fixtures(candidate):
+    candidate.kwargs["round_id"] = "not-a-uuid"
+    with pytest.raises(CommandError, match="exact startup"):
+        candidate.probe()
+    assert not Submission.objects.exists() and not Problem.objects.exists()
+
+
 def test_unrelated_or_orphan_reservation_blocks_cleanup(candidate):
     prepare(candidate)
     settle(candidate)
@@ -363,6 +390,7 @@ def test_management_command_only_reports_completed_database_verification(candida
         "worker_id": candidate.kwargs["worker"],
         "cpu_worker_id": candidate.kwargs["cpu_worker"],
         "device": candidate.device.pk,
+        "round_id": candidate.kwargs["round_id"],
         "owner_token": candidate.kwargs["owner"],
         "fingerprint": candidate.kwargs["fingerprint"],
         "started_at": candidate.kwargs["started"],

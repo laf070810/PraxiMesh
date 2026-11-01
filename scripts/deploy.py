@@ -726,11 +726,11 @@ class Deployment:
 
         return GPUWorkerRecovery(self, generation, release).run()
 
-    def check_gpu_candidate(self, generation, release, *, cleanup=False):
+    def check_gpu_candidate(self, generation, release, *, cleanup=False, round_id=None):
         """Internal fixed real queue check; public activation remains closed."""
         from scripts.deploy_gpu_check import GPUCandidateCheck
 
-        return GPUCandidateCheck(self, generation, release).run(cleanup=cleanup)
+        return GPUCandidateCheck(self, generation, release).run(cleanup=cleanup, round_id=round_id)
 
     def quiesce(self, generation):
         """Stop and freeze one generation; GPU retains its original device/DB guards."""

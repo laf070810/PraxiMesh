@@ -14,7 +14,7 @@ from types import SimpleNamespace
 import pytest
 
 from scripts import deploy
-from scripts.deploy_gpu_check import SOURCES, GPUCandidateError, expected_report
+from scripts.deploy_gpu_check import SOURCES, GPUCandidateError, expected_report, record_key
 from tests import test_deploy_gpu_readiness as fixture_module
 from tests.test_container_adapter import configured as configured
 from tests.test_container_deployment_config import bound as bound
@@ -45,10 +45,16 @@ def candidate(request, monkeypatch):
     value = request.getfixturevalue("readiness")
     result = SimpleNamespace(value=value, failure=None, mutate=None)
 
-    def record():
-        return state(value.item)["gpu_candidate_checks"][
-            value.item.token + ":" + value.item.generation["gpu_worker"]
-        ]
+    def record(round_id=None):
+        records = list(state(value.item)["gpu_candidate_checks"].values())
+        if round_id is not None:
+            return next(row for row in records if row["round_id"] == round_id)
+        return max(
+            records,
+            key=lambda row: datetime.fromisoformat(
+                row["observation"]["started_at"].replace("Z", "+00:00")
+            ),
+        )
 
     def control(host, generation, *command, **kwargs):
         assert generation == value.item.generation
@@ -56,7 +62,8 @@ def candidate(request, monkeypatch):
         value.model.change(
             lambda saved: saved.setdefault("candidate_calls", []).append(list(command))
         )
-        current = record()
+        arguments = dict(zip(command[2::2], command[3::2], strict=True))
+        current = record(arguments["--round-id"])
         assert current["phase"] in (
             {"checked", "cleaning"} if command[1] == "cleanup" else {"checking"}
         )
@@ -65,7 +72,6 @@ def candidate(request, monkeypatch):
         observed = (
             current["cleanup_observation"] if command[1] == "cleanup" else current["observation"]
         )
-        arguments = dict(zip(command[2::2], command[3::2], strict=True))
         assert arguments["--token"] == value.item.token
         assert arguments["--owner-token"] == observed["owner_token"]
         report = expected_report(current, command[1] == "cleanup")
@@ -75,10 +81,12 @@ def candidate(request, monkeypatch):
 
     monkeypatch.setattr(deploy.Deployment, "control", control)
 
-    def run(cleanup=False):
+    def run(cleanup=False, round_id=None):
         host = value.item.coordinator()
         with host.locked():
-            return host.check_gpu_candidate(value.item.generation, value.release, cleanup=cleanup)
+            return host.check_gpu_candidate(
+                value.item.generation, value.release, cleanup=cleanup, round_id=round_id
+            )
 
     result.run, result.record = run, record
     result.calls = lambda: value.model.read().get("candidate_calls", [])
@@ -194,7 +202,75 @@ def test_restarted_worker_requires_cleanup_and_cannot_reuse_old_verification(can
     assert record["observation"] == original
     assert record["cleanup_observation"]["owner_token"] != original["owner_token"]
     with pytest.raises(GPUCandidateError, match="cannot authorize"):
+        candidate.run(round_id=record["round_id"])
+
+
+def test_recovered_worker_can_verify_a_distinct_round_after_original_cleanup(candidate):
+    candidate.failure = "original command interrupted"
+    with pytest.raises(RuntimeError):
         candidate.run()
+    first = copy.deepcopy(candidate.record())
+    restart(candidate.value)
+    candidate.failure = None
+    candidate.run(cleanup=True)
+    report = candidate.run()
+    assert report["passed"] is True and report["cleanup_passed"] is True
+    assert candidate.record()["observation"]["started_at"] != first["observation"]["started_at"]
+    assert len(state(candidate.value.item)["gpu_candidate_checks"]) == 2
+
+
+def test_completed_original_round_is_not_reused_after_new_startup(candidate):
+    first = candidate.run()
+    restart(candidate.value)
+    second = candidate.run()
+    assert first["fixture"] != second["fixture"]
+    assert len(state(candidate.value.item)["gpu_candidate_checks"]) == 2
+
+
+def test_owner_change_without_new_startup_cannot_create_a_new_round(candidate):
+    candidate.run()
+    before = copy.deepcopy(state(candidate.value.item)["gpu_candidate_checks"])
+    candidate.value.snapshot["device"]["owner_token"] = uuid.uuid4()
+    with pytest.raises(GPUCandidateError, match="fresh readiness"):
+        candidate.run()
+    assert state(candidate.value.item)["gpu_candidate_checks"] == before
+
+
+def test_round_limit_does_not_remove_history_or_submit_again(candidate, monkeypatch):
+    from scripts import deploy_gpu_check
+
+    monkeypatch.setattr(deploy_gpu_check, "MAX_ROUNDS", 1)
+    candidate.run()
+    before = copy.deepcopy(state(candidate.value.item)["gpu_candidate_checks"])
+    restart(candidate.value)
+    with pytest.raises(GPUCandidateError, match="round limit"):
+        candidate.run()
+    assert state(candidate.value.item)["gpu_candidate_checks"] == before
+    assert len(candidate.calls()) == 2
+
+
+def test_unknown_round_selector_cannot_create_or_clean_records(candidate):
+    candidate.run()
+    before = copy.deepcopy(state(candidate.value.item)["gpu_candidate_checks"])
+    with pytest.raises(GPUCandidateError, match="exact original"):
+        candidate.run(cleanup=True, round_id=str(uuid.uuid4()))
+    assert state(candidate.value.item)["gpu_candidate_checks"] == before
+    assert len(candidate.calls()) == 2
+
+
+def test_duplicate_round_for_same_startup_is_rejected(candidate):
+    candidate.run()
+    duplicate = copy.deepcopy(candidate.record())
+    duplicate["round_id"] = str(uuid.uuid4())
+    duplicate["report"] = expected_report(duplicate)
+    duplicate["cleanup_report"] = expected_report(duplicate, True)
+    host = candidate.value.item.coordinator()
+    with host.locked():
+        host.state["gpu_candidate_checks"][record_key(duplicate)] = duplicate
+        host.save()
+    with pytest.raises(GPUCandidateError, match="multiple candidate rounds"):
+        candidate.run()
+    assert len(candidate.calls()) == 2
 
 
 def test_unfinished_check_blocks_configuration_publication(candidate):
@@ -222,7 +298,7 @@ def test_cleanup_observation_cannot_switch_identity_in_a_completed_record(candid
     value = candidate.value
     host = value.item.coordinator()
     with host.locked():
-        key = value.item.token + ":" + value.item.generation["gpu_worker"]
+        key = record_key(candidate.record())
         host.state["gpu_candidate_checks"][key]["cleanup_observation"][field] = "f" * 64
         host.save()
     value.act("stop")

@@ -14,6 +14,7 @@ class Command(BaseCommand):
         parser.add_argument("action", choices=["check", "cleanup"])
         for name in (
             "token",
+            "round-id",
             "worker-id",
             "cpu-worker-id",
             "device",
@@ -28,6 +29,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         probe = CandidateProbe(
             token=options["token"],
+            round_id=options["round_id"],
             worker=options["worker_id"],
             cpu_worker=options["cpu_worker_id"],
             device=options["device"],

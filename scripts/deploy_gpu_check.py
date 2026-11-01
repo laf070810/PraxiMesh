@@ -15,7 +15,8 @@ from scripts.deploy_gpu_readiness import GPUReadiness, literal
 from scripts.deploy_gpu_worker import HEX, started
 from scripts.release import verify_source
 
-PROTOCOL = "gpu-deployment-check-v1"
+PROTOCOL = "gpu-deployment-check-v2"
+MAX_ROUNDS = 16
 SOURCES = ("core/deployment_gpu_check.py", "core/management/commands/deployment_gpu_check.py")
 PHASES = {"checking", "checked", "cleaning", "verified", "cleaned"}
 OBSERVATION = {
@@ -28,6 +29,7 @@ OBSERVATION = {
 }
 FIELDS = {
     "schema",
+    "round_id",
     "operation",
     "generation",
     "cpu_worker",
@@ -45,14 +47,20 @@ class GPUCandidateError(RuntimeError):
     pass
 
 
+def record_key(record):
+    return record["operation"] + ":" + record["generation"]["gpu_worker"] + ":" + record["round_id"]
+
+
 def expected_report(record, cleanup=False):
     observed = record["cleanup_observation"] if cleanup else record["observation"]
     worker = record["generation"]["gpu_worker"]
     identity = uuid.uuid5(
-        uuid.NAMESPACE_URL, f"{PROTOCOL}:{record['operation']}:{worker}:{observed['fingerprint']}"
+        uuid.NAMESPACE_URL,
+        f"{PROTOCOL}:{record['operation']}:{worker}:{observed['fingerprint']}:{record['round_id']}",
     )
     return {
         "protocol": PROTOCOL,
+        "round_id": record["round_id"],
         "action": "cleanup" if cleanup else "check",
         "passed": not cleanup,
         "token": record["operation"],
@@ -77,7 +85,8 @@ def validate_record(record):
             type(record) is dict
             and set(record) == FIELDS
             and type(record["schema"]) is int
-            and record["schema"] == 1
+            and record["schema"] == 2
+            and str(uuid.UUID(record["round_id"])) == record["round_id"]
             and record["phase"] in PHASES
             and str(uuid.UUID(record["operation"])) == record["operation"]
             and record["generation"] == context(record["generation"])
@@ -163,8 +172,8 @@ class GPUCandidateCheck:
             raise GPUCandidateError("GPU candidate lost its original fresh readiness")
         return current
 
-    def load(self, cleanup):
-        config, _, token, _, _ = self.readiness.instance()
+    def load(self, cleanup, round_id):
+        config, _, token, container, stamp = self.readiness.instance()
         generation = self.readiness.runtime.generation
         operation = self.host.state["operation"]
         if not any(
@@ -176,31 +185,61 @@ class GPUCandidateCheck:
             )
         ):
             raise GPUCandidateError("GPU candidate is outside the recorded deployment operation")
-        self.key = token + ":" + generation["gpu_worker"]
         records = self.host.state.get("gpu_candidate_checks", {})
         if type(records) is not dict:
             raise GPUCandidateError("Invalid GPU candidate journal")
+        own, pending = [], []
         for key, record in records.items():
             validate_record(record)
-            if key != record["operation"] + ":" + record["generation"]["gpu_worker"]:
+            if key != record_key(record):
                 raise GPUCandidateError("GPU candidate journal key changed")
-            if (
-                key != self.key
-                and record["generation"] == generation
-                and record["phase"] not in {"verified", "cleaned"}
-            ):
-                raise GPUCandidateError("Finish the original GPU candidate operation first")
-        self.record = records.get(self.key)
+            if record["generation"] == generation:
+                if record["phase"] not in {"verified", "cleaned"}:
+                    if record["operation"] != token:
+                        raise GPUCandidateError("Finish the original GPU candidate operation first")
+                    pending.append(record)
+                if record["operation"] == token:
+                    own.append(record)
+        if len(pending) > 1 or len(own) > MAX_ROUNDS:
+            raise GPUCandidateError("Ambiguous or excessive GPU candidate rounds")
+        same_start = [
+            record
+            for record in own
+            if record["observation"]["container"] == container
+            and record["observation"]["started_at"] == stamp
+        ]
+        if len(same_start) > 1:
+            raise GPUCandidateError("One GPU startup cannot have multiple candidate rounds")
+        if round_id is not None:
+            selected = [record for record in own if record["round_id"] == round_id]
+            if len(selected) != 1 or (pending and selected != pending):
+                raise GPUCandidateError("Continue the exact original GPU candidate round")
+            self.record = selected[0]
+        elif pending:
+            self.record = pending[0]
+        elif same_start:
+            self.record = same_start[0]
+        elif cleanup and len(own) == 1:
+            self.record = own[0]
+        else:
+            self.record = None
         runtime = self.readiness.runtime.record
         cpu_worker = f"px-{self.host.config['instance']}-{generation['id']}-worker"
         if self.generation.get("worker", cpu_worker) != cpu_worker:
             raise GPUCandidateError("GPU candidate CPU worker differs from the original generation")
         if self.record is None:
             if cleanup:
-                raise GPUCandidateError("No original GPU candidate intent to clean")
+                raise GPUCandidateError("Select the original GPU candidate round to clean")
+            if len(own) >= MAX_ROUNDS:
+                raise GPUCandidateError(
+                    "GPU candidate round limit reached; original records retained"
+                )
             observed = self.readiness.wait()
+            if observed["container"] != container or observed["started_at"] != stamp:
+                raise GPUCandidateError("Original GPU startup changed before candidate preparation")
             self.record = {
-                "schema": 1,
+                "schema": 2,
+                "round_id": str(uuid.uuid4()),
                 "operation": token,
                 "generation": generation,
                 "cpu_worker": cpu_worker,
@@ -212,7 +251,9 @@ class GPUCandidateCheck:
                 "report": None,
                 "cleanup_report": None,
             }
+            self.key = record_key(self.record)
             self.save("checking")
+        self.key = record_key(self.record)
         if (
             self.record["generation"] != generation
             or self.record["device"] != config["gpu"]
@@ -221,8 +262,8 @@ class GPUCandidateCheck:
         ):
             raise GPUCandidateError("GPU candidate generation or runtime identity changed")
 
-    def run(self, *, cleanup=False):
-        self.load(cleanup)
+    def run(self, *, cleanup=False, round_id=None):
+        self.load(cleanup, round_id)
         if not cleanup and self.record["phase"] in {"cleaning", "cleaned"}:
             raise GPUCandidateError("Cleaned GPU candidate intent cannot authorize verification")
         if cleanup:
@@ -265,6 +306,7 @@ class GPUCandidateCheck:
         command = ["deployment_gpu_check", "cleanup" if cleanup else "check"]
         for key, value in {
             "token": self.record["operation"],
+            "round-id": self.record["round_id"],
             "worker-id": self.record["generation"]["gpu_worker"],
             "cpu-worker-id": self.record["cpu_worker"],
             "device": self.record["device"],
