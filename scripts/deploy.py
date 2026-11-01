@@ -732,6 +732,16 @@ class Deployment:
 
         return GPUCandidateCheck(self, generation, release).run(cleanup=cleanup)
 
+    def quiesce(self, generation):
+        """Stop and freeze one generation; GPU retains its original device/DB guards."""
+        if generation and "gpu" in generation["manifest"]:
+            from scripts.deploy_gpu_quiescence import freeze
+
+            return freeze(self, generation)
+        self.stop(generation)
+        if generation:
+            self.database.freeze(generation["database"])
+
     def require_cpu_lifecycle(self, manifest=None):
         """Until full GPU coordination is connected, CPU paths cannot retire its state."""
         state = self.state or {}
@@ -821,9 +831,8 @@ class Deployment:
                 )
             self.save("quiescing")
             self.proxy.maintenance()
-            self.stop(old)
+            self.quiesce(old)
             if old:
-                self.database.freeze(old["database"])
                 self.save("copying")
                 backup = self.directory / "backups"
                 backup.mkdir(mode=0o700, exist_ok=True)
@@ -871,8 +880,7 @@ class Deployment:
         if not previous:
             self.save("failed_initial")
             return
-        self.stop(previous)
-        self.database.freeze(previous["database"])
+        self.quiesce(previous)
         self.database.thaw(previous["database"])
         self.database.invalidate_health(previous["database"])
         self.control(previous, "judge_admission", "pause", "--token", operation["id"])
@@ -917,8 +925,7 @@ class Deployment:
                 "180",
                 timeout=210,
             )
-            self.stop(target)
-            self.database.freeze(target["database"])
+            self.quiesce(target)
             self.database.thaw(target["database"])
             self.database.invalidate_health(target["database"])
             self.replace_web(target)

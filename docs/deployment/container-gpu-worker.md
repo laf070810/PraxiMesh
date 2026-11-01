@@ -201,6 +201,28 @@ DOCKER_HOST="unix://$PRAXIMESH_DOCKER_SOCKET" \
 
 文件、锁和被终止的协调器进程是真实的，Docker、数据库及设备就绪是显式模型，范围见 [G49](../acceptance-g49.md)。这仍是开发中的内部入口，没有可用的完整 GPU 发布/回滚命令。公共 CPU 发布与恢复会拒绝已有 GPU 配置、容器或恢复状态，包括 GPU→CPU；不能删除这些记录来走 CPU 恢复路径。完整 Docker/PostgreSQL、GPU 启动、队列及整站恢复尚待实测。
 
+<a id="database-freeze"></a>
+### 协调器内部的原代停机与冻结
+
+内部 `quiesce` 现在区分 CPU 和 GPU 发布代。GPU 路径须在原操作的暂停与维护路由下，先确认所有任务和预约已排空，再停止原 GPU worker；取得原设备锁并复查容器、原启动和 journal 后，才停止 Web/CPU worker、冻结原数据库。候选失败时，残余任务必须先按[原库恢复](#worker-recovery)完成清理，不能直接冻结后换库。
+
+GPU 数据库冻结持有排空锁，直到 runtime 连接权限撤销和现有连接终止。只在这段事务内保留本次检查的精确 owner 连接，其他 owner 或未知连接仍拒绝；事务关闭和最终身份检查结束后，目标库必须没有任何会话。中断重试重新核对原状态，失败不自动解冻或清空预约。
+
+不使用实际 Docker、数据库或 GPU 的检查：
+
+```sh
+.venv/bin/pytest -q tests/test_deploy_gpu_quiescence.py tests/test_deploy_gpu_freeze.py
+```
+
+实际 PostgreSQL 检查使用自有临时数据库与角色，覆盖 CONNECT 撤销、原会话终止、行锁和失败重试：
+
+```sh
+.venv/bin/python scripts/postgres_tests.py -q tests/test_deploy_gpu_freeze_postgres.py \
+  tests/test_deploy_gpu_config_postgres.py
+```
+
+当前验证范围见 [G51](../acceptance-g51.md)。停止/冻结调用点已衔接，完整 GPU apply、候选失败回滚与曝光后恢复仍在开发，公共 GPU 激活继续关闭；不能从内部组件检查推断真实部署成功。
+
 <a id="candidate-verification"></a>
 ### 协调器内部的候选队列检查
 

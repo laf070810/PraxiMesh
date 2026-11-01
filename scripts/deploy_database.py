@@ -633,11 +633,25 @@ class DeploymentDatabase:
 
     @safe_errors
     def freeze(self, name):
+        self._freeze_runtime(name)
+
+    def _freeze_runtime(self, name, *, guard_pid=None):
+        """Close runtime access, optionally preserving one owned drain transaction."""
         self._require_operation_lock()
         self.require_owned(name)
         self._require_roles()
+        guard = (guard_pid, self.config["owner_user"])
+
+        def clients(connection):
+            sessions = self._sessions(connection, name)
+            if guard_pid is not None and (
+                type(guard_pid) is not int or guard_pid <= 0 or sessions.count(guard) != 1
+            ):
+                raise DeploymentDatabaseError("Original GPU freeze guard connection was lost")
+            return [pair for pair in sessions if guard_pid is None or pair != guard]
+
         with self._connect("postgres", autocommit=True) as connection:
-            if any(role not in self.roles.values() for _, role in self._sessions(connection, name)):
+            if any(role not in self.roles.values() for _, role in clients(connection)):
                 raise DeploymentDatabaseError("Unexpected database sessions prevent freezing")
             with connection.transaction():
                 connection.execute(
@@ -645,7 +659,7 @@ class DeploymentDatabase:
                         sql.Identifier(name), *map(sql.Identifier, self.roles.values())
                     )
                 )
-            for pid, role in self._sessions(connection, name):
+            for pid, role in clients(connection):
                 if role not in self.roles.values():
                     raise DeploymentDatabaseError(
                         "Unexpected database session appeared while freezing"
@@ -655,12 +669,14 @@ class DeploymentDatabase:
                     "WHERE pid=%s AND datname=%s AND usename=ANY(%s)",
                     (pid, name, list(self.roles.values())),
                 )
-        self._require_frozen(name)
+        self._require_frozen(name, guard_pid=guard_pid)
 
-    def _require_frozen(self, name):
+    def _require_frozen(self, name, *, guard_pid=None):
         self.require_owned(name)
         with self._connect("postgres") as connection:
-            if self._sessions(connection, name) or any(
+            sessions = self._sessions(connection, name)
+            expected = [] if guard_pid is None else [(guard_pid, self.config["owner_user"])]
+            if sessions != expected or any(
                 connection.execute(
                     "SELECT has_database_privilege(%s,%s,'CONNECT')", (role, name)
                 ).fetchone()[0]
@@ -671,6 +687,22 @@ class DeploymentDatabase:
                 "SELECT EXISTS (SELECT 1 FROM pg_prepared_xacts WHERE database=%s)", (name,)
             ).fetchone()[0]:
                 raise DeploymentDatabaseError("Prepared transactions prevent database freezing")
+
+    @safe_errors
+    def freeze_gpu(self, name, token):
+        """Keep the original drain locked until runtime access has been revoked.
+
+        The caller must already have stopped the original GPU/Web/CPU services
+        and retain the original device lock. This never clears reservations,
+        releases admission, or reopens access on a failed/ambiguous freeze.
+        """
+        with self._gpu_configuration_guard([name], token) as (check, connections):
+            connection = connections[0]
+            self._freeze_runtime(name, guard_pid=connection.info.backend_pid)
+            check()
+        # No owner exception survives the drain transaction's actual close.
+        self._require_operation_lock()
+        self._require_frozen(name)
 
     @safe_errors
     def thaw(self, name):
@@ -948,6 +980,12 @@ class DeploymentDatabase:
     @contextmanager
     def gpu_configuration_guard(self, names, token):
         """Hold original/target admission and reservation rows across publication."""
+        with self._gpu_configuration_guard(names, token) as (check, _):
+            yield check
+
+    @contextmanager
+    def _gpu_configuration_guard(self, names, token):
+        """Share the actual held backend with the database freeze implementation."""
         try:
             canonical_token = type(token) is str and str(uuid.UUID(token)) == token
         except ValueError:
@@ -1007,7 +1045,7 @@ class DeploymentDatabase:
                             )
 
                 check()
-                yield check
+                yield check, connections
                 check()
         except (psycopg.Error, OSError):
             raise DeploymentDatabaseError("GPU configuration database checks failed") from None
