@@ -228,6 +228,12 @@ class Harness(deploy.Deployment):
         self.running.add((generation["id"], role))
         self.event("service", generation["id"], role)
 
+    def replace_web(self, generation):
+        assert self.proxy.active is None
+        assert (generation["id"], "web") not in self.running
+        self.event("replace_web", generation["id"])
+        self.service(generation, "web")
+
     def port(self, generation):
         return 21000 if generation["id"] == "old" else 21001
 
@@ -710,13 +716,18 @@ def test_owned_service_start_stop_preserve_bounded_private_diagnostics(
     monkeypatch.setattr(
         host,
         "inspect",
-        lambda name: {
-            "Image": MANIFEST["images"]["worker"],
-            "Config": {
-                "Labels": {"org.praximesh.generation": "owned", "org.praximesh.role": "worker"}
-            },
-            "State": {"Running": action == "stop"},
-        },
+        lambda name: (
+            None
+            if name.endswith("web")
+            else {
+                "Id": "f" * 64,
+                "Image": MANIFEST["images"]["worker"],
+                "Config": {
+                    "Labels": {"org.praximesh.generation": "owned", "org.praximesh.role": "worker"}
+                },
+                "State": {"Running": action == "stop"},
+            }
+        ),
     )
 
     def fail(arguments, **options):

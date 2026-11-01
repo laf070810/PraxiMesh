@@ -8,6 +8,9 @@
 - [完整 PRD 需求追踪](requirements.md) — 全目标实施中，当前 F 自部署制品及版本题目反馈已验证
 - [RFC-022：GPU 发布协调与原数据库恢复](rfcs/022-gpu-release-coordination.md) — 实施中
 - [ADR-059：GPU 协调器绑定原节点身份](adr/059-gpu-deployment-attachment.md)
+- [RFC-023：恢复时重建无状态 Web 容器](rfcs/023-web-container-recovery.md) — 已实施，真实复验待完成
+- [ADR-060：在原数据库恢复中重建无状态 Web](adr/060-web-container-recovery.md)
+- [G44：无状态 Web 持久重建的验证范围](acceptance-g44.md)
 - [G43 原节点绑定与中断重试](acceptance-g43.md) — 无设备验收；完整 GPU 升级待完成
 - [ADR-058：同一冻结源码的四镜像 GPU 发布制品](adr/058-gpu-release-artifacts.md)
 - [G42 四镜像 GPU 发布制品](acceptance-g42.md)

@@ -27,6 +27,7 @@
 - `content_import` 是发布动作，会撤回官方全量包中缺失的内容。只在新建或明确授权的数据库导入示例包。应用升级默认保留现有目录；不自动覆盖维护者或组织的内容。
 - 数据库结构变化追加迁移，保留已交付迁移文件。新增表/应用时核对 `scripts/deploy_database.py` 的角色权限、`scripts/release.py` 的源码范围和 `Dockerfile` 的复制范围；Web/worker 不获得全表权限来规避授权错误。
 - 发布包不可原地改写。新控制器必须能校验需要升级的旧制品；新增开发文档不得无意变成旧清单的必填项。schema 升级、失败恢复和内容发布分别说明验证范围。
+- 协调器恢复时的无状态 Web 重建在 `scripts/deploy_web.py`；保留实际维护路由、原数据库及严格运行契约。先保存原 ID/配置摘要与意图，移除只用已核对的完整 ID，新容器保存 ID 后才启动；不能按同名认领替代，也不能将此流程套用于 worker。按[集中恢复检查](docs/deployment/production.md#web-recovery-check)验证真实端口和中断，再重放完整 CPU 发布矩阵。
 - GPU 发布使用同一冻结源码的四镜像 format 2，默认 CPU format 1 保持兼容。构建与核验在 `scripts/release.py`、`scripts/release_gpu.py`；有序源码契约从归档字节计算，导入前核对完整镜像层、角色和入口，不能执行归档代码或借用当前工作树/daemon 缓存。按[发布指南](docs/deployment/releases.md#gpu-release)串行验证导入后的无设备 worker 和 CPU 应用。制品通过不代表 GPU 激活或升级通过；未接入完整 GPU 生命周期的协调器必须拒绝激活。
 - GPU 协调器节点绑定在 `scripts/deploy_gpu.py`，操作集中在[原节点绑定](docs/deployment/container-gpu-worker.md#coordinator-binding)。先保存意图再认领同一私有状态和锁，只允许 `attach-gpu` 为原配置增加 GPU 字段；不得借此改密钥或接管已有 worker/任务。绑定未确认前不得触及数据库或执行发布变更。`--prepare-only --initialize` 仍读取真实 GPU，需要授权；`deploy_gpu_acceptance.py` 才是合成元数据与实际文件锁/SIGKILL 的无设备检查，不生成就绪证据。
 - 界面字符串使用 Django 翻译，维护 `.po` 和编译后的 `.mo`；内容译文绑定准确的源版本。缺少译文明确回退，不能借用另一版本文本。
@@ -92,6 +93,7 @@
 - 浏览器、HTTPS、发布包和升级用现有 `scripts/*acceptance.py` 入口。使用一次性数据库、合成账号和明确属于本次测试的容器/卷；默认使用回环地址，按用户明确要求验证直接 IP 访问时使用独立测试端口。完成后核对清理，不删除未知资源。源码浏览器通过 `BROWSER_ARTIFACTS` 分开保存每轮日志、截图和报告；旧发布包的编辑器契约由已验证的当前代清单决定，新版仍须验证 CodeMirror，不能用自动 textarea 回退掩盖加载失败。
 - Compose 单机入口为 `core/selfhost.py`，复用 `core/preview.py` 的原子数据库初始化；默认包括真实 WASI worker，可选 `compose.ai.yaml` 启动本地模型。修改时重放 `python3 scripts/compose_acceptance.py`；涉及模型或界面时使用 `--ai --browsers`。核对真实探针与七种题型、worker 离线关闭提交、直接 IP/CSRF、初始化恢复、旧内容不重导及成绩/会话跨重建保留。不得用旧 receipt 或宿主缓存代替镜像内自检。此入口不替代生产发布协调器。
 - 重型 WASI/worker 验收按资源预算串行安排，避免争用造成假超时。长进程须跟踪原进程或工具句柄；观察超时不代表进程结束，不据此重复启动。
+- 验收派生镜像仅改变自有测试对象；删除临时镜像使用 `--no-prune`，并核对原固定基镜像仍存在，避免 Docker 连带清掉未打标签的原镜像缓存。不得覆盖原发布归档或未知镜像标签。
 - 托管 CI、部署 runner 与 GPU 评测 worker 分别验证；接入步骤见 [CI 指南](docs/deployment/ci.md)。自定义 runner 标签不构成权限隔离，公开 PR 不能接触持有站点权限的 runner。GitHub 管理 API 查询失败不得当作 runner 不存在；部署 `status` 只验证记录读取，不证明站点健康。
 - 保留原始失败和修复后的结果，记录代码/策略/制品身份。结果文件放忽略目录 `test-results/`，必要的结论写入对应验收文档；不以单元 mock 证明真实隔离、GPU、模型或部署成功。
 - 文档变更核对链接、命令参数和当前行为。初始化、导入和恢复示例尽量在临时副本/数据库验证，避免改变开发者已有数据。

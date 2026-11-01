@@ -147,9 +147,9 @@ export PRAXIMESH_DEPLOYMENT_TOKEN="$(python3 -c 'import uuid; print(uuid.uuid4()
 
 ## 恢复入口
 
-管理命令或所属容器的启动/停止失败时，协调器在私有状态目录保存 `control-failure-<UUID>.json`，文件为 0600。其中记录命令类别、退出码和脱敏后的 stdout/stderr 尾部，每路最多 64 KiB、整个文件最多 1 MiB；常规错误只给文件名定位。恢复失败也会在原部署日志记录失败阶段与诊断文件名，保留当前数据库和恢复阶段。日志不记录命令行或环境，已知配置凭证会被替换，但它仍是仅供部署维护者读取的内部诊断，不应作为公开 CI artifact 上传。诊断无法落盘时，原有控制容器清理和恢复流程仍会执行。
+管理命令或所属容器的创建、启动、停止、移除失败时，协调器在私有状态目录保存 `control-failure-<UUID>.json`，文件为 0600。其中记录命令类别、退出码和脱敏后的 stdout/stderr 尾部，每路最多 64 KiB、整个文件最多 1 MiB；常规错误只给文件名定位。恢复失败也会在原部署日志记录失败阶段与诊断文件名，保留当前数据库和恢复阶段。日志不记录命令行或环境，已知配置凭证会被替换，但它仍是仅供部署维护者读取的内部诊断，不应作为公开 CI artifact 上传。诊断无法落盘时，原有控制容器清理和恢复流程仍会执行。
 
-已确认的 RootlessKit 端口冲突恢复缺口见 [G43](../acceptance-g43.md)：同容器重试可能显示 running，但没有发布端口且 HTTP 不可用。诊断须同时核对实际 `NetworkSettings.Ports` 和 HTTP；这一状态继续保持维护模式及已曝光数据库，不能按容器运行状态判定恢复成功。
+已确认的 RootlessKit 端口冲突见 [G43](../acceptance-g43.md)：同容器重试可能显示 running，但没有发布端口且 HTTP 不可用。当前 `recover` 在维护、排空和停止后重建无状态 Web，沿用原代镜像、配置与数据库，重新分配内部回环端口；先记录原身份和意图，再移除/创建，保存新 ID 后才启动。未知容器、持久挂载或运行契约变化会拒绝自动处理。诊断须同时核对实际 `NetworkSettings.Ports` 和 HTTP，不能按容器运行状态判定恢复成功。该修复的组件验证已通过，真实复验尚未完成，范围见 [G44](../acceptance-g44.md)。
 
 候选或恢复后的版本完成实际隔离探针、健康检查和功能验证后，用原 token 恢复：
 
@@ -162,6 +162,22 @@ export PRAXIMESH_DEPLOYMENT_TOKEN="$(python3 -c 'import uuid; print(uuid.uuid4()
 恢复会拒绝错误 token、关闭的评测配置、失联或其他策略的 worker，以及尚存的其他策略任务。暂停本身不会让 worker 停止；不要把它当成宿主执行隔离或数据库整体只读模式。
 
 ## 复验
+
+<a id="web-recovery-check"></a>
+
+### Web 端口恢复专项检查
+
+在有本地固定 CPU Web 镜像的独立验收环境执行；镜像 ID 来自已经核验的发布包清单：
+
+```sh
+.venv/bin/python scripts/deploy_web_acceptance.py \
+    --image "$PRAXIMESH_WEB_IMAGE" \
+    --output test-results/web-recovery
+```
+
+输出目录须尚不存在。脚本仅在本地派生固定 CPU HTTP 命令，使用自有临时容器、网络和占端口 socket，检查端口冲突、四处 SIGKILL 后继续及同名替换拒绝；结束时清理自有资源并核对基镜像保留。协调器/代理元数据为合成夹具，不使用数据库、学员代码或 GPU。此项通过后，仍须运行下文完整发布演练，验证实际 PostgreSQL、HTTPS、WASI、数据保留和 worker 重启；不能用专项检查替代完整恢复验收。
+
+### 完整发布与数据库检查
 
 ```sh
 # PostgreSQL 并发矩阵；使用独立容器和显式数据库卷并自动清理。

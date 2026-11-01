@@ -28,6 +28,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+from scripts import deploy_web  # noqa: E402
 from scripts.deploy_database import DeploymentDatabase, DeploymentDatabaseError  # noqa: E402
 from scripts.deploy_gpu import GPUDeploymentNode  # noqa: E402
 from scripts.deploy_gpu import configuration as gpu_configuration  # noqa: E402
@@ -39,6 +40,8 @@ CONTROL_DIAGNOSTIC_MAX_BYTES = 1024 * 1024
 CONTROL_COMMANDS = {
     "container-start",
     "container-stop",
+    "container-create",
+    "container-remove",
     "check",
     "content_import",
     "project_import",
@@ -453,20 +456,34 @@ class Deployment:
             if self.inspect(name):
                 self.run("rm", "--force", "--volumes", name, timeout=20)
 
+    def service_identity(self, generation, role, info):
+        labels = info["Config"].get("Labels") or {}
+        if (
+            info["Image"] != generation["manifest"]["images"][role]
+            or labels.get("org.praximesh.generation") != generation["id"]
+            or labels.get("org.praximesh.role") != role
+        ):
+            raise DeploymentError("Existing container identity differs from the journal")
+        if role == "web":
+            try:
+                deploy_web.check_reference(self, generation, info)
+            except deploy_web.WebRecoveryError as error:
+                raise DeploymentError(str(error)) from None
+
+    def replace_web(self, generation):
+        try:
+            deploy_web.replace(self, generation)
+        except deploy_web.WebRecoveryError as error:
+            raise DeploymentError(str(error)) from None
+
     def service(self, generation, role):
         name = generation[role]
         info = self.inspect(name)
         image = generation["manifest"]["images"][role]
         if info:
-            labels = info["Config"]["Labels"]
-            if (
-                info["Image"] != image
-                or labels.get("org.praximesh.generation") != generation["id"]
-                or labels.get("org.praximesh.role") != role
-            ):
-                raise DeploymentError("Existing container identity differs from the journal")
+            self.service_identity(generation, role, info)
             if not info["State"]["Running"]:
-                self.run("start", name, diagnostic="container-start")
+                self.run("start", info["Id"], diagnostic="container-start")
             return
         environment = self.environment(generation, role)
         args = self.runtime(generation, role, name) + ["--restart=unless-stopped"]
@@ -484,12 +501,14 @@ class Deployment:
             return
         for role in ["web", "worker"]:
             info = self.inspect(generation[role])
+            if info:
+                self.service_identity(generation, role, info)
             if info and info["State"]["Running"]:
                 self.run(
                     "stop",
                     "--timeout",
                     "35",
-                    generation[role],
+                    info["Id"],
                     timeout=45,
                     diagnostic="container-stop",
                 )
@@ -498,6 +517,7 @@ class Deployment:
         info = self.inspect(generation["web"])
         if not info or not info["State"]["Running"]:
             raise DeploymentError("Candidate Web is not running")
+        self.service_identity(generation, "web", info)
         ports = info["NetworkSettings"]["Ports"].get("8000/tcp") or []
         if len(ports) != 1 or ports[0]["HostIp"] != "127.0.0.1":
             raise DeploymentError("Application upstream must be loopback-only")
@@ -769,7 +789,7 @@ class Deployment:
         self.database.thaw(previous["database"])
         self.database.invalidate_health(previous["database"])
         self.control(previous, "judge_admission", "pause", "--token", operation["id"])
-        self.service(previous, "web")
+        self.replace_web(previous)
         self.service(previous, "worker")
         self.check(previous, operation["id"])
         self.expose(previous, operation["id"], "rolled_back")
@@ -813,7 +833,7 @@ class Deployment:
             self.database.freeze(target["database"])
             self.database.thaw(target["database"])
             self.database.invalidate_health(target["database"])
-            self.service(target, "web")
+            self.replace_web(target)
             self.service(target, "worker")
             self.check(target, operation["id"])
             self.expose(target, operation["id"])
