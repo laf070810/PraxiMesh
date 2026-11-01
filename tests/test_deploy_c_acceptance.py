@@ -89,6 +89,7 @@ def test_new_rehearsal_cannot_initially_claim_success_or_auto_publish(tmp_path):
         previous_manifest_sha256="b" * 64,
         upgrade_only=True,
         worker_restart_only=False,
+        recovery_only=False,
     )
     rehearsal = CRehearsal(options, tmp_path)
     assert not rehearsal.result["passed"]
@@ -161,6 +162,7 @@ def test_c_role_probe_executes_real_postgres_fk_graph_and_denials(user, monkeypa
         previous_manifest_sha256="b" * 64,
         upgrade_only=True,
         worker_restart_only=False,
+        recovery_only=False,
     )
     rehearsal = CRehearsal(options, tmp_path)
     config = connection.settings_dict

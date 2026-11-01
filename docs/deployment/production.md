@@ -147,7 +147,7 @@ export PRAXIMESH_DEPLOYMENT_TOKEN="$(python3 -c 'import uuid; print(uuid.uuid4()
 
 ## 恢复入口
 
-管理命令失败时，协调器在私有状态目录保存 `control-failure-<UUID>.json`，文件为 0600。其中记录命令类别、退出码和脱敏后的 stdout/stderr 尾部，每路最多 64 KiB、整个文件最多 1 MiB；常规错误只给文件名定位。日志不记录命令行或环境，已知配置凭证会被替换，但它仍是仅供部署维护者读取的内部诊断，不应作为公开 CI artifact 上传。诊断无法落盘时，原有控制容器清理和恢复流程仍会执行。
+管理命令或所属容器的启动/停止失败时，协调器在私有状态目录保存 `control-failure-<UUID>.json`，文件为 0600。其中记录命令类别、退出码和脱敏后的 stdout/stderr 尾部，每路最多 64 KiB、整个文件最多 1 MiB；常规错误只给文件名定位。恢复失败也会在原部署日志记录失败阶段与诊断文件名，保留当前数据库和恢复阶段。日志不记录命令行或环境，已知配置凭证会被替换，但它仍是仅供部署维护者读取的内部诊断，不应作为公开 CI artifact 上传。诊断无法落盘时，原有控制容器清理和恢复流程仍会执行。
 
 候选或恢复后的版本完成实际隔离探针、健康检查和功能验证后，用原 token 恢复：
 
@@ -186,7 +186,14 @@ RUN_SANDBOX_TESTS=1 .venv/bin/python scripts/postgres_tests.py -q
 .venv/bin/python scripts/deploy_acceptance.py \
     --release var/releases/candidate --manifest-sha256 "$RELEASE_SHA256" \
     --caddy var/tools/caddy-2.11.7 --worker-restart-only
+# 只定位已对外代际的停止/重启恢复及数据保留时：
+.venv/bin/python scripts/deploy_acceptance.py \
+    --release var/releases/candidate --manifest-sha256 "$RELEASE_SHA256" \
+    --caddy var/tools/caddy-2.11.7 --recovery-only \
+    --artifacts test-results/recovery-only
 ```
+
+`--recovery-only` 使用一代独立 CPU 发布，验证真实提交、账号删除、原数据库保留及恢复后的正确提交；不注入进程故障，不验证代际替换或 schema 升级。它不能与其他专项模式混用，也不替代完整中断矩阵。验收失败时，输出目录会保留原日志所指向的有界诊断文件，权限仍为 0600；不要公开上传这些私有文件。
 
 真实场景先提交有界的标准库函数，让 `drain --timeout 0` 确实超时；检查新提交 503、阅读和草稿可用，等待原任务实际 Accepted，拒绝错误 token，再恢复并执行另一份正确提交。测试自己的账号和数据库均清理，不使用注入的评测结果。
 

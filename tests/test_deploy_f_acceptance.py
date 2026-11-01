@@ -62,6 +62,7 @@ def test_feedback_rehearsal_starts_unverified_and_does_not_republish(tmp_path):
         previous_manifest_sha256="b" * 64,
         upgrade_only=True,
         worker_restart_only=False,
+        recovery_only=False,
     )
     rehearsal = FRehearsal(options, tmp_path)
     assert not rehearsal.result["passed"] and not rehearsal.result["schema_changing_upgrade_tested"]

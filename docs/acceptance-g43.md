@@ -1,6 +1,6 @@
 # G43：GPU 发布协调的原节点绑定
 
-日期：2026-11-01。状态：节点绑定与无设备中断验收通过，CPU 协调器的完整恢复重放仍在进行；GPU 代际激活与真实升级未完成。设计见 [RFC-022](rfcs/022-gpu-release-coordination.md)、[ADR-059](adr/059-gpu-deployment-attachment.md)，操作集中在[节点绑定指南](deployment/container-gpu-worker.md#coordinator-binding)。本轮没有读取或映射 GPU。
+日期：2026-11-01。状态：节点绑定与无设备中断验收通过，CPU 完整演练在切换后恢复失败，定向诊断正在进行；GPU 代际激活与真实升级未完成。设计见 [RFC-022](rfcs/022-gpu-release-coordination.md)、[ADR-059](adr/059-gpu-deployment-attachment.md)，操作集中在[节点绑定指南](deployment/container-gpu-worker.md#coordinator-binding)。本轮没有读取或映射 GPU。
 
 ## 已实现与验证
 
@@ -22,7 +22,9 @@
 
 已让两个流程复用同一编辑器操作，并由实际当前代的已验证源码清单决定契约：旧包明确使用 textarea，新包仍强制 CodeMirror，没有“加载失败就算旧版”的自动回退。社区报告、截图及源码浏览器日志均写入显式验收目录。当前源码的编辑器、25 个页面 × 两种语言 × 四种宽度的 200 组布局，以及学习、社区审核、英文和项目浏览器流程通过，记录在 `test-results/g43-current-browser/` 与同名 `.log`，临时数据库和服务已清理；此源码检查未运行评测或使用 GPU。
 
-修复后的完整 CPU 重放位于 `test-results/g43-cpu-coordinator-final/`；待其结束再记录升级、曝光前后恢复与数据保留结论，当前不计作通过。
+第三轮 `test-results/g43-cpu-coordinator-final/` 通过真实 HTTPS 评测和社区流程、代理 SIGKILL 后恢复、正常代际替换，以及切换前 SIGKILL 后返回上一代；备份核对 58 张表、33 个序列、531 行。第四代实际曝光并产生写入后，`recover` 在服务停止后的流程返回通用 `DeploymentError`，原操作记录只有 `recovering_current`、没有失败详情。随后只读查询故障窗口内的用户 Docker 服务日志，精确匹配到本次 Web 容器：RootlessKit 重启绑定 `127.0.0.1:32830` 时返回 `bind: address already in use`；四条相关记录保存在 `owned-web-daemon-failure.json`。端口占用方未确认，这轮不计作完整恢复通过。最终 `cleanup.passed=true`，本次容器、网络、数据库卷和本地进程已清理；未修改共享 daemon 或其他服务。
+
+已补齐恢复失败阶段记录、所属容器启动/停止的脱敏私有诊断，以及验收清理前对所指诊断文件的有界保留。新增独立单代 `--recovery-only` 入口，范围与命令集中在[恢复复验](deployment/production.md#复验)。首次组件运行的三个旧夹具缺少新参数，原失败见 `g43-recovery-diagnostics.xml`；补齐后 123 项通过，1 项实际 PostgreSQL 权限检查因本轮使用 SQLite 跳过。扩大后的当前相关集合为 374 项通过、同一项跳过，见 `g43-components-diagnostic.xml`；当前协调器的九项真实无设备绑定复验通过，见 `g43-attachment-current/result.json`。单代真实复现位于 `g43-recovery-diagnostic/`，尚未完成；新增诊断本身不作为原恢复故障已修复的证据。
 
 ## 继续完成的范围
 

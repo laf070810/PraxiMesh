@@ -17,6 +17,7 @@ import os
 import re
 import secrets
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -30,7 +31,7 @@ from psycopg import sql
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from scripts.deploy import Deployment  # noqa: E402
+from scripts.deploy import CONTROL_DIAGNOSTIC_MAX_BYTES, Deployment  # noqa: E402
 from scripts.deploy_proxy import DeploymentProxy  # noqa: E402
 from scripts.production_acceptance import POSTGRES, Client, pki, port  # noqa: E402
 from scripts.release import inspect_images, verify  # noqa: E402
@@ -143,6 +144,34 @@ def stop(process):
         process.wait(timeout=10)
 
 
+def retain_failure_diagnostic(state, artifacts, filename):
+    """Retain only the named, bounded private diagnostic before fixture cleanup."""
+    if not isinstance(filename, str) or not re.fullmatch(
+        r"control-failure-[a-f0-9]{32}\.json", filename
+    ):
+        raise ValueError("Expected the exact recorded deployment diagnostic filename")
+    descriptor = os.open(state / filename, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(descriptor, "rb") as source:
+        info = os.fstat(source.fileno())
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or info.st_uid != os.getuid()
+            or stat.S_IMODE(info.st_mode) != 0o600
+            or info.st_nlink != 1
+            or info.st_size > CONTROL_DIAGNOSTIC_MAX_BYTES
+        ):
+            raise ValueError("Expected a bounded private deployment diagnostic")
+        payload = source.read(CONTROL_DIAGNOSTIC_MAX_BYTES + 1)
+        if len(payload) > CONTROL_DIAGNOSTIC_MAX_BYTES or not isinstance(json.loads(payload), dict):
+            raise ValueError("Invalid deployment diagnostic")
+    output = os.open(
+        artifacts / filename, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600
+    )
+    with os.fdopen(output, "wb") as target:
+        target.write(payload)
+    return filename
+
+
 class Rehearsal:
     def __init__(self, options, directory):
         self.options, self.directory = options, directory
@@ -166,10 +195,16 @@ class Rehearsal:
             "schema_changing_upgrade_tested": False,
             "schema_failure_rollback_tested": False,
             "worker_restart_only": options.worker_restart_only,
+            "recovery_only": options.recovery_only,
             "upgrade_only": options.upgrade_only,
             "worker_auto_restart_recovery_tested": False,
             "public_CA_or_system_trust_tested": False,
         }
+        if options.recovery_only:
+            self.result["scope"] = (
+                "one active CPU generation; synthetic private data; loopback HTTPS; "
+                "targeted recovery without injected process faults or schema upgrade"
+            )
         if options.upgrade_only:
             self.result.update(
                 scope="Phase A to B1 schema upgrade; synthetic private data; original eight-problem catalogue retained; private Docker networks; loopback HTTPS",
@@ -1137,6 +1172,41 @@ class Rehearsal:
             completed_at=datetime.now(UTC).isoformat(),
         )
 
+    def recovery_only(self):
+        """Exercise existing-generation stop/start recovery with actual private writes."""
+        print("Applying one immutable generation for targeted data-preserving recovery", flush=True)
+        self.run(*self.apply_args(initial=True), log="initial")
+        generation = self.journal()["current"]
+        assert self.journal()["operation"]["phase"] == "active"
+        retained = self.register("retained")
+        deleted = self.register("deleted", judge=False)
+        client, password = self.accounts[deleted]
+        assert (
+            client.request("/accounts/delete/", {"password": password, "confirm": "DELETE"})[0]
+            == 200
+        )
+        assert self.user_id(generation, deleted) is None
+        before = self.snapshot(generation, [retained])["tables"]
+        print("Recovering the active generation and preserving its current database", flush=True)
+        self.run("recover", log="recover-current")
+        final = self.journal()
+        assert final["operation"]["phase"] == "active"
+        assert final["current"]["id"] == generation["id"]
+        assert final["current"]["database"] == generation["database"]
+        assert self.snapshot(final["current"], [retained])["tables"] == before
+        assert self.user_id(final["current"], deleted) is None
+        assert self.proxy.status()["mode"] == "active"
+        self.submit_and_wait(self.accounts[retained][0])
+        self.result.update(
+            active_generation_recovery_preserved_writes=True,
+            post_recovery_account_deletion_not_resurrected=True,
+            recovery_kept_exposed_database=True,
+            post_recovery_real_https_submission_accepted=True,
+            generations_attempted=1,
+            no_journal_or_verdict_edits=True,
+            completed_at=datetime.now(UTC).isoformat(),
+        )
+
     def worker_restart(self):
         """Focused real regression for recovery during a worker auto-restart."""
         print("Applying one immutable generation for focused worker restart recovery", flush=True)
@@ -1222,6 +1292,14 @@ class Rehearsal:
         try:
             operation = self.journal().get("operation") or {}
             diagnostic = {"phase": operation.get("phase"), "failure": operation.get("failure")}
+            filename = (operation.get("failure") or {}).get("diagnostic")
+            if filename:
+                try:
+                    diagnostic["retained_private_diagnostic"] = retain_failure_diagnostic(
+                        self.state_dir, self.options.artifacts, filename
+                    )
+                except (OSError, ValueError, TypeError) as error:
+                    diagnostic["diagnostic_retention_error"] = type(error).__name__
             encoded = json.dumps(diagnostic, ensure_ascii=True)
             if len(encoded) > 4096:
                 diagnostic["failure"] = "Diagnostic exceeded its bounded size"
@@ -1318,6 +1396,11 @@ def parse_options(arguments=None):
     parser.add_argument("--failed-release", type=Path)
     parser.add_argument("--failed-manifest-sha256")
     parser.add_argument("--worker-restart-only", action="store_true")
+    parser.add_argument(
+        "--recovery-only",
+        action="store_true",
+        help="One active CPU generation: verify stop/start recovery and retained writes without fault injection",
+    )
     parser.add_argument("--migration-only", action="store_true")
     parser.add_argument(
         "--upgrade-only",
@@ -1331,6 +1414,13 @@ def parse_options(arguments=None):
     parser.add_argument("--artifacts", type=Path, default=ROOT / "test-results/deployment")
     parser.add_argument("--output", type=Path)
     options = parser.parse_args(arguments)
+    if options.recovery_only and (
+        options.worker_restart_only
+        or options.migration_only
+        or options.upgrade_only
+        or options.failed_release
+    ):
+        parser.error("--recovery-only excludes upgrade, worker restart and failed migration modes")
     if bool(options.previous_release) != bool(options.previous_manifest_sha256):
         parser.error("--previous-release and --previous-manifest-sha256 must be supplied together")
     if options.upgrade_only:
@@ -1493,6 +1583,8 @@ def main():
                 rehearsal.upgrade_rehearsal()
             elif options.worker_restart_only:
                 rehearsal.worker_restart()
+            elif options.recovery_only:
+                rehearsal.recovery_only()
             elif options.migration_only:
                 rehearsal.migration_rehearsal()
             else:

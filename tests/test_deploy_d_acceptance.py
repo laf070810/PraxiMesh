@@ -61,6 +61,7 @@ def test_d_rehearsal_does_not_claim_success_and_preserves_catalogue(tmp_path):
         previous_manifest_sha256="b" * 64,
         upgrade_only=True,
         worker_restart_only=False,
+        recovery_only=False,
     )
     rehearsal = DRehearsal(options, tmp_path)
     assert not rehearsal.result["passed"] and not rehearsal.result["schema_changing_upgrade_tested"]

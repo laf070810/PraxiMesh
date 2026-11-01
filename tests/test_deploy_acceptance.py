@@ -1,6 +1,9 @@
 """Rehearsal preflight boundaries only; these tests do not certify a live upgrade."""
 
 import copy
+import json
+import os
+import stat
 
 import pytest
 
@@ -76,6 +79,7 @@ def test_upgrade_requires_explicit_mode_and_paired_previous_identity(extra):
     "extra",
     [
         ["--worker-restart-only"],
+        ["--recovery-only"],
         ["--migration-only"],
         ["--failed-release", "/tmp/failed", "--failed-manifest-sha256", "c" * 64],
         ["--manifest-sha256", "b" * 64],
@@ -106,6 +110,60 @@ def test_upgrade_rejects_conflicting_modes_and_same_release(extra):
 def test_existing_modes_remain_available(extra):
     options = parse_options(arguments(*extra))
     assert not options.upgrade_only and options.previous_release is None
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        ["--worker-restart-only"],
+        ["--migration-only"],
+        ["--failed-release", "/tmp/failed", "--failed-manifest-sha256", "c" * 64],
+    ],
+)
+def test_targeted_recovery_excludes_other_modes(extra):
+    with pytest.raises(SystemExit):
+        parse_options(arguments("--recovery-only", *extra))
+
+
+def test_targeted_recovery_report_does_not_claim_injected_faults(tmp_path):
+    options = parse_options(arguments("--recovery-only"))
+    report = Rehearsal(options, tmp_path).result
+    assert report["recovery_only"] and not report["worker_restart_only"]
+    assert "without injected process faults" in report["scope"]
+    assert not report["schema_changing_upgrade_tested"]
+
+
+@pytest.mark.parametrize(
+    "invalid", [None, "name", "symlink", "hardlink", "permissions", "oversized"]
+)
+def test_rehearsal_retains_only_recorded_private_diagnostic(tmp_path, invalid):
+    state, artifacts = tmp_path / "state", tmp_path / "artifacts"
+    state.mkdir(mode=0o700)
+    artifacts.mkdir()
+    filename = "control-failure-" + "a" * 32 + ".json"
+    source = state / filename
+    source.write_text(json.dumps({"command": "container-stop", "stderr": "safe test diagnostic"}))
+    source.chmod(0o600)
+    if invalid == "name":
+        filename = "../" + filename
+    elif invalid == "symlink":
+        source.rename(state / "actual.json")
+        source.symlink_to(state / "actual.json")
+    elif invalid == "hardlink":
+        os.link(source, state / "other.json")
+    elif invalid == "permissions":
+        source.chmod(0o644)
+    elif invalid == "oversized":
+        source.write_bytes(b"x" * (deploy_acceptance.CONTROL_DIAGNOSTIC_MAX_BYTES + 1))
+    if invalid:
+        with pytest.raises((ValueError, OSError)):
+            deploy_acceptance.retain_failure_diagnostic(state, artifacts, filename)
+        assert not list(artifacts.iterdir())
+    else:
+        retained = deploy_acceptance.retain_failure_diagnostic(state, artifacts, filename)
+        assert retained == filename
+        assert (artifacts / filename).read_bytes() == source.read_bytes()
+        assert stat.S_IMODE((artifacts / filename).stat().st_mode) == 0o600
 
 
 def test_upgrade_command_cannot_republish_catalogue_on_new_generation(tmp_path):

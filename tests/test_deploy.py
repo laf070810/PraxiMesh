@@ -401,12 +401,34 @@ def test_forward_recovery_drain_failure_stays_closed_and_preserves_current_datab
     assert harness.proxy.active is None
     assert harness.state["current"]["id"] == target["id"]
     assert harness.state["operation"]["phase"] == "recovering_current"
+    assert harness.durable[-1]["operation"]["failure"] == {
+        "phase": "recovering_current",
+        "type": "DeploymentError",
+        "reason": "recovery drain timed out",
+    }
     assert ("stop", target["id"]) not in harness.events
     assert ("thaw", "old-db") not in harness.events
     harness.reboot()
     harness.recover()
     assert harness.database.rows[target["database"]] == ["existing-user-write", "new-user-write"]
     assert harness.state["current"]["id"] == target["id"]
+
+
+def test_recovery_records_only_safe_failure_reason_and_keeps_exposed_database(harness):
+    harness.apply(harness.directory, "release-digest")
+    target = copy.deepcopy(harness.state["current"])
+    fail_once(
+        harness,
+        lambda event: event[:3] == ("control", target["id"], "maintain"),
+        RuntimeError("private connection details must not enter the journal"),
+    )
+    with pytest.raises(RuntimeError, match="private connection"):
+        harness.recover()
+    failure = harness.durable[-1]["operation"]["failure"]
+    assert failure["phase"] == "recovering_current" and failure["type"] == "RuntimeError"
+    assert "private connection" not in json.dumps(harness.durable[-1])
+    assert harness.state["current"]["database"] == target["database"]
+    assert harness.proxy.active is None
 
 
 def test_crash_while_exposing_restored_previous_tracks_that_database_as_current(harness):
@@ -675,6 +697,47 @@ def test_other_docker_failures_do_not_capture_output(diagnostic_control, monkeyp
         host.run("inspect", "owned")
     assert caught.value.diagnostic is None
     assert list(host.directory.iterdir()) == []
+
+
+@pytest.mark.parametrize("action", ["start", "stop"])
+def test_owned_service_start_stop_preserve_bounded_private_diagnostics(
+    diagnostic_control, monkeypatch, action
+):
+    host, _ = diagnostic_control
+    generation = {"id": "owned", "worker": "owned-worker", "web": "owned-web", "manifest": MANIFEST}
+    host.state = {"operation": {"phase": "recovering_current"}}
+    secret = host.config["database"]["owner_password"]
+    monkeypatch.setattr(
+        host,
+        "inspect",
+        lambda name: {
+            "Image": MANIFEST["images"]["worker"],
+            "Config": {
+                "Labels": {"org.praximesh.generation": "owned", "org.praximesh.role": "worker"}
+            },
+            "State": {"Running": action == "stop"},
+        },
+    )
+
+    def fail(arguments, **options):
+        assert arguments[:2] == ["docker", action]
+        raise deploy.subprocess.CalledProcessError(
+            7, arguments, stderr=("synthetic runtime failure " + secret).encode()
+        )
+
+    monkeypatch.setattr(deploy.subprocess, "run", fail)
+    with pytest.raises(deploy.DeploymentError) as caught:
+        if action == "start":
+            host.service(generation, "worker")
+        else:
+            host.stop(generation)
+    diagnostic = host.directory / caught.value.diagnostic
+    data = json.loads(diagnostic.read_text())
+    assert data["command"] == "container-" + action and data["exit_code"] == 7
+    assert "synthetic runtime failure" in data["stderr"] and secret not in data["stderr"]
+    assert stat.S_IMODE(diagnostic.stat().st_mode) == 0o600
+    assert "synthetic runtime failure" not in str(caught.value)
+    assert host.failure_record(caught.value)["diagnostic"] == diagnostic.name
 
 
 def test_inspection_refuses_foreign_container_before_control(harness, monkeypatch):

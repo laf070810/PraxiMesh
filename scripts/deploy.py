@@ -37,6 +37,8 @@ from scripts.release import initial_content_commands, inspect_images, verify  # 
 CONTROL_DIAGNOSTIC_STREAM_BYTES = 64 * 1024
 CONTROL_DIAGNOSTIC_MAX_BYTES = 1024 * 1024
 CONTROL_COMMANDS = {
+    "container-start",
+    "container-stop",
     "check",
     "content_import",
     "project_import",
@@ -222,6 +224,18 @@ class Deployment:
         self.state["updated_at"] = datetime.now(UTC).isoformat()
         atomic_json(self.path, self.state)
 
+    def failure_record(self, error):
+        record = {
+            "phase": self.state["operation"]["phase"],
+            "type": type(error).__name__,
+            "reason": str(error)
+            if isinstance(error, (DeploymentError, DeploymentDatabaseError, ProxyError))
+            else "See the owned service logs; raw output is not copied into the journal",
+        }
+        if isinstance(error, DeploymentError) and error.diagnostic:
+            record["diagnostic"] = error.diagnostic
+        return record
+
     def control_diagnostic(self, error, category):
         """Retain bounded private output, never the command line or environment."""
         path = self.directory / f"control-failure-{uuid.uuid4().hex}.json"
@@ -309,7 +323,7 @@ class Deployment:
                     else "private diagnostic could not be written"
                 )
                 raise DeploymentError(
-                    f"A deployment management command failed; {location}", diagnostic=filename
+                    f"A deployment command failed; {location}", diagnostic=filename
                 ) from None
             # Docker inspect/environment and DB failures can contain credentials.
             raise DeploymentError("A deployment container operation failed") from None
@@ -452,7 +466,7 @@ class Deployment:
             ):
                 raise DeploymentError("Existing container identity differs from the journal")
             if not info["State"]["Running"]:
-                self.run("start", name)
+                self.run("start", name, diagnostic="container-start")
             return
         environment = self.environment(generation, role)
         args = self.runtime(generation, role, name) + ["--restart=unless-stopped"]
@@ -471,7 +485,14 @@ class Deployment:
         for role in ["web", "worker"]:
             info = self.inspect(generation[role])
             if info and info["State"]["Running"]:
-                self.run("stop", "--timeout", "35", generation[role], timeout=45)
+                self.run(
+                    "stop",
+                    "--timeout",
+                    "35",
+                    generation[role],
+                    timeout=45,
+                    diagnostic="container-stop",
+                )
 
     def port(self, generation):
         info = self.inspect(generation["web"])
@@ -721,13 +742,7 @@ class Deployment:
             self.expose(candidate, token)
         except Exception as error:
             phase = self.state["operation"]["phase"]
-            self.state["operation"]["failure"] = {
-                "phase": phase,
-                "type": type(error).__name__,
-                "reason": str(error)
-                if isinstance(error, (DeploymentError, DeploymentDatabaseError, ProxyError))
-                else "See the owned service logs; raw output is not copied into the journal",
-            }
+            self.state["operation"]["failure"] = self.failure_record(error)
             if self.state["operation"]["exposure_target"]:
                 self.save("needs_recovery")
                 self.proxy.maintenance()
@@ -763,6 +778,14 @@ class Deployment:
         self.check_gpu_attachment()
         if not self.state or not self.state.get("operation"):
             raise DeploymentError("No interrupted deployment to recover")
+        try:
+            self._recover()
+        except Exception as error:
+            self.state["operation"]["failure"] = self.failure_record(error)
+            self.save()
+            raise
+
+    def _recover(self):
         self.cleanup_controls()
         operation = self.state["operation"]
         if operation["exposure_target"]:
