@@ -1,6 +1,6 @@
 # ADR-058：同一冻结源码的四镜像 GPU 发布制品
 
-日期：2026-11-01。状态：实现与实际制品验证进行中。设计见 [RFC-021](../rfcs/021-gpu-container-supervision.md#gpu-release-artifact)，操作统一在[发布制品指南](../deployment/releases.md#gpu-release)，结果见 [G42](../acceptance-g42.md)。
+日期：2026-11-01。状态：已采纳，制品、导入与非 GPU 应用验收完成。设计见 [RFC-021](../rfcs/021-gpu-container-supervision.md#gpu-release-artifact)，操作统一在[发布制品指南](../deployment/releases.md#gpu-release)，结果见 [G42](../acceptance-g42.md)。
 
 GPU 发布使用可选 format 2，在原 `release.json`、`source.tar.gz`、`images.tar` 内绑定 Web、CPU worker、GPU worker 和任务镜像。默认仍生成 format 1；新读取器继续验证旧制品，不增加旧包必需文件。构建只执行本机审阅源码的一次冻结副本，不将已下载归档中的代码当作构建器。
 

@@ -1,6 +1,6 @@
 # G42：四镜像 GPU 发布制品
 
-2026-11-01，实现与实际制品验证进行中。设计见 [ADR-058](adr/058-gpu-release-artifacts.md)，操作集中在[发布指南](deployment/releases.md#gpu-release)。本轮不查询、映射或使用 GPU，不改变现有运行站点。
+2026-11-01，本批制品、导入和非 GPU 应用验收完成。设计见 [ADR-058](adr/058-gpu-release-artifacts.md)，操作集中在[发布指南](deployment/releases.md#gpu-release)。本轮不查询、映射或使用 GPU，不改变现有运行站点。
 
 ## 已实现
 
@@ -12,15 +12,15 @@
 
 `test-results/g42-baseline.json` 记录原读取器接受旧格式、拒绝新 GPU 格式。旧 F 归档的实际成员与标签结构已核对。首轮旧格式/部署回归 **85 passed**；加入 GPU 归档与拒绝检查后 **121 passed**，增加非规范路径检查后 **122 passed**。测试中的镜像层是明确的不可执行夹具，不表示真实镜像或 GPU 通过。
 
-实际四镜像构建、完整归档校验和导入已通过。首轮 CPU/WASI 发布验收也已通过，输出目录修正后的新制品待复验。
+实际四镜像构建、完整归档校验和导入已通过。三份制品的 CPU/WASI 发布流程均通过；第三份同时通过修正后的完整输出目录保护检查。各轮覆盖同一组应用流程，不把重复执行相加为独立测试数量。
 
 补齐畸形 JSON 类型拒绝后，最终相关组件检查 **127 passed、0 skipped**，见 `test-results/g42-artifact-complete.log` 和 `.xml`。新读取器已按 F 验收中记录的清单摘要 `896e1c1b605025376ed30786ea4e79d3fde008c97e7d114bf91febd86cc62482` 核验实际旧包，464 个源码文件、两个镜像及完整层通过，见 `g42-f-compatibility.json`。这只重放旧制品读取，不将 F 的历史部署结果算作本次重跑。
 
-浏览器前置检查首次因默认缓存路径不存在失败，记录在 `g42-browser-preflight-default.log`；指定已安装的独立缓存后启动通过，见 `g42-browser-preflight-fixed.log`。没有安装或改变服务依赖，尚未据此宣称页面流程通过。
+浏览器前置检查首次因默认缓存路径不存在失败，记录在 `g42-browser-preflight-default.log`；指定已安装的独立缓存后启动通过，见 `g42-browser-preflight-fixed.log`。没有安装或改变服务依赖。该前置检查只验证浏览器启动，页面流程由下方真实验收验证。
 
 首轮镜像浏览器执行时发现新输出目录只作用于父进程日志，未传给主要浏览器子进程；七个截图或子报告仍写到公共 `test-results/`，原始身份见 `g42-browser-output-first.json`。已补齐显式目录的传递；默认未指定目录时保持原行为。首轮继续跟踪到终止并保留结果，随后使用新发布目录和新验收目录重放，不原地改写已经完成的制品。
 
-第二轮复核发现英文流程和本地 CLI 流程仍将目录写死，忽略已经传入的 `BROWSER_ARTIFACTS`；英文截图和两个子报告继续写到公共目录，原始输出保护断言失败。已让这两个脚本沿用其他浏览器入口的目录选择，未设置变量时保持原路径；再生成第三份不可变制品验证全部子记录。第二轮的产品流程和输出目录保护分别记录，不把部分路径修正描述为全部通过。
+第二轮复核发现英文流程和本地 CLI 流程仍将目录写死，忽略已经传入的 `BROWSER_ARTIFACTS`；英文截图和两个子报告继续写到公共目录，原始输出保护断言失败，实际重现日志为 `g42-output-protection-second.log`。已让这两个脚本沿用其他浏览器入口的目录选择，未设置变量时保持原路径；再生成第三份不可变制品验证全部子记录。第二轮的产品流程和输出目录保护分别记录，不把部分路径修正描述为全部通过。
 
 ## 实际制品与无设备应用
 
@@ -53,6 +53,27 @@
 | CPU worker 镜像 | `7403aa6f853b4874a666d056152b2043f5c08925ff0488cae012e42e44826116` |
 
 两份包的 GPU worker、任务 image ID 及完整 GPU 元数据相同；前述九项无设备应用结果绑定首轮导入的这些确切身份，不将它们记为第二轮重复执行。输出目录修正不涉及应用、评测策略或 GPU 源码。
+
+## 最终制品与 Git 对应
+
+最终目录为 `var/releases/2026-11-01-g42-candidate-3`。构建与归档核验通过，记录为 `test-results/g42-build-complete.log`、`release-build-89ecc7fa8b6e.log` 及同名 `.gpu/` 子日志。最终浏览器/CPU 复验全部通过，报告为 `test-results/g42-release-complete/release-acceptance.json`：129 个真实探针、主流程、三组功能浏览器、七组扩展浏览器、排空/恢复、错误解释器拒绝和自有资源清理均通过。没有运行 GPU 或模型。
+
+| 身份 | SHA-256 |
+| --- | --- |
+| 发布清单 | `44b6ca03b1e22d92382e5a04b578dee64813f57eceb1b3c3485117b0fdfa2142` |
+| 冻结源码 | `7ebd4c107d7f7df38b05596e32baf5d5a39b70b2d5ac0d9b91a26f97d055d587` |
+| Web 镜像 | `1c642b14ae6b00d8daa7ba95115d69749535a6dd26e79d9334faf5de5f01e158` |
+| CPU worker 镜像 | `e1d4fe91926c1c41e8ed3a2de8106f9572f17b32c293ad2b0b2f030a3356b144` |
+
+`test-results/g42-source-commit.json` 逐一读取 Git blob 并比较 SHA-256，确认全部 **839 个源码文件**与实现提交 `3cecc5f9a1c15be1748e65d42f28910b15af6a5f` 一致。GPU worker、任务镜像及完整元数据与前两轮相同；最终验收结论另以文档提交补齐，不改写冻结包。
+
+## 最终复核与清理
+
+`test-results/g42-audit.json` 的独立只读复核通过：最终发布包的完整归档、导入镜像身份、各轮报告和 127 项组件记录均符合；九项无设备 worker 检查对应的十个容器已不存在，三轮 CPU 发布容器/网络/数据库卷均已清理，三组构建的六个临时 GPU 标签已移除。导入的四个发布镜像保留，制品与日志也继续保留。
+
+最终七个截图/子报告全部位于指定目录；第二轮结束后保存的公共记录，其 SHA-256 和修改时间均未变化。复用已有输出目录的实际 CLI 在 Docker 操作前以 `FileExistsError` 拒绝，原验收报告保持原字节和修改时间，日志为 `g42-output-directory-guard.log`。
+
+原有 `praximesh-web-1`、`praximesh-worker-1`、`praximesh-tutor-1` 均运行且健康，没有重建。代码格式检查和本批文档链接检查通过；最终差异清单 `g42-final-source-audit.json` 确认后续补充只涉及五份交付文档，运行代码与测试均与最终冻结包保持一致。
 
 ## 剩余范围
 
