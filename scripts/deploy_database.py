@@ -424,6 +424,12 @@ class DeploymentDatabase:
 
     @safe_errors
     def require_owned(self, name):
+        if not self.owned_exists(name):
+            raise DeploymentDatabaseError("Database is missing or has no matching owner and marker")
+
+    @safe_errors
+    def owned_exists(self, name):
+        """Read-only distinction; an existing unmarked database is never adopted."""
         self._validate_name(name)
         with self._connect("postgres") as connection:
             row = connection.execute(
@@ -431,8 +437,11 @@ class DeploymentDatabase:
                 "FROM pg_database WHERE datname = %s",
                 (name,),
             ).fetchone()
+        if row is None:
+            return False
         if row != (self.config["owner_user"], self._marker("database")):
             raise DeploymentDatabaseError("Database is missing or has no matching owner and marker")
+        return True
 
     @safe_errors
     def connection(self, name):

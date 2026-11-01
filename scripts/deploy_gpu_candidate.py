@@ -19,6 +19,7 @@ from scripts.deploy_gpu_check import (
 )
 from scripts.deploy_gpu_config import CONTEXT, context, frozen
 from scripts.deploy_gpu_recovery import validate_record as validate_recovery
+from scripts.deploy_gpu_retirement import validate_record as validate_retirement
 from scripts.deploy_gpu_worker import HEX, started
 
 PHASES = {
@@ -297,12 +298,36 @@ class GPUGenerationPreparation:
         return {"gpu": observed, "verification": self.verified_round()}
 
     def recover(self):
+        retirements = self.host.state.get("gpu_retirements", {})
+        if type(retirements) is not dict:
+            raise GPUPreparationError("Invalid GPU retirement registry")
+        for key, retirement in retirements.items():
+            validate_retirement(retirement)
+            if (
+                key != retirement["operation"] + ":" + retirement["generation"]["gpu_worker"]
+                or retirement["phase"] != "retired"
+            ):
+                raise GPUPreparationError("Finish the original GPU configuration retirement first")
         self.load()
         if len(self.record["attempts"]) >= MAX_ATTEMPTS:
             self.fresh()
             return self.run()
         if self.entry["phase"] == "publishing":
-            self.host.publish_gpu_configuration(self.generation, enabled=True)
+            active = self.host.state.get("gpu_configuration") or {}
+            published = active.get("active")
+            if (
+                active.get("transition") is None
+                and published is not None
+                and published["generation"] == context(self.generation)
+                and published["enabled"] is True
+            ):
+                # New operations can recover a live original worker. Check the
+                # complete pair without republishing it or taking its device lock.
+                config, _, _ = self.runtime.configuration()
+                if config["enabled"] is not True:
+                    raise GPUPreparationError("Original GPU configuration is not enabled")
+            else:
+                self.host.publish_gpu_configuration(self.generation, enabled=True)
             self.save("starting_services")
         # This creates only a missing, intended original worker; an existing
         # registered ID is inspected, never replaced or adopted by name.

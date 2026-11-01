@@ -221,14 +221,40 @@ GPU 数据库冻结持有排空锁，直到 runtime 连接权限撤销和现有�
   tests/test_deploy_gpu_config_postgres.py
 ```
 
-当前验证范围见 [G51](../acceptance-g51.md)。停止/冻结调用点已衔接，完整 GPU apply、候选失败回滚与曝光后恢复仍在开发，公共 GPU 激活继续关闭；不能从内部组件检查推断真实部署成功。
+当前验证范围见 [G51](../acceptance-g51.md)。停止/冻结已接入[内部整站编排](#whole-site-release)，公共 GPU 激活继续关闭；不能从内部组件检查推断真实部署成功。
+
+<a id="whole-site-release"></a>
+### 协调器内部的整站发布与恢复
+
+`scripts/deploy_gpu_release.py` 已将原有组件串接为内部安装、升级和失败恢复流程，记录完整前代、候选代、冻结包路径与恢复尝试。**这不是新增的可用部署方案：公共 GPU `apply/recover` 仍关闭，当前用户启动仍按部署首页选择已验收的 CPU/WASI 方案。** 不应直接调用内部方法或修改私有日志来绕过门槛。
+
+| 场景 | 内部流程和数据保留 |
+| --- | --- |
+| 首次 GPU 安装 | 新建自有数据库、迁移、授予最小权限、暂停并验证候选；只有显式初次安装才导入内容 |
+| CPU→GPU、GPU→GPU | 原库排空和冻结后复制到独立候选库；保留用户数据与内容，验证完成后保存曝光决定再开放 |
+| GPU→CPU | 原 GPU 库先恢复、排空、停止、冻结并退出配置；原节点、任务与验证历史保留 |
+| 候选曝光前失败 | 先在实际配置的原库完成恢复和旧轮清理，再回到前代；失败候选无需先通过同一产品检查 |
+| 曝光决定之后失败 | 只恢复当前库，保留开放后写入；重验和曝光都有持久阶段，不复制旧快照 |
+
+恢复响应丢失时继续同一尝试。原 GPU 实例仍运行时不重复重启；确认同一实例退出才重新恢复并验证。CPU 重试仅接受维护路由或已决定的原 Web 端口。缺少 owner/marker 的数据库、未知对象或未完成清理会保留现场并拒绝后续切换，不能按“没有可用库”重新初始化。
+
+不连接实际服务或 GPU 的编排与组件检查：
+
+```sh
+.venv/bin/pytest -q tests/test_deploy_gpu_release.py \
+  tests/test_deploy_gpu_release_components.py tests/test_deploy_gpu_candidate.py \
+  tests/test_deploy_gpu_exposure.py tests/test_deploy_gpu_retirement.py \
+  tests/test_deploy_database.py tests/test_deploy_gpu_recovery.py
+```
+
+具体范围、失败复现和 CPU 进程中断见 [G56](../acceptance-g56.md)，设计见 [ADR-072](../adr/072-coordinated-gpu-release-recovery.md)。还需实际 PostgreSQL 锁/权限和 Docker 组合验收，以及获授权独占 GPU 上的完整启动、队列、升级、候选失败回退和曝光后恢复。未完成这些检查前不开放公共入口；数据库辅助代码改变 worker 源码契约，须制作新的匹配制品，不能改写旧包。
 
 <a id="configuration-retirement"></a>
 ### 回到 CPU 前退出原 GPU 配置
 
 完整发布流程在回到 CPU 版本前，须先在原 GPU 库完成恢复、排空、停止与冻结，再调用内部配置退出。`scripts/deploy_gpu_retirement.py` 在原设备锁和数据库排空锁下保存退出意图，通过原过渡标记有序移除匹配的两份配置；完成后不再有有效 GPU 配置，节点锁、容器登记、数据库和任务/验证历史仍保留。
 
-曝光决定存在、原库未冻结、worker 未停止、存在任务/预约或未知文件时拒绝退出。中断只能继续同一原配置；不能手工删文件或日志来模拟完成。后续新操作发布新代时不接管退休库的旧暂停 token。此步骤不自行切换 CPU 站点，完整 GPU→CPU 与候选失败回退仍须连接并实际验收。
+曝光决定存在、原库未冻结、worker 未停止、存在任务/预约或未知文件时拒绝退出。中断只能继续同一原配置；不能手工删文件或日志来模拟完成。后续新操作发布新代时不接管退休库的旧暂停 token。此步骤不自行切换 CPU 站点，GPU→CPU 与候选失败回退由上文整站编排协调，仍待实际验收。
 
 不访问实际服务或 GPU 的检查：
 
@@ -253,7 +279,7 @@ GPU 数据库冻结持有排空锁，直到 runtime 连接权限撤销和现有�
   tests/test_deploy_gpu_check.py tests/test_deploy.py
 ```
 
-验证范围见 [G53](../acceptance-g53.md)。准备已连接下方内部曝光步骤，但目前没有完整 GPU apply/回退/恢复命令；实际 Docker、PostgreSQL 和 GPU 需要另行验收。
+验证范围见 [G53](../acceptance-g53.md)。准备已连接内部曝光和上文整站编排，但目前没有可用的公共 GPU apply/回退/恢复命令；实际 Docker、PostgreSQL 和 GPU 需要另行验收。
 
 <a id="durable-exposure"></a>
 ### 协调器内部的持久曝光
@@ -269,7 +295,7 @@ GPU 数据库冻结持有排空锁，直到 runtime 连接权限撤销和现有�
   tests/test_deploy_gpu_exposure_database.py tests/test_deploy_gpu_candidate.py
 ```
 
-实际 PostgreSQL 开放准入与预约快照检查复用上文 `tests/test_deploy_gpu_config_postgres.py` 入口，不能用 SQLite 的跳过结果代替。验证范围见 [G54](../acceptance-g54.md)。这是内部流程；公共 `apply/recover` 仍拒绝 GPU 状态，完整失败回退、GPU→CPU 及真实升级还需完成，不应手工修改私有日志来开放。
+实际 PostgreSQL 开放准入与预约快照检查复用上文 `tests/test_deploy_gpu_config_postgres.py` 入口，不能用 SQLite 的跳过结果代替。验证范围见 [G54](../acceptance-g54.md)。这是内部流程；公共 `apply/recover` 仍拒绝 GPU 状态，完整失败回退、GPU→CPU 及真实升级验收还需完成，不应手工修改私有日志来开放。
 
 <a id="candidate-verification"></a>
 ### 协调器内部的候选队列检查

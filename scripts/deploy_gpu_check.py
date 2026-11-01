@@ -134,19 +134,24 @@ def validate_record(record):
         raise GPUCandidateError("Invalid original GPU candidate verification record")
 
 
+def require_protocol(generation, release):
+    """Inspect verified frozen bytes without constructing or operating a worker."""
+    manifest = generation["manifest"]
+    if not set(SOURCES) <= set(manifest["gpu"]["source_scopes"]["worker"]):
+        raise GPUCandidateError("Frozen release does not support the GPU candidate protocol")
+    contents = verify_source(
+        Path(release) / "source.tar.gz", manifest["source_files"], capture=SOURCES
+    )
+    if literal(contents, SOURCES[0], "PROTOCOL") != PROTOCOL:
+        raise GPUCandidateError("Frozen GPU candidate protocol is unsupported")
+
+
 class GPUCandidateCheck:
     def __init__(self, host, generation, release):
         self.host = host
         self.generation = copy.deepcopy(generation)
         self.readiness = GPUReadiness(host, generation, release)
-        manifest = generation["manifest"]
-        if not set(SOURCES) <= set(manifest["gpu"]["source_scopes"]["worker"]):
-            raise GPUCandidateError("Frozen release does not support the GPU candidate protocol")
-        contents = verify_source(
-            Path(release) / "source.tar.gz", manifest["source_files"], capture=SOURCES
-        )
-        if literal(contents, SOURCES[0], "PROTOCOL") != PROTOCOL:
-            raise GPUCandidateError("Frozen GPU candidate protocol is unsupported")
+        require_protocol(generation, release)
 
     def save(self, phase):
         self.record["phase"] = phase

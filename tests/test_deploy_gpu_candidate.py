@@ -154,6 +154,53 @@ def test_preparation_composes_publication_services_preflight_startup_and_both_ch
     assert value.events() == before and len(value.candidate.calls()) == 2
 
 
+@pytest.mark.parametrize("pending_retirement", [False, True])
+def test_new_operation_recovers_published_original_without_republishing_live_worker(
+    preparation, pending_retirement
+):
+    from judge.container_deployment_config import digest
+
+    value = preparation
+    value.run()
+    item = value.value.item
+    previous = copy.deepcopy(value.record())
+    host = value.coordinator()
+    token = str(uuid.uuid4())
+    with host.locked():
+        host.state["current"] = copy.deepcopy(item.generation)
+        host.state["operation"].update(id=token, exposure_target=None)
+        if pending_retirement:
+            host.state["gpu_retirements"] = {
+                token + ":" + item.generation["gpu_worker"]: {
+                    "schema": 1,
+                    "operation": token,
+                    "generation": copy.deepcopy(item.generation),
+                    "binding_sha256": digest(host.state["gpu_attachment"]["binding"]),
+                    "from": copy.deepcopy(host.state["gpu_configuration"]["active"]),
+                    "phase": "prepared",
+                }
+            }
+        host.save()
+    item.token = token
+    before = value.events()
+    if pending_retirement:
+        with pytest.raises((ValueError, RuntimeError)):
+            value.run(recover=True)
+        assert value.events() == before
+        return
+    result = value.run(recover=True)
+    assert result["verification"]["passed"]
+    assert "publish" not in value.events()[len(before) :]
+    assert previous in state(item)["gpu_preparations"].values()
+    assert value.record()["operation"] == token
+    assert value.record()["attempts"][-1]["startup"] != previous["attempts"][-1]["startup"]
+    after = value.events()
+    value.run(recover=True)
+    # Ensuring the same CPU service is idempotent; no GPU restart, publication,
+    # Web replacement or new candidate verification is permitted on this retry.
+    assert value.events()[len(after) :] == ["service:worker"]
+
+
 def test_fresh_candidate_creates_both_fixed_containers_through_normal_lifecycle(preparation):
     value = preparation
     # Only synthetic fixture containers/records exist here. Start this scenario

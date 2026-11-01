@@ -787,6 +787,7 @@ class Deployment:
             or state.get("gpu_preparations")
             or state.get("gpu_exposures")
             or state.get("gpu_retirements")
+            or state.get("gpu_releases")
             or state.get("gpu_workers")
             or state.get("gpu_checks")
         ):
@@ -800,6 +801,18 @@ class Deployment:
         from scripts.deploy_gpu_exposure import GPUExposure
 
         return GPUExposure(self, generation, release, phase=phase).run()
+
+    def apply_coordinated(self, release, digest, *, initial_content=False):
+        """Internal whole-site flow; public GPU apply remains gated for acceptance."""
+        from scripts.deploy_gpu_release import GPURelease
+
+        return GPURelease(self).apply(release, digest, initial_content=initial_content)
+
+    def recover_coordinated(self):
+        """Internal original-operation recovery; never restores an exposed snapshot."""
+        from scripts.deploy_gpu_release import GPURelease
+
+        return GPURelease(self).recover()
 
     def expose(self, generation, token, phase="active"):
         self.require_cpu_lifecycle(generation["manifest"])

@@ -2,6 +2,7 @@
 
 import json
 import os
+from contextlib import contextmanager
 from types import SimpleNamespace
 from urllib.parse import parse_qs, unquote, urlsplit
 
@@ -112,6 +113,48 @@ def test_generation_and_instance_boundaries(database):
     for name in ["postgres", "px_other_a0123456789f", "px_example1_a0123456789f;--"]:
         with pytest.raises(DeploymentDatabaseError):
             database._validate_name(name)
+
+
+@pytest.mark.parametrize("kind", ["absent", "owned", "foreign-owner", "unmarked", "foreign-site"])
+def test_database_existence_never_adopts_or_mutates_unowned_database(database, monkeypatch, kind):
+    row = {
+        "absent": None,
+        "owned": ("postgres", database._marker("database")),
+        "foreign-owner": ("another-owner", database._marker("database")),
+        "unmarked": ("postgres", None),
+        "foreign-site": ("postgres", "another-site"),
+    }[kind]
+    calls = []
+    name = database.name("a0123456789f")
+
+    class Connection:
+        def execute(self, statement, parameters):
+            assert statement.startswith("SELECT ") and "FROM pg_database" in statement
+            assert parameters == (name,)
+            calls.append(statement)
+            return SimpleNamespace(fetchone=lambda: row)
+
+    @contextmanager
+    def connect(target):
+        assert target == "postgres"
+        yield Connection()
+
+    monkeypatch.setattr(database, "_connect", connect)
+    if kind in {"absent", "owned"}:
+        assert database.owned_exists(name) is (kind == "owned")
+    else:
+        with pytest.raises(DeploymentDatabaseError, match="owner and marker"):
+            database.owned_exists(name)
+    assert len(calls) == 1
+    if kind == "owned":
+        database.require_owned(name)
+    else:
+        with pytest.raises(DeploymentDatabaseError, match="owner and marker"):
+            database.require_owned(name)
+    assert len(calls) == 2
+    with pytest.raises(DeploymentDatabaseError, match="outside"):
+        database.owned_exists("px_another_a0123456789f")
+    assert len(calls) == 2
 
 
 def test_django_url_preserves_quoted_credentials_and_container_boundary(database, configuration):

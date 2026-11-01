@@ -16,7 +16,7 @@
 
 前三种方式沿用同一套账号、内容版本、学习、社区、组织、项目和挑战功能，主要差别在服务启动、数据存储、网络配置与升级保障。已验收的七种评测均为 CPU/WASI；GPU 宿主和容器入口用于后续独占硬件验收，**目前网站没有开放 GPU 题型**。独立 GPU Compose worker 使用 PostgreSQL，不能直接挂入默认 SQLite 单机方案的数据卷。
 
-需要保存或分发匹配的 Web、CPU worker、GPU worker 和任务镜像时，使用[四镜像发布包](releases.md#gpu-release)。它提供统一构建、校验与导入；协调器可先完成[原 GPU 节点绑定](container-gpu-worker.md#coordinator-binding)。当前仍只激活两镜像 CPU 包，GPU 生命周期与升级尚未接通。
+需要保存或分发匹配的 Web、CPU worker、GPU worker 和任务镜像时，使用[四镜像发布包](releases.md#gpu-release)。它提供统一构建、校验与导入；协调器可先完成[原 GPU 节点绑定](container-gpu-worker.md#coordinator-binding)。[内部整站发布与恢复](container-gpu-worker.md#whole-site-release)已串接，真实环境验收仍待完成；公共协调器当前只激活两镜像 CPU 包。
 
 GPU 0 的独立环境已通过真实 CUDA 样例、内核参考解/错解和 CPU 限额检查。准备执行节点或排障时使用 [GPU 单卡环境检查](gpu.md#重放单卡环境检查)及[内核组件检查](gpu.md#重放内核正确性检查)。显卡被占用时，可按 [GPU 指南的检查入口表](gpu.md#validation-options)选择控制链、离线 runsc、异常恢复、可信容器监督、容器内 runsc 或[控制端 UID/锁映射检查](gpu.md#container-controller)；它们只运行固定 CPU 程序，尚不能作为接收学员提交的 GPU 部署方案。
 
