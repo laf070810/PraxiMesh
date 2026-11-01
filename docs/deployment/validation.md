@@ -11,13 +11,16 @@
 ```sh
 uv sync --frozen --group judge --group browser
 .venv/bin/playwright install chromium
+.venv/bin/python -m tests.browser_runtime
 .venv/bin/python scripts/fetch_caddy.py --output var/tools/caddy-2.11.7
 .venv/bin/python scripts/production_acceptance.py --caddy var/tools/caddy-2.11.7
 ```
 
 下载器只获取固定摘要的官方 Caddy 2.11.7，并保留其 LICENSE；目标已存在时拒绝覆盖。已下载的可信版本可直接重用。Docker 按固定 digest 获取 PostgreSQL 17。需要离线运行时先准备这些工具、浏览器、数据库镜像和 WASI 制品。使用 rootless Docker 时，由调用环境设置已有 daemon 的 `DOCKER_HOST`，脚本不会修改 daemon 或登录配置。
 
-如果浏览器安装时设置过 `PLAYWRIGHT_BROWSERS_PATH`，验收进程也必须继承同一路径；否则 Playwright 会去默认缓存查找，可能在应用启动后才报浏览器不存在。先确认当前固定虚拟环境能实际启动并关闭 Chromium，再运行需要真实 worker 的长时演练。不要为此同步正在运行的服务环境。
+如果浏览器安装时设置过 `PLAYWRIGHT_BROWSERS_PATH`，验收进程也必须继承同一路径；否则 Playwright 会去默认缓存查找，可能在应用启动后才报浏览器不存在。上面的预检实际生成一张 640×480 的 PNG，再关闭 Chromium；仅能启动浏览器不代表截图可以完成。不要为此同步正在运行的服务环境。
+
+所有无头验收浏览器共用 `tests/browser_runtime.py`，仅在浏览器子进程中移除 `DISPLAY`、`WAYLAND_DISPLAY` 和 `DBUS_SESSION_BUS_ADDRESS`，不修改调用者的桌面会话或系统服务。若字体已加载但截图仍超时，先重放这个最小预检，再检查原日志，不跳过截图或提高正常验收期限。[G61](../acceptance-g61.md)记录了当前桌面环境导致空白 HTML 也无法绘制的复现及修复；原缓存和锁定依赖均未更换。
 
 ## 验收内容
 

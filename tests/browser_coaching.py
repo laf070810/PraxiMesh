@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from browser_community import delete_account, export_account, launch_arguments, register
+from browser_runtime import launch_chromium
 from playwright.sync_api import expect, sync_playwright
 
 
@@ -52,7 +53,7 @@ def main():
     ]
     errors = []
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(args=arguments)
+        browser = launch_chromium(playwright, args=arguments)
         try:
             for account in accounts:
                 account["page"] = browser.new_context(

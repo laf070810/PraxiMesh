@@ -34,6 +34,7 @@ def main():
     django.setup()
     from browser_cuda_editor import check_cuda_editor
     from browser_gpu_showcase import check_gpu_showcase, prepare_gpu_showcase
+    from browser_runtime import launch_chromium
     from django.conf import settings
     from django.contrib.auth import get_user_model
     from django.urls import reverse
@@ -132,7 +133,7 @@ def main():
     save()
     try:
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=True)
+            browser = launch_chromium(playwright)
             try:
                 for language in ("zh-hans", "en"):
                     context = browser.new_context(locale=language)

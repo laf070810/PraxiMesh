@@ -8,6 +8,7 @@ import uuid
 from pathlib import Path
 
 from browser_community import launch_arguments
+from browser_runtime import launch_chromium
 from playwright.sync_api import expect, sync_playwright
 
 
@@ -172,8 +173,8 @@ def main():
     errors, violations = [], []
     created = False
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(
-            args=launch_arguments(base, os.environ.get("BROWSER_TEST_SPKI", ""))
+        browser = launch_chromium(
+            pw, args=launch_arguments(base, os.environ.get("BROWSER_TEST_SPKI", ""))
         )
         context = browser.new_context(locale="zh-CN", viewport={"width": 1440, "height": 1050})
         page = context.new_page()

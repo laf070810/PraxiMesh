@@ -10,6 +10,7 @@ import uuid
 from pathlib import Path
 
 from browser_community import delete_account, export_account, launch_arguments, register
+from browser_runtime import launch_chromium
 from browser_specialists import wait_finished
 from playwright.sync_api import expect, sync_playwright
 
@@ -43,8 +44,8 @@ def main():
     accounts, errors = [], []
     raw = None
     with tempfile.TemporaryDirectory(prefix="praximesh-api-") as temporary, sync_playwright() as pw:
-        browser = pw.chromium.launch(
-            args=launch_arguments(base, os.environ.get("BROWSER_TEST_SPKI", ""))
+        browser = launch_chromium(
+            pw, args=launch_arguments(base, os.environ.get("BROWSER_TEST_SPKI", ""))
         )
         for _ in range(2):
             page = browser.new_context(locale="zh-CN", accept_downloads=True).new_page()

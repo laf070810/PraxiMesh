@@ -10,6 +10,7 @@ import uuid
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from browser_runtime import launch_chromium
 from playwright.sync_api import expect, sync_playwright
 
 
@@ -98,7 +99,7 @@ def main():
         # ignore_https_errors or install a CA in a system-wide trust store.
         launch_args.append("--ignore-certificate-errors-spki-list=" + pin)
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(args=launch_args)
+        browser = launch_chromium(playwright, args=launch_args)
         page = browser.new_page(locale="zh-CN", viewport={"width": 1440, "height": 1050})
         page.on("pageerror", lambda error: errors.append(str(error)))
         response = page.goto(base)

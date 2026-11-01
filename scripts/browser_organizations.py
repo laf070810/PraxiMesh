@@ -176,6 +176,7 @@ def run_journey(environment, owner_run, artifacts=None):
         login,
         register,
     )
+    from browser_runtime import launch_chromium
 
     base = environment["BROWSER_URL"].rstrip("/")
     arguments = launch_arguments(base, environment.get("BROWSER_TEST_SPKI", ""))
@@ -196,7 +197,7 @@ def run_journey(environment, owner_run, artifacts=None):
     published = withdrawn = False
     package_id = package_digest = course_digest = None
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(args=arguments)
+        browser = launch_chromium(playwright, args=arguments)
         try:
             for prefix in ("org-owner-", "org-learner-"):
                 accounts.append(

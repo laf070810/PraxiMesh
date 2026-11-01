@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from browser_community import delete_account, export_account, launch_arguments, register
+from browser_runtime import launch_chromium
 from playwright.sync_api import expect, sync_playwright
 
 
@@ -50,8 +51,8 @@ def run_journey(environment, artifacts):
         )["problems"]
     }
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(
-            args=launch_arguments(base, environment.get("BROWSER_TEST_SPKI", ""))
+        browser = launch_chromium(
+            playwright, args=launch_arguments(base, environment.get("BROWSER_TEST_SPKI", ""))
         )
         try:
             for account in accounts:

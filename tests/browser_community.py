@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from browser_runtime import launch_chromium
 from browser_smoke import editor
 from playwright.sync_api import expect, sync_playwright
 
@@ -342,7 +343,7 @@ def main():
     errors = []
     failure = None
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(args=arguments)
+        browser = launch_chromium(playwright, args=arguments)
         try:
             run_workflow(browser, base, accounts, result, artifacts, progress, errors)
         except Exception as error:

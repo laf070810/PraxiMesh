@@ -62,9 +62,11 @@ uv sync --frozen --group judge --group browser
     --release var/releases/candidate --sha256 "$RELEASE_SHA256"
 ```
 
-脚本导入刚校验的镜像，在独立临时 PostgreSQL 和 Docker 网络上运行 Web/worker。Web 的 HTTP 端口仅绑定回环；worker 只连接内部数据库网络。两者非 root、只读根、删除 capabilities、有内存/PID 限额、使用 init 回收进程，不挂宿主目录或 Docker socket。数据库使用独立 owner/Web/worker 角色；凭证通过选择性的运行环境传入，不进入命令行或镜像。
+脚本先执行[真实截图预检](validation.md#准备与运行)，通过后才校验、导入镜像，在独立临时 PostgreSQL 和 Docker 网络上运行 Web/worker。Web 的 HTTP 端口仅绑定回环；worker 只连接内部数据库网络。两者非 root、只读根、删除 capabilities、有内存/PID 限额、使用 init 回收进程，不挂宿主目录或 Docker socket。数据库使用独立 owner/Web/worker 角色；凭证通过选择性的运行环境传入，不进入命令行或镜像。
 
 检查真实启动探针、镜像内策略一致性、Web 不含运行时、浏览器 Run→错误提交→Accepted→路径/历史→删除、真实任务的暂停/超时保持关闭/排空/恢复，以及错误解释器摘要导致启动拒绝。结束清理容器、网络和显式标记的数据库卷，另查卷是否已消失，才输出 `test-results/release-acceptance.json` 和受限日志。它检查当前协议的打包核心功能；生产设置/TLS 另按 [HTTPS 验收指南](validation.md)验证。
+
+多次复验时使用 `--output-directory test-results/本次新目录`，目录必须尚不存在。默认输出目录中的旧成功摘要在预检开始前清除，原诊断日志不据此删除；失败的预检不能留下看似属于本次运行的旧通过记录。
 
 ## 激活与恢复
 

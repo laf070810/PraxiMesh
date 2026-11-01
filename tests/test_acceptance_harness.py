@@ -44,6 +44,36 @@ def test_release_browser_environment_disables_inherited_model_and_tls_fixture():
     assert result["PLAYWRIGHT_BROWSERS_PATH"] == "/private/cache"
 
 
+def test_release_rendering_failure_invalidates_old_success_before_docker(tmp_path, monkeypatch):
+    from scripts import release_acceptance
+
+    artifacts = tmp_path / "test-results"
+    artifacts.mkdir()
+    reports = [artifacts / name for name in ("release-acceptance.json", "browser-preflight.json")]
+    for path in reports:
+        path.write_text('{"passed": true}')
+    unrelated = artifacts / "previous-diagnostic.log"
+    unrelated.write_text("preserve earlier evidence")
+
+    def fail_rendering():
+        raise RuntimeError("Synthetic renderer timeout")
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Browser failure must stop before archive work or Docker")
+
+    monkeypatch.setattr(release_acceptance, "ROOT", tmp_path)
+    monkeypatch.setattr(release_acceptance, "preflight", fail_rendering)
+    monkeypatch.setattr(release_acceptance, "verify", forbidden)
+    monkeypatch.setattr(release_acceptance, "docker", forbidden)
+    monkeypatch.setattr(
+        sys, "argv", ["release_acceptance", "--release", "unused", "--sha256", "0" * 64]
+    )
+    with pytest.raises(RuntimeError, match="Synthetic renderer timeout"):
+        release_acceptance.main()
+    assert not any(path.exists() for path in reports)
+    assert unrelated.read_text() == "preserve earlier evidence"
+
+
 @pytest.fixture
 def trusted_owner(monkeypatch):
     """Execute only the harness's fixed Django fixture commands in the test DB."""

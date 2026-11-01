@@ -25,6 +25,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from scripts.production_acceptance import POSTGRES, Client, database_roles  # noqa: E402
 from scripts.release import docker, initial_content_commands, inspect_images, verify  # noqa: E402
+from tests.browser_runtime import preflight  # noqa: E402
 
 
 def runtime_args(name, network, memory, pids):
@@ -142,11 +143,14 @@ def main():
     options = parser.parse_args()
     artifacts = options.output_directory or ROOT / "test-results"
     artifacts.mkdir(parents=True, exist_ok=options.output_directory is None)
+    output_path = artifacts / "release-acceptance.json"
+    preflight_path = artifacts / "browser-preflight.json"
+    output_path.unlink(missing_ok=True)
+    preflight_path.unlink(missing_ok=True)
+    preflight_path.write_text(json.dumps(preflight()) + "\n")
     manifest = verify(options.release, options.sha256)
     docker("image", "load", "--input", str(options.release / "images.tar"), capture_output=True)
     inspect_images(manifest)
-    output_path = artifacts / "release-acceptance.json"
-    output_path.unlink(missing_ok=True)
     token = uuid.uuid4().hex[:12]
     network, pg, web, worker = [
         f"praximesh-release-{token}-{role}" for role in ["net", "pg", "web", "worker"]

@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from browser_community import launch_arguments
+from browser_runtime import launch_chromium
 from playwright.sync_api import expect, sync_playwright
 
 
@@ -27,7 +28,7 @@ def main():
     created = False
     errors = []
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(args=arguments)
+        browser = launch_chromium(playwright, args=arguments)
         context = browser.new_context(locale="en-US", accept_downloads=True)
         page = context.new_page()
         page.on("pageerror", lambda error: errors.append(type(error).__name__))

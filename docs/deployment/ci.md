@@ -10,9 +10,9 @@
 | 发布状态、激活与中断恢复 | [deploy.yml](../../.github/workflows/deploy.yml) | 专用 `self-hosted, linux, x64, praximesh-deploy` runner，访问预装协调器和目标站点配置 |
 | 原生代码隔离验收 | [sandbox.yml](../../.github/workflows/sandbox.yml) | 可销毁的 `praximesh-judge` 节点；只运行已审查代码，当前仅为 gVisor Python 适配器检查 |
 
-GPU 评测 worker 是接收学员提交的产品服务，与 GitHub Actions runner 职责不同。当前已提供默认关闭的宿主 GPU worker 命令；容器部署与完整硬件验收尚未完成，也没有 GPU 评测工作流，见 [GPU 接入准备](gpu.md)。
+GPU 评测 worker 是接收学员提交的产品服务，与 GitHub Actions runner 职责不同。当前已提供默认关闭的宿主及[容器 worker 开发入口](container-gpu-worker.md)；完整硬件和 GPU 部署升级仍未验收，也没有 GPU 评测工作流，见 [GPU 接入准备](gpu.md)。
 
-远端已配置为 `git@github.com:laf070810/PraxiMesh.git`，默认分支 `main`。2026-10-31 通过公开 API 复核，远端提交 `d2c6560825211d60dd48c742e470ab188d69e612` 的两项工作流均已结束：
+远端已配置为 `git@github.com:laf070810/PraxiMesh.git`，默认分支 `main`。2026-11-02 再次通过公开 API 复核，远端仍为 `d2c6560825211d60dd48c742e470ab188d69e612`，该提交的两项工作流均已结束：
 
 | 工作流 | 最终结果与范围 |
 | --- | --- |
@@ -20,6 +20,8 @@ GPU 评测 worker 是接收学员提交的产品服务，与 GitHub Actions runn
 | [真实 WASI 验收](https://github.com/laf070810/PraxiMesh/actions/runs/41002028143) | `failure`，失败步骤为 `Import and exercise the packaged release` |
 
 失败注释只有退出码 1，公开作业日志下载接口本次返回 403，尚未取得详细错误，不能据此判断是构建、部署还是浏览器问题。维护者可登录 GitHub 查看该步骤和 `real-wasi-acceptance` 报告，再按实际失败修复并重放。其他依赖 PR 或分支成功不能替代此提交的完整验收；这些历史作业也不覆盖随后未推送的本地增量。本次复核没有触发工作流、推送代码或改动 runner。
+
+本地重放同一入口时发现并修复了独立的无头浏览器桌面环境问题，详见 [G61](../acceptance-g61.md)；尚不能确认它与远端旧作业同因。当前应用浏览器 job 和 WASI job 均先执行实际截图预检，WASI 在构建解释器前检查渲染能力。源码浏览器通过后仍须完成冻结发布包与托管复验，不能将这个预检当作完整 CI 成功。
 
 ## 先选择 runner 的权限边界
 

@@ -19,6 +19,7 @@ from browser_community import (
     register,
     submit,
 )
+from browser_runtime import launch_chromium
 from playwright.sync_api import expect, sync_playwright
 
 
@@ -113,7 +114,7 @@ def main():
     receipt = {"passed": False, "https": base.startswith("https://"), "phase": "startup"}
     accounts = []
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(args=arguments)
+        browser = launch_chromium(playwright, args=arguments)
         try:
             accounts = [
                 {

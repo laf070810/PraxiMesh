@@ -15,6 +15,7 @@ import uuid
 from pathlib import Path
 
 from browser_community import launch_arguments
+from browser_runtime import launch_chromium
 from playwright.sync_api import expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -56,7 +57,7 @@ def main():
         tempfile.TemporaryDirectory(prefix="praximesh-practice-") as temporary,
         sync_playwright() as playwright,
     ):
-        browser = playwright.chromium.launch(args=arguments)
+        browser = launch_chromium(playwright, args=arguments)
         context = browser.new_context(locale="zh-CN", accept_downloads=True)
         page = context.new_page()
         page.on("pageerror", lambda error: errors.append(type(error).__name__))

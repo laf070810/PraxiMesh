@@ -104,6 +104,7 @@
 - GPU worker 生命周期在 `core/gpu_worker.py`，命令与配置统一见 [GPU 指南](docs/deployment/gpu.md#gpu-worker)。每次进程启动完整重检，领取和结算在设备身份行锁下核对当前凭证。信号处理器只设置标志；退出沿原服务实例清理、撤销就绪并保留尚未恢复的预约。取消后恢复前后均核对原预约，正常到期才可完整续检，损坏或身份变化不能当续期处理。修改后验证真实 PostgreSQL 竞争及自有子进程信号；不以运行时替身证明 CUDA 或容器化部署成功。
 - GPU 持久成绩在 `core/gpu_evidence.py`，复用 `core/result_evidence.py` 的私有学习入口。按保存的版本化配置验证历史环境和摘要，不把旧执行摘要强制改为当前代码；既有 `PROFILES` 定义不可改写。GPU 正确性全部通过后重复批次仍可能失败，正式性能必须来自完整正确 Submit 的控制器采样。页面与导出只用已验证反馈，GPU 整卡秒数不能显示为 CPU 调用单位。真实浏览器检查入口见 [GPU 成绩展示](docs/deployment/gpu.md#gpu-results)；合成数据库和计时只证明展示与状态，不能签发运行凭证或声称 GPU 性能通过。
 - 浏览器、HTTPS、发布包和升级用现有 `scripts/*acceptance.py` 入口。使用一次性数据库、合成账号和明确属于本次测试的容器/卷；默认使用回环地址，按用户明确要求验证直接 IP 访问时使用独立测试端口。完成后核对清理，不删除未知资源。源码浏览器通过 `BROWSER_ARTIFACTS` 分开保存每轮日志、截图和报告；旧发布包的编辑器契约由已验证的当前代清单决定，新版仍须验证 CodeMirror，不能用自动 textarea 回退掩盖加载失败。
+- 无头 Chromium 统一通过 `tests/browser_runtime.py` 启动，只对浏览器子进程移除显示连接与 D-Bus 会话环境，保留调用者环境、缓存路径及原 TLS 参数。长时验收前运行 `python -m tests.browser_runtime`，实际截图成功才算渲染就绪；不能仅凭浏览器启动成功、延长超时或跳过截图宣称通过。发布验收的预检失败须在 Docker 操作前结束，并清除本轮入口的旧成功摘要。
 - Compose 单机入口为 `core/selfhost.py`，复用 `core/preview.py` 的原子数据库初始化；默认包括真实 WASI worker，可选 `compose.ai.yaml` 启动本地模型。修改时重放 `python3 scripts/compose_acceptance.py`；涉及模型或界面时使用 `--ai --browsers`。核对真实探针与七种题型、worker 离线关闭提交、直接 IP/CSRF、初始化恢复、旧内容不重导及成绩/会话跨重建保留。不得用旧 receipt 或宿主缓存代替镜像内自检。此入口不替代生产发布协调器。
 - 重型 WASI/worker 验收按资源预算串行安排，避免争用造成假超时。长进程须跟踪原进程或工具句柄；观察超时不代表进程结束，不据此重复启动。
 - 验收派生镜像仅改变自有测试对象；删除临时镜像使用 `--no-prune`，并核对原固定基镜像仍存在，避免 Docker 连带清掉未打标签的原镜像缓存。不得覆盖原发布归档或未知镜像标签。

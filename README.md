@@ -65,6 +65,7 @@ docker compose -f compose.yaml -f compose.ai.yaml up --build -d
 ```sh
 uv sync --frozen --group browser
 .venv/bin/playwright install chromium
+.venv/bin/python -m tests.browser_runtime
 .venv/bin/python scripts/browser_acceptance.py
 ```
 
