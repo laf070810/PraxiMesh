@@ -149,6 +149,8 @@ export PRAXIMESH_DEPLOYMENT_TOKEN="$(python3 -c 'import uuid; print(uuid.uuid4()
 
 管理命令或所属容器的启动/停止失败时，协调器在私有状态目录保存 `control-failure-<UUID>.json`，文件为 0600。其中记录命令类别、退出码和脱敏后的 stdout/stderr 尾部，每路最多 64 KiB、整个文件最多 1 MiB；常规错误只给文件名定位。恢复失败也会在原部署日志记录失败阶段与诊断文件名，保留当前数据库和恢复阶段。日志不记录命令行或环境，已知配置凭证会被替换，但它仍是仅供部署维护者读取的内部诊断，不应作为公开 CI artifact 上传。诊断无法落盘时，原有控制容器清理和恢复流程仍会执行。
 
+已确认的 RootlessKit 端口冲突恢复缺口见 [G43](../acceptance-g43.md)：同容器重试可能显示 running，但没有发布端口且 HTTP 不可用。诊断须同时核对实际 `NetworkSettings.Ports` 和 HTTP；这一状态继续保持维护模式及已曝光数据库，不能按容器运行状态判定恢复成功。
+
 候选或恢复后的版本完成实际隔离探针、健康检查和功能验证后，用原 token 恢复：
 
 ```sh

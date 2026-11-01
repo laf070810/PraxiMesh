@@ -1,6 +1,6 @@
 # G43：GPU 发布协调的原节点绑定
 
-日期：2026-11-01。状态：节点绑定与无设备中断验收通过，CPU 完整演练在切换后恢复失败，定向诊断正在进行；GPU 代际激活与真实升级未完成。设计见 [RFC-022](rfcs/022-gpu-release-coordination.md)、[ADR-059](adr/059-gpu-deployment-attachment.md)，操作集中在[节点绑定指南](deployment/container-gpu-worker.md#coordinator-binding)。本轮没有读取或映射 GPU。
+日期：2026-11-01。状态：节点绑定、无设备中断检查和正常单代 CPU 恢复通过；完整 CPU 演练发现 RootlessKit 端口冲突，冲突后的恢复仍未通过。GPU 代际激活与真实升级未完成。设计见 [RFC-022](rfcs/022-gpu-release-coordination.md)、[ADR-059](adr/059-gpu-deployment-attachment.md)，操作集中在[节点绑定指南](deployment/container-gpu-worker.md#coordinator-binding)。本轮没有读取或映射 GPU。
 
 ## 已实现与验证
 
@@ -24,8 +24,14 @@
 
 第三轮 `test-results/g43-cpu-coordinator-final/` 通过真实 HTTPS 评测和社区流程、代理 SIGKILL 后恢复、正常代际替换，以及切换前 SIGKILL 后返回上一代；备份核对 58 张表、33 个序列、531 行。第四代实际曝光并产生写入后，`recover` 在服务停止后的流程返回通用 `DeploymentError`，原操作记录只有 `recovering_current`、没有失败详情。随后只读查询故障窗口内的用户 Docker 服务日志，精确匹配到本次 Web 容器：RootlessKit 重启绑定 `127.0.0.1:32830` 时返回 `bind: address already in use`；四条相关记录保存在 `owned-web-daemon-failure.json`。端口占用方未确认，这轮不计作完整恢复通过。最终 `cleanup.passed=true`，本次容器、网络、数据库卷和本地进程已清理；未修改共享 daemon 或其他服务。
 
-已补齐恢复失败阶段记录、所属容器启动/停止的脱敏私有诊断，以及验收清理前对所指诊断文件的有界保留。新增独立单代 `--recovery-only` 入口，范围与命令集中在[恢复复验](deployment/production.md#复验)。首次组件运行的三个旧夹具缺少新参数，原失败见 `g43-recovery-diagnostics.xml`；补齐后 123 项通过，1 项实际 PostgreSQL 权限检查因本轮使用 SQLite 跳过。扩大后的当前相关集合为 374 项通过、同一项跳过，见 `g43-components-diagnostic.xml`；当前协调器的九项真实无设备绑定复验通过，见 `g43-attachment-current/result.json`。单代真实复现位于 `g43-recovery-diagnostic/`，尚未完成；新增诊断本身不作为原恢复故障已修复的证据。
+已补齐恢复失败阶段记录、所属容器启动/停止的脱敏私有诊断，以及验收清理前对所指诊断文件的有界保留。新增独立单代 `--recovery-only` 入口，范围与命令集中在[恢复复验](deployment/production.md#复验)。首次组件运行的三个旧夹具缺少新参数，原失败见 `g43-recovery-diagnostics.xml`；补齐后 123 项通过，1 项实际 PostgreSQL 权限检查因本轮使用 SQLite 跳过。扩大后的当前相关集合为 374 项通过、同一项跳过，见 `g43-components-diagnostic.xml`；当前协调器的九项真实无设备绑定复验通过，见 `g43-attachment-current/result.json`。
+
+`test-results/g43-recovery-diagnostic/deployment-acceptance.json` 的正常单代恢复通过：原数据库、写入和删除状态保留，恢复后真实 HTTPS 提交 Accepted，自有资源与本地进程清理完成。这一轮没有触发端口冲突，没有注入进程故障或测试 schema 升级，不能替代失败的完整矩阵。
+
+随后使用同一可信 F Web 镜像中的固定 CPU HTTP 服务、合成协调器身份和自有 socket 进行定向调查，没有数据库、学员代码或 GPU。`g43-port-conflict-probe/` 的自动端口实验未触发冲突，结果为失败；`g43-port-conflict-fixed/` 用固定自有端口复现同一 RootlessKit 错误，但释放端口后直接重启缺少发布映射。`g43-port-conflict-state/` 再次确认：原 `HostConfig.PortBindings` 保留，失败后 `NetworkSettings.Ports` 为空；重试后的同一容器为 running，连续 20 次观察仍无发布映射，HTTP 不可用。三次探针均已清理自有容器和网络，原始失败、状态与 0600 诊断保留。尚未加入自动重试或替换容器，不能用 running 状态掩盖这个恢复缺口。
 
 ## 继续完成的范围
 
-当前 `apply` 仍在服务或数据库变更前拒绝四镜像 GPU 激活。下一步是把每代私有 worker 配置与对应数据库持久绑定，接通原任务清理、排空、候选完整启动、GPU 正确/错误队列及曝光前后恢复；这些不以本次文件/daemon 检查替代。真实 GPU 设备读取、映射、完整启动和升级验收继续等待明确授权及独占条件，完整 PRD 目标保持未完成。
+先完成 RootlessKit 端口失败后的原数据库恢复，再重放完整 CPU 中断及 worker 重启矩阵。当前汇总 `test-results/g43-local-status.json` 明确将完整 CPU 恢复和完整 PRD 标为未通过；483 个相关本地文档链接已核对。
+
+当前 `apply` 仍在服务或数据库变更前拒绝四镜像 GPU 激活。后续把每代私有 worker 配置与对应数据库持久绑定，接通原任务清理、排空、候选完整启动、GPU 正确/错误队列及曝光前后恢复；这些不以本次文件/daemon 检查替代。真实 GPU 设备读取、映射、完整启动和升级验收继续等待明确授权及独占条件，完整 PRD 目标保持未完成。
