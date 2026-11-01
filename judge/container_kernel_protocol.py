@@ -8,7 +8,12 @@ from judge.container_devices import validate_selection
 from judge.driver_artifacts import manifest_digest
 from judge.gpu_artifacts import RUNSC_SHA256
 from judge.gpu_kernel_checks import check_request
-from judge.gpu_task_protocol import task_request, validate_result, validate_target
+from judge.gpu_task_protocol import (
+    public_task_request,
+    task_request,
+    validate_result,
+    validate_target,
+)
 from judge.sandbox import SandboxUnavailable
 
 PROTOCOL = "praximesh-container-kernel-v1"
@@ -56,7 +61,12 @@ def validate_request(value):
         raise ValueError("Unexpected kernel check request")
     if type(value) is not dict or set(value) != {"event", "source", "problem", "mode"}:
         raise ValueError("Unexpected kernel task request")
-    if value != task_request(value["problem"], value["source"], value["mode"]):
+    expected = (
+        public_task_request(value["problem"], value["source"])
+        if value["event"] == "execute-public"
+        else task_request(value["problem"], value["source"], value["mode"])
+    )
+    if value != expected:
         raise ValueError("Unexpected kernel task data")
     return value
 
@@ -93,6 +103,9 @@ def checked_completion(value, request, *, target=None, selection=None):
     fields = {"event", "protocol", "recovered", "cleanup", "ready"}
     maintenance = request["event"] == "recover"
     check = request["event"] in {"check-kernel", "check-resources"}
+    public = request["event"] == "execute-public"
+    if public:
+        fields.add("formal_result")
     if check:
         fields.add("report")
     elif not maintenance:
@@ -104,6 +117,7 @@ def checked_completion(value, request, *, target=None, selection=None):
         or value["protocol"] != PROTOCOL
         or value["recovered"] is not True
         or value["ready"] is not False
+        or (public and value["formal_result"] is not False)
         or value["cleanup"] != expected_cleanup(request)
         or any(
             item.get(key) is not True for item in value["cleanup"] for key in ("stopped", "removed")

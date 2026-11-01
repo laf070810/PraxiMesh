@@ -26,7 +26,7 @@ from judge.driver_artifacts import manifest_digest, validate_manifest
 from judge.gpu_execution_contract import canonical_digest
 from judge.gpu_kernel_checks import check_request
 from judge.gpu_policy import execution_digest
-from judge.gpu_task_protocol import task_request
+from judge.gpu_task_protocol import public_task_request, task_request
 from judge.sandbox import SandboxUnavailable
 
 
@@ -135,6 +135,24 @@ class ContainerGPUAdapter:
             on_begin=lambda: None,
         )
         return deepcopy(self.environment)
+
+    def evaluate_public(self, task, *, deadline, problem, source, on_tick, on_begin):
+        """Internal local-practice path; caller must establish full device readiness."""
+        completed = self.exchange(
+            task,
+            public_task_request(problem, source),
+            deadline=deadline,
+            on_tick=on_tick,
+            on_begin=on_begin,
+        )
+        if completed.get("formal_result") is not False:
+            raise SandboxUnavailable("Public GPU execution cannot return a formal result")
+        return {
+            "scope": "Local public examples only; no server progress or performance score.",
+            "formal_result": False,
+            "result": deepcopy(completed["result"]),
+            "environment": deepcopy(self.environment),
+        }
 
     def check_kernel(self, task, name, *, deadline, on_tick):
         completed = self.exchange(

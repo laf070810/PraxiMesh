@@ -12,6 +12,20 @@ def evaluate_kernel(problem, source, mode, session):
     validate_problem(problem)
     if mode not in {"run", "submit"} or session.mode != mode:
         raise ValueError("Unknown GPU evaluation mode")
+    return _evaluate(problem, source, mode, session)
+
+
+def evaluate_public_kernel(problem, source, session):
+    """Public examples use the same trusted comparison, without Submit timing."""
+    from judge.gpu_task_protocol import public_task_request
+
+    public_task_request(problem, source)
+    if session.mode != "run":
+        raise ValueError("Public GPU examples require a Run session")
+    return _evaluate(problem, source, "run", session)
+
+
+def _evaluate(problem, source, mode, session):
     cases = [case for case in problem["tests"] if mode == "submit" or case["public"]]
     result = {"passed": 0, "total": len(cases), "public_cases": []}
     verdict = "accepted"

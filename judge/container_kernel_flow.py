@@ -8,7 +8,7 @@ from judge.container_kernel_protocol import PROTOCOL, checked_completion, valida
 from judge.container_lifecycle import LABEL as FAULT_LABEL
 from judge.container_lifecycle import arm_fault
 from judge.controller_faults import trigger_fault
-from judge.gpu import evaluate_kernel
+from judge.gpu import evaluate_kernel, evaluate_public_kernel
 from judge.gpu_recovery_kernel import recover_device, verify_device_session
 from judge.gpu_session import GPUExecutionError
 from judge.gpu_task_protocol import CLEANUP_MARGIN, RECOVERY_MARGIN
@@ -54,8 +54,12 @@ def serve_kernel(channel, runtime, identity):
                 with runtime.kernel_session(
                     "task", mode=request["mode"], on_tick=execution_tick
                 ) as session:
-                    result = evaluate_kernel(
-                        request["problem"], request["source"], request["mode"], session
+                    result = (
+                        evaluate_public_kernel(request["problem"], request["source"], session)
+                        if request["event"] == "execute-public"
+                        else evaluate_kernel(
+                            request["problem"], request["source"], request["mode"], session
+                        )
                     )
         # The task guest has stopped before an independently compiled correct
         # recovery guest is created. A raw runtime error cannot stand in for it.
@@ -75,6 +79,8 @@ def serve_kernel(channel, runtime, identity):
             completed["report"] = report
         elif not maintenance:
             completed["result"] = result
+            if request["event"] == "execute-public":
+                completed["formal_result"] = False
         checked_completion(
             completed,
             request,

@@ -8,6 +8,7 @@
 - [完整 PRD 需求追踪](requirements.md) — 全目标实施中，当前 F 自部署制品及版本题目反馈已验证
 - [RFC-024：本地 CUDA 练习工具](rfcs/024-local-cuda-practice.md) — 无设备隔离编译已接入；完整本地 GPU 运行仍待实现和验收
 - [ADR-073：本地 CUDA 编译复用无设备隔离任务](adr/073-local-device-free-cuda-compilation.md)
+- [ADR-074：本地公开样例使用独立 GPU 任务协议](adr/074-public-only-gpu-task-protocol.md) — 命令与完整启动接入待完成
 - [G63：本地 CUDA 无设备编译与恢复](acceptance-g63.md) — 真实编译、CLI 中断恢复与源码交付；不访问 GPU
 - [RFC-022：GPU 发布协调与原数据库恢复](rfcs/022-gpu-release-coordination.md) — 实施中
 - [ADR-059：GPU 协调器绑定原节点身份](adr/059-gpu-deployment-attachment.md)

@@ -19,9 +19,10 @@ from judge.container_journal import ContainerJournal, PersistentRuntimeService  
 from judge.container_kernel_protocol import checked_completion  # noqa: E402
 from judge.container_runtime_service import SOURCES, contract_digest  # noqa: E402
 from judge.container_service import LocalEngine  # noqa: E402
+from judge.gpu_contract import project_public_problem  # noqa: E402
 from judge.gpu_device_lock import DeviceLock  # noqa: E402
 from judge.gpu_kernel_checks import check_request  # noqa: E402
-from judge.gpu_task_protocol import task_request  # noqa: E402
+from judge.gpu_task_protocol import public_task_request, task_request  # noqa: E402
 from judge.sandbox import SandboxUnavailable  # noqa: E402
 from scripts.container_journal_acceptance import save  # noqa: E402
 from scripts.container_kernel_fixture import IDENTITY  # noqa: E402
@@ -54,6 +55,17 @@ def problem():
 
 
 def request_for(test_mode):
+    if test_mode.startswith("public"):
+        request = public_task_request(
+            project_public_problem(problem()), "Opaque CPU fixture data, never compiled"
+        )
+        if test_mode == "public-protected":
+            request["problem"]["tests"].append(problem()["tests"][-1])
+        elif test_mode == "public-submit":
+            request["mode"] = "submit"
+        elif test_mode != "public":
+            raise ValueError("Unknown public CPU fixture scenario")
+        return request
     if test_mode == "recover":
         return {"event": "recover"}
     if test_mode == "check-resources":
@@ -114,6 +126,8 @@ def scenario(engine, image, path, mode, test_mode):
                 if mode in {"recovery-fail", "hang"} or test_mode in {
                     "invalid",
                     "check-unexpected",
+                    "public-protected",
+                    "public-submit",
                 }:
                     try:
                         channel.receive()
@@ -140,6 +154,9 @@ def scenario(engine, image, path, mode, test_mode):
                         assert ("performance" in value["result"]) == (
                             test_mode == "submit" and expected == "accepted"
                         )
+                        if test_mode == "public":
+                            assert value["formal_result"] is False
+                            assert value["result"]["total"] == 1
                         row["verdict"] = expected
                     channel.send({"event": "finish"})
                     connection.finish()
@@ -148,7 +165,7 @@ def scenario(engine, image, path, mode, test_mode):
                 row["controller"] = controller
                 assert controller["gpu_executed"] is False and controller["fixture_only"] is True
                 assert controller["passed"] == (not row.get("result_withheld", False))
-                if test_mode == "invalid":
+                if test_mode in {"invalid", "public-protected", "public-submit"}:
                     assert not controller["cleanup"]
                 if mode == "recovery-fail":
                     assert "correctness recovery failed" in controller["failure"]
@@ -222,6 +239,15 @@ def main():
             ("recovery-fail", "run"),
             ("hang", "run"),
             ("normal", "invalid"),
+            ("normal", "public"),
+            ("wrong-answer", "public"),
+            ("syntax-error", "public"),
+            ("runtime-error", "public"),
+            ("recovery-fail", "public"),
+            ("hang", "public"),
+            ("normal", "public-protected"),
+            ("normal", "public-submit"),
+            ("normal", "public"),
             ("normal", "recover"),
             ("normal", "check-public-run"),
             ("wrong-answer", "check-vector-subtraction"),

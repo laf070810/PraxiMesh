@@ -50,6 +50,20 @@ def task_request(problem, source, mode):
     }
 
 
+def public_task_request(problem, source):
+    """Local examples cannot become Submit or smuggle private/execution fields."""
+    validate_problem(problem, public_only=True)
+    if set(problem) != set(PROBLEM_FIELDS):
+        raise ValueError("A public GPU task must contain only its execution fields")
+    compile_request(source, problem["operation"])
+    return {
+        "event": "execute-public",
+        "mode": "run",
+        "source": source,
+        "problem": copy.deepcopy(problem),
+    }
+
+
 def validate_result(result, problem, mode, *, profile=None):
     """Even trusted IPC returns only bounded learner-visible result fields."""
     profile = PROFILE if profile is None else profile
