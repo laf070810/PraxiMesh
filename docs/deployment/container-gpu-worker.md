@@ -223,6 +223,22 @@ GPU 数据库冻结持有排空锁，直到 runtime 连接权限撤销和现有�
 
 当前验证范围见 [G51](../acceptance-g51.md)。停止/冻结调用点已衔接，完整 GPU apply、候选失败回滚与曝光后恢复仍在开发，公共 GPU 激活继续关闭；不能从内部组件检查推断真实部署成功。
 
+<a id="candidate-preparation"></a>
+### 协调器内部的连续候选准备
+
+`scripts/deploy_gpu_candidate.py` 将配置发布、Web/CPU 服务、固定预检、GPU worker 启动、CPU/GPU 就绪和两类队列验证连接为可中断流程。候选库须已完成迁移、最小权限及本操作暂停；升级时还须先完成原库排空和冻结。每次续跑重新核验原绝对路径中的冻结制品。准备成功仍保持维护路由和准入暂停，不能直接作为曝光许可。
+
+候选恢复先在原数据库恢复 CPU/GPU worker，确认原 GPU 恢复记录与新启动一致，再清理未完成的旧验证轮次，建立新的准备尝试并重验。清理失败时保留原任务和尝试，不创建新轮；历史不删除。同一操作/发布代最多 16 次准备尝试，启动与提交期限仍属于各自原实例。
+
+不访问实际服务或 GPU 的组合检查：
+
+```sh
+.venv/bin/pytest -q tests/test_deploy_gpu_candidate.py tests/test_deploy_gpu_recovery.py \
+  tests/test_deploy_gpu_check.py tests/test_deploy.py
+```
+
+验证范围见 [G53](../acceptance-g53.md)。目前仍是内部流程，没有完整 GPU apply/回退/曝光命令；实际 Docker、PostgreSQL 和 GPU 需要另行验收。
+
 <a id="candidate-verification"></a>
 ### 协调器内部的候选队列检查
 

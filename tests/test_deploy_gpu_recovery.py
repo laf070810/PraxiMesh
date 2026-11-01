@@ -388,6 +388,7 @@ def test_later_recovery_of_a_confirmed_stopped_instance_keeps_both_attempts(reco
         "gpu_runtime",
         "gpu_recoveries",
         "gpu_candidate_checks",
+        "gpu_preparations",
         "gpu_workers",
         "gpu_checks",
     ],

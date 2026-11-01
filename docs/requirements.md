@@ -53,6 +53,8 @@
 
 ## 分批结果
 
+- 2026-11-02 R-09/16 连续 GPU 候选准备：配置发布、服务、固定预检、GPU 启动与 CPU/GPU 队列检查已串接；恢复在原库完成旧轮清理后建立新尝试，保留全部历史和维护状态。阶段中断、就绪与设备/运行契约绑定见 [G53](acceptance-g53.md)。完整 apply、曝光与回退、GPU→CPU 仍需连接，实际 Docker/PostgreSQL/GPU 验收未执行。
+
 - 2026-11-02 R-09/16 GPU 恢复后验证轮次：原 worker 新启动可在旧轮已验证/清理后重新验证；同一启动继续原轮次和原期限，清理绑定精确轮次。协议 v2、历史保留及轮次边界见 [G52](acceptance-g52.md)；GPU、Docker、成绩为测试模型，完整候选准备与发布/回退仍需继续实施。
 
 - 2026-11-02 R-09/16 GPU 原代停机与冻结：停止/冻结调用点区分 CPU 与 GPU，先排空、停止原 GPU worker，再持原设备锁复查并停止 Web/CPU worker；GPU 排空事务持续到 runtime CONNECT 撤销及会话终止，仅临时保留本次精确 owner 后端，最终无会话才确认。文件锁、五处实际 CPU 协调器 SIGKILL、SQL/Docker 模型及未执行的 PostgreSQL 专项见 [G51](acceptance-g51.md)。完整 GPU apply、候选失败回退、曝光后恢复与真实硬件验收仍未完成。

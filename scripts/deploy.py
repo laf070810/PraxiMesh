@@ -742,6 +742,19 @@ class Deployment:
         if generation:
             self.database.freeze(generation["database"])
 
+    def prepare_candidate(self, generation, release, *, recover=False):
+        """Prepare an already migrated/paused generation; do not expose it."""
+        if "gpu" in generation["manifest"]:
+            from scripts.deploy_gpu_candidate import GPUGenerationPreparation
+
+            preparation = GPUGenerationPreparation(self, generation, release)
+            return preparation.recover() if recover else preparation.run()
+        if recover:
+            raise DeploymentError("CPU candidate recovery belongs to the existing release flow")
+        self.service(generation, "web")
+        self.service(generation, "worker")
+        self.check(generation, self.state["operation"]["id"])
+
     def require_cpu_lifecycle(self, manifest=None):
         """Until full GPU coordination is connected, CPU paths cannot retire its state."""
         state = self.state or {}
@@ -754,6 +767,7 @@ class Deployment:
             or state.get("gpu_runtime")
             or state.get("gpu_recoveries")
             or state.get("gpu_candidate_checks")
+            or state.get("gpu_preparations")
             or state.get("gpu_workers")
             or state.get("gpu_checks")
         ):
@@ -851,9 +865,7 @@ class Deployment:
             self.database.invalidate_health(candidate["database"])
             self.control(candidate, "judge_admission", "pause", "--token", token)
             self.save("validating")
-            self.service(candidate, "web")
-            self.service(candidate, "worker")
-            self.check(candidate, token)
+            self.prepare_candidate(candidate, release)
             self.expose(candidate, token)
         except Exception as error:
             phase = self.state["operation"]["phase"]

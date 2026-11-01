@@ -24,6 +24,8 @@
 - [G51：GPU 原代停机与数据库冻结](acceptance-g51.md) — 实际文件锁/进程与数据库模型；真实 PostgreSQL 和完整 GPU 发布待验收
 - [ADR-068：候选验证按原启动实例分轮](adr/068-gpu-candidate-verification-rounds.md)
 - [G52：GPU 恢复后的独立候选验证轮次](acceptance-g52.md) — 原任务重试与轮次隔离；真实 GPU 验收待完成
+- [ADR-069：可中断恢复的 GPU 候选准备](adr/069-recoverable-gpu-candidate-preparation.md)
+- [G53：GPU 候选准备与原库恢复串接](acceptance-g53.md) — 连续流程及实际 CPU 进程中断；整站 GPU 发布仍未开放
 - [RFC-023：恢复时重建无状态 Web 容器](rfcs/023-web-container-recovery.md) — 已实施，真实复验待完成
 - [ADR-060：在原数据库恢复中重建无状态 Web](adr/060-web-container-recovery.md)
 - [G44：无状态 Web 持久重建的验证范围](acceptance-g44.md)
