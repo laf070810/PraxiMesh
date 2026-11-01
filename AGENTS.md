@@ -27,6 +27,7 @@
 - `content_import` 是发布动作，会撤回官方全量包中缺失的内容。只在新建或明确授权的数据库导入示例包。应用升级默认保留现有目录；不自动覆盖维护者或组织的内容。
 - 数据库结构变化追加迁移，保留已交付迁移文件。新增表/应用时核对 `scripts/deploy_database.py` 的角色权限、`scripts/release.py` 的源码范围和 `Dockerfile` 的复制范围；Web/worker 不获得全表权限来规避授权错误。
 - 发布包不可原地改写。新控制器必须能校验需要升级的旧制品；新增开发文档不得无意变成旧清单的必填项。schema 升级、失败恢复和内容发布分别说明验证范围。
+- GPU 发布使用同一冻结源码的四镜像 format 2，默认 CPU format 1 保持兼容。构建与核验在 `scripts/release.py`、`scripts/release_gpu.py`；有序源码契约从归档字节计算，导入前核对完整镜像层、角色和入口，不能执行归档代码或借用当前工作树/daemon 缓存。按[发布指南](docs/deployment/releases.md#gpu-release)串行验证导入后的无设备 worker 和 CPU 应用。制品通过不代表 GPU 激活或升级通过；未接入完整 GPU 生命周期的协调器必须拒绝激活。
 - 界面字符串使用 Django 翻译，维护 `.po` 和编译后的 `.mo`；内容译文绑定准确的源版本。缺少译文明确回退，不能借用另一版本文本。
 - 编辑器源码在 `frontend/`，按 [编辑器指南](docs/editor.md)更新 npm 锁文件、预构建静态资源和许可证；不能只改源码而遗留旧 bundle。保留 textarea 回退、私有草稿、异步修订保护及 CSP nonce，分析工具不得执行源码或外发代码。界面改动用 `scripts/browser_acceptance.py --interface` 验证中英、多种宽度、键盘操作与失败回退。
 - 标题、列表、表单与选项须共用页面边距。无独立页头的内容页继承 `workspace_base.html`；带 `.page-heading` 的正文使用 `.section.compact`，避免正文直接落在无边距的 main 下。布局检查应比较正文和标题的实际起点，并包含 320 像素手机页、多行标题及两种 Django 复选框结构，不能只检查横向溢出。

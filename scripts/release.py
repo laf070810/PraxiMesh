@@ -16,6 +16,7 @@ import sys
 import tarfile
 import tempfile
 import uuid
+from contextlib import ExitStack
 from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -194,10 +195,21 @@ def docker(*args, **kwargs):
     return subprocess.run(["docker", *args], check=True, timeout=900, **kwargs)
 
 
-def inspect_images(manifest):
+def inspect_images(manifest, *, runner=None):
+    runner = runner or docker
     for role, expected in manifest["images"].items():
-        output = docker("image", "inspect", expected, capture_output=True).stdout
+        output = runner("image", "inspect", expected, capture_output=True).stdout
         info = json.loads(output)[0]
+        if role in {"gpu_worker", "gpu_task"}:
+            from scripts.release_gpu import check_image
+
+            if info["Id"] != expected or info["Architecture"] != "amd64" or info["Os"] != "linux":
+                raise ReleaseError("GPU image identity or platform mismatch")
+            try:
+                check_image(role, info["Config"], manifest["gpu"])
+            except ValueError as error:
+                raise ReleaseError(str(error)) from None
+            continue
         labels = info["Config"].get("Labels") or {}
         required = {
             "org.praximesh.source": manifest["source_id"],
@@ -218,15 +230,22 @@ def inspect_images(manifest):
             raise ReleaseError("Image evaluation artifact configuration mismatch")
 
 
-def build(bundle, bundle_sha256, output):
+def build(bundle, bundle_sha256, output, *, gpu=None):
     if output.exists():
         raise ReleaseError("Refusing to overwrite a release")
+    if gpu is not None:
+        from scripts.release_gpu import check_engine
+
+        check_engine(gpu, docker)
     bundle_info = WasiSandbox(bundle, bundle_sha256).verify_bundle()
     output.parent.mkdir(parents=True, exist_ok=True)
     logs = ROOT / "test-results"
     logs.mkdir(exist_ok=True)
     log_path = logs / ("release-build-" + uuid.uuid4().hex[:12] + ".log")
-    with tempfile.TemporaryDirectory(prefix=".praximesh-release-", dir=output.parent) as temporary:
+    with (
+        tempfile.TemporaryDirectory(prefix=".praximesh-release-", dir=output.parent) as temporary,
+        ExitStack() as builds,
+    ):
         work = Path(temporary)
         context, package = work / "source", work / "release"
         context.mkdir()
@@ -264,10 +283,29 @@ def build(bundle, bundle_sha256, output):
                     stderr=subprocess.STDOUT,
                 )
                 images[role] = iidfile.read_text().strip()
+        gpu_identity = None
+        if gpu is not None:
+            from scripts.release_gpu import build_images, validate_metadata, verify_contracts
+
+            gpu_logs = log_path.with_suffix(".gpu")
+            gpu_logs.mkdir(mode=0o700)
+            result = builds.enter_context(build_images(context, work, gpu, docker, gpu_logs))
+            if (
+                type(result) is not dict
+                or set(result) != {"images", "gpu"}
+                or set(result["images"]) != {"gpu_worker", "gpu_task"}
+            ):
+                raise ReleaseError("GPU builder returned an unexpected image inventory")
+            gpu_identity = result["gpu"]
+            capture = validate_metadata(gpu_identity, files)
+            verify_contracts(
+                gpu_identity, {name: (context / name).read_bytes() for name in capture}
+            )
+            images.update(result["images"])
         source_archive(context, files, package / "source.tar.gz")
         docker("image", "save", "--output", str(package / "images.tar"), *images.values())
         manifest = {
-            "format": 1,
+            "format": 2 if gpu_identity else 1,
             "platform": "linux/amd64",
             "source_id": source_id,
             "source_files": files,
@@ -283,6 +321,8 @@ def build(bundle, bundle_sha256, output):
                 for name in ["source.tar.gz", "images.tar"]
             },
         }
+        if gpu_identity:
+            manifest["gpu"] = gpu_identity
         (package / "release.json").write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n")
         digest = sha256(package / "release.json")
         verify(package, digest)
@@ -294,8 +334,9 @@ def build(bundle, bundle_sha256, output):
     return digest
 
 
-def verify_source(path, files):
+def verify_source(path, files, *, capture=()):
     seen, size = set(), 0
+    contents = {}
     # Bound decompression before tarfile parses extended/PAX headers as well.
     with gzip.open(path, "rb") as compressed:
         expanded = compressed.read(MAX_SOURCE_ARCHIVE_BYTES + 1)
@@ -315,11 +356,17 @@ def verify_source(path, files):
             if size > MAX_SOURCE_BYTES:
                 raise ReleaseError("Source archive exceeds release size limit")
             with archive.extractfile(member) as data:
-                if hashlib.file_digest(data, "sha256").hexdigest() != files[member.name]:
+                if member.name in capture:
+                    contents[member.name] = data.read()
+                    digest = hashlib.sha256(contents[member.name]).hexdigest()
+                else:
+                    digest = hashlib.file_digest(data, "sha256").hexdigest()
+                if digest != files[member.name]:
                     raise ReleaseError("Archived source content mismatch")
             seen.add(member.name)
     if seen != set(files):
         raise ReleaseError("Source archive is incomplete")
+    return contents
 
 
 def unique_fields(pairs):
@@ -331,19 +378,37 @@ def unique_fields(pairs):
     return result
 
 
-def verify_image_archive(path, images):
+def verify_image_archive(path, images, *, frozen_roles=False):
     """Check configs and layers without relying on an existing daemon layer cache."""
     with tarfile.open(path, "r:") as archive:
+        members = archive.getmembers()
+        if (
+            len(members) > 10000
+            or len({member.name for member in members}) != len(members)
+            or any(
+                PurePosixPath(member.name).is_absolute()
+                or ".." in PurePosixPath(member.name).parts
+                or str(PurePosixPath(member.name)) != member.name.rstrip("/")
+                or not (member.isfile() or member.isdir())
+                for member in members
+            )
+        ):
+            raise ReleaseError("Unsafe or duplicate Docker archive entries")
         member = archive.getmember("manifest.json")
         if not member.isfile() or member.size > 100000:
             raise ReleaseError("Invalid Docker archive manifest")
         with archive.extractfile(member) as stream:
             entries = json.load(stream, object_pairs_hook=unique_fields)
-        if not isinstance(entries, list) or len(entries) != 2:
-            raise ReleaseError("Expected exactly the Web and worker images")
+        if not isinstance(entries, list) or len(entries) != len(images):
+            raise ReleaseError("Docker archive image count differs from the release")
         found = set()
+        configs = {}
         layer_hashes = {}
         for entry in entries:
+            if type(entry) is not dict:
+                raise ReleaseError("Invalid Docker archive manifest entry")
+            if frozen_roles and entry.get("RepoTags") not in (None, []):
+                raise ReleaseError("GPU release archives must not replace mutable image tags")
             name = entry["Config"]
             if PurePosixPath(name).is_absolute() or ".." in PurePosixPath(name).parts:
                 raise ReleaseError("Unsafe Docker image config path")
@@ -352,8 +417,10 @@ def verify_image_archive(path, images):
                 raise ReleaseError("Invalid Docker image config")
             with archive.extractfile(member) as stream:
                 raw = stream.read()
-            found.add("sha256:" + hashlib.sha256(raw).hexdigest())
+            image = "sha256:" + hashlib.sha256(raw).hexdigest()
+            found.add(image)
             config = json.loads(raw, object_pairs_hook=unique_fields)
+            configs[image] = config
             if config["rootfs"]["type"] != "layers" or len(entry["Layers"]) != len(
                 config["rootfs"]["diff_ids"]
             ):
@@ -371,8 +438,9 @@ def verify_image_archive(path, images):
                         )
                 if layer_hashes[layer] != expected:
                     raise ReleaseError("Docker layer content differs from its image config")
-        if found != set(images.values()) or len(found) != 2:
+        if found != set(images.values()) or len(found) != len(images):
             raise ReleaseError("Docker archive image identities differ from the release")
+        return configs
 
 
 def verify(directory, expected_sha256):
@@ -395,10 +463,15 @@ def verify(directory, expected_sha256):
         raise ReleaseError("Release manifest digest mismatch")
     try:
         manifest = json.loads(path.read_text(), object_pairs_hook=unique_fields)
+        if type(manifest) is not dict:
+            raise ReleaseError("Release manifest must be an object")
+        gpu = manifest.get("format") == 2
         if (
             set(manifest)
             != {"format", "platform", "source_id", "source_files", "images", "judge", "payloads"}
-            or manifest["format"] != 1
+            | ({"gpu"} if gpu else set())
+            or type(manifest["format"]) is not int
+            or manifest["format"] not in {1, 2}
             or manifest["platform"] != "linux/amd64"
         ):
             raise ReleaseError("Unsupported release format/platform")
@@ -414,8 +487,12 @@ def verify(directory, expected_sha256):
             or identity(files) != manifest["source_id"]
         ):
             raise ReleaseError("Invalid source inventory")
-        if set(manifest["images"]) != {"web", "worker"} or any(
-            not IMAGE.fullmatch(image) for image in manifest["images"].values()
+        roles = {"web", "worker"} | ({"gpu_worker", "gpu_task"} if gpu else set())
+        if (
+            type(manifest["images"]) is not dict
+            or set(manifest["images"]) != roles
+            or len(set(manifest["images"].values())) != len(roles)
+            or any(not IMAGE.fullmatch(image) for image in manifest["images"].values())
         ):
             raise ReleaseError("Images must be pinned by immutable image ID")
         judge = manifest["judge"]
@@ -440,11 +517,52 @@ def verify(directory, expected_sha256):
                 or sha256(payload) != info["sha256"]
             ):
                 raise ReleaseError("Release payload digest/size mismatch")
-        verify_source(directory / "source.tar.gz", files)
-        verify_image_archive(directory / "images.tar", manifest["images"])
-    except (KeyError, TypeError, OSError, tarfile.TarError, json.JSONDecodeError) as error:
+        capture = ()
+        if gpu:
+            from scripts.release_gpu import validate_metadata, verify_contracts
+
+            capture = validate_metadata(manifest["gpu"], files)
+        contents = verify_source(directory / "source.tar.gz", files, capture=capture)
+        configs = verify_image_archive(
+            directory / "images.tar", manifest["images"], frozen_roles=gpu
+        )
+        if gpu:
+            verify_contracts(manifest["gpu"], contents)
+            verify_archived_roles(manifest, configs)
+    except ReleaseError:
+        raise
+    except (KeyError, TypeError, ValueError, OSError, tarfile.TarError) as error:
         raise ReleaseError("Malformed release artifact") from error
     return manifest
+
+
+def verify_archived_roles(manifest, configs):
+    from scripts.release_gpu import check_image
+
+    for role, image in manifest["images"].items():
+        info = configs[image]
+        if info.get("architecture") != "amd64" or info.get("os") != "linux":
+            raise ReleaseError("Archived image platform mismatch")
+        config = info["config"]
+        if type(config) is not dict:
+            raise ReleaseError("Archived image configuration must be an object")
+        if role in {"gpu_worker", "gpu_task"}:
+            check_image(role, config, manifest["gpu"])
+        else:
+            labels = config.get("Labels") or {}
+            expected = {
+                "org.praximesh.source": manifest["source_id"],
+                "org.praximesh.role": role,
+                "org.praximesh.wasi": manifest["judge"]["bundle_sha256"],
+                "org.praximesh.policy": manifest["judge"]["policy_sha256"],
+            }
+            environment = dict(item.split("=", 1) for item in config.get("Env", []))
+            if (
+                config.get("User") != "65532:65532"
+                or any(labels.get(k) != v for k, v in expected.items())
+                or environment.get("JUDGE_WASI_SHA256") != manifest["judge"]["bundle_sha256"]
+            ):
+                raise ReleaseError("Archived Web/CPU worker role or policy mismatch")
 
 
 def main():
@@ -454,6 +572,18 @@ def main():
     builder.add_argument("--bundle", type=Path, required=True)
     builder.add_argument("--bundle-sha256", required=True)
     builder.add_argument("--output", type=Path, required=True)
+    for name in (
+        "docker-socket",
+        "docker-cli-archive",
+        "runtime-archive",
+        "nvrtc-archive",
+        "management-library-dir",
+    ):
+        builder.add_argument(
+            "--gpu-" + name,
+            type=Path,
+            help="Build the matching GPU release; all five GPU options are required.",
+        )
     for action in ["verify", "load"]:
         command = commands.add_parser(action)
         command.add_argument("--release", type=Path, required=True)
@@ -461,7 +591,24 @@ def main():
     options = parser.parse_args()
     try:
         if options.action == "build":
-            build(options.bundle.resolve(), options.bundle_sha256, options.output.resolve())
+            gpu = {
+                name: getattr(options, "gpu_" + name)
+                for name in (
+                    "docker_socket",
+                    "docker_cli_archive",
+                    "runtime_archive",
+                    "nvrtc_archive",
+                    "management_library_dir",
+                )
+            }
+            if any(gpu.values()) and not all(gpu.values()):
+                raise ReleaseError("Supply all five GPU build options together")
+            build(
+                options.bundle.resolve(),
+                options.bundle_sha256,
+                options.output.resolve(),
+                gpu={k: v.absolute() for k, v in gpu.items()} if any(gpu.values()) else None,
+            )
         else:
             manifest = verify(options.release, options.sha256)
             if options.action == "load":
@@ -473,7 +620,7 @@ def main():
                     {"source_id": manifest["source_id"], "images": manifest["images"]}, indent=2
                 )
             )
-    except (ReleaseError, OSError, subprocess.SubprocessError) as error:
+    except (ValueError, OSError, subprocess.SubprocessError) as error:
         parser.exit(1, f"Release operation failed: {error}\n")
 
 

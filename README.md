@@ -2,7 +2,7 @@
 
 通过真实编程练习学习计算知识：用结构化知识导航找到学习方向，也可以直接筛题、写代码、运行和提交。
 
-当前交付为**已完成本地验收的自部署版本**。默认 Docker Compose 包含真实 CPU/WASI 评测；可选覆盖文件提供本地 CPU AI 辅导。GPU 正式评测仍在开发：宿主与[容器 worker/Compose 入口](docs/deployment/container-gpu-worker.md)、持久成绩及健康准入已接通，默认关闭；完整硬件验收、部署升级及正式题型发布尚未完成。公开运营和项目许可证仍待维护者决定。产品需求见 [PRD.md](PRD.md)，完整范围与未完成项见[需求追踪](docs/requirements.md)。
+当前交付为**已完成本地验收的自部署版本**。默认 Docker Compose 包含真实 CPU/WASI 评测；可选覆盖文件提供本地 CPU AI 辅导。GPU 正式评测仍在开发：宿主与[容器 worker/Compose 入口](docs/deployment/container-gpu-worker.md)、持久成绩及健康准入已接通，默认关闭；可制作包含配套 GPU 镜像的[统一发布包](docs/deployment/releases.md#gpu-release)，完整硬件验收、部署升级及正式题型发布尚未完成。公开运营和项目许可证仍待维护者决定。产品需求见 [PRD.md](PRD.md)，完整范围与未完成项见[需求追踪](docs/requirements.md)。
 
 ## 可以做什么
 

@@ -6,6 +6,8 @@
 
 - [阶段计划与安全发布门槛](plan.md)
 - [完整 PRD 需求追踪](requirements.md) — 全目标实施中，当前 F 自部署制品及版本题目反馈已验证
+- [ADR-058：同一冻结源码的四镜像 GPU 发布制品](adr/058-gpu-release-artifacts.md)
+- [G42 四镜像 GPU 发布制品](acceptance-g42.md)
 - [RFC-006：阶段 B/C 的完整产品实施](rfcs/006-complete-product.md) — 实施中
 - [RFC-007：多语言练习、本地工具、中英界面与公开作品](rfcs/007-b2-practice-and-sharing.md) — B2 本地验收通过
 - [RFC-008：个人博客](rfcs/008-personal-blogs.md)

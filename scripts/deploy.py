@@ -585,6 +585,10 @@ class Deployment:
         }:
             raise DeploymentError("An unfinished deployment requires recover")
         manifest = verify(release, digest)
+        if "gpu" in manifest:
+            raise DeploymentError(
+                "GPU release activation requires the coordinated GPU lifecycle; artifact import alone is insufficient"
+            )
         self.run("image", "load", "--input", str(release / "images.tar"), timeout=900)
         inspect_images(manifest)
         self.proxy.probe()

@@ -35,9 +35,23 @@ from scripts.production_acceptance import POSTGRES  # noqa: E402
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--docker-socket", required=True)
-    parser.add_argument("--docker-cli-archive", required=True, type=Path)
-    parser.add_argument("--management-library-dir", required=True, type=Path)
+    parser.add_argument("--docker-cli-archive", type=Path)
+    parser.add_argument("--management-library-dir", type=Path)
+    parser.add_argument(
+        "--release", type=Path, help="Use the matching verified GPU release instead of rebuilding."
+    )
+    parser.add_argument("--sha256")
     args = parser.parse_args()
+    if (
+        bool(args.release) != bool(args.sha256)
+        or (
+            args.release is None and not all((args.docker_cli_archive, args.management_library_dir))
+        )
+        or (
+            args.release is not None and any((args.docker_cli_archive, args.management_library_dir))
+        )
+    ):
+        parser.error("Choose either --release/--sha256 or both local build inputs")
     engine = LocalEngine(args.docker_socket)
     engine.verify()
     token = "px-container-worker-" + uuid.uuid4().hex[:12]
@@ -84,11 +98,48 @@ def main():
     try:
         save()
         print(json.dumps({"result": str(output / "result.json")}), flush=True)
-        build = output / "worker"
-        build.mkdir(mode=0o700)
-        image = build_worker(
-            engine, args.docker_cli_archive, args.management_library_dir, build, tag
-        )
+        released = None
+        if args.release is not None:
+            from scripts.release import inspect_images, verify
+
+            released = verify(args.release, args.sha256)
+            if "gpu" not in released or released["gpu"]["contracts"]["worker"] != worker_digest():
+                raise ValueError("Use a GPU release matching this acceptance application's sources")
+            import_client = temporary / "import-client"
+            import_client.mkdir(mode=0o700)
+            loaded = subprocess.run(
+                [
+                    "docker",
+                    "--config",
+                    str(import_client),
+                    "--host",
+                    "unix://" + str(engine.path),
+                    "image",
+                    "load",
+                    "--input",
+                    str(args.release / "images.tar"),
+                ],
+                env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "LC_ALL": "C.UTF-8"},
+                capture_output=True,
+                timeout=900,
+                check=True,
+            )
+            (output / "import.log").write_text(redact(loaded.stdout + loaded.stderr))
+            inspect_images(released, runner=lambda *a, **k: engine.run(*a))
+            image = {
+                "schema": 1,
+                "image": released["images"]["gpu_worker"],
+                "worker_contract": released["gpu"]["contracts"]["worker"],
+                "controller_contract": released["gpu"]["contracts"]["controller"],
+                "management_manifest": released["gpu"]["management"],
+            }
+            report["release_sha256"] = args.sha256
+        else:
+            build = output / "worker"
+            build.mkdir(mode=0o700)
+            image = build_worker(
+                engine, args.docker_cli_archive, args.management_library_dir, build, tag
+            )
         report["image"] = image
         save()
         engine.run("network", "create", "--internal", "--label", label, network)
@@ -205,6 +256,10 @@ def main():
                 },
             }
         )
+        if released is not None:
+            configuration["task_image"] = released["images"]["gpu_task"]
+            configuration["driver_manifest"] = released["gpu"]["driver"]
+            validate_config(configuration)
         create_json(state / "worker.json", configuration)
         config_bytes = (state / "worker.json").read_bytes()
         client = temporary / "docker-client"
@@ -280,6 +335,8 @@ def main():
             save()
             value = terminal(identifier)
             host, config = value["HostConfig"], value["Config"]
+            if name == "default-disabled":
+                assert config["Cmd"] in (None, [])
             assert not host.get("Devices") and not host.get("DeviceRequests")
             assert host["ReadonlyRootfs"] and host["CapDrop"] == ["ALL"] and config["User"] == "0:0"
             assert (host["NanoCpus"], host["Memory"], host["MemorySwap"], host["PidsLimit"]) == (
@@ -305,6 +362,7 @@ def main():
             else:
                 message = {
                     "disabled": "stage=disabled error=ValueError",
+                    "default-disabled": "stage=disabled error=ValueError",
                     "public-config-rejected": "Container GPU worker stopped: SandboxUnavailable",
                     "column-grant-rejected": "stage=database error=ValueError",
                     "source-rejected": "Container GPU worker stopped: ValueError",
@@ -328,6 +386,7 @@ def main():
         )
         run_check("recreated")
         run_check("disabled", expected=1, arguments=("--once",))
+        run_check("default-disabled", expected=1, arguments=(), extra={"command": []})
         (state / "worker.json").chmod(0o644)
         try:
             run_check("public-config-rejected", expected=1)

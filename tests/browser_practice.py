@@ -35,7 +35,7 @@ def main():
         connection += ["--ca-file", ca]
     if local_http:
         connection += ["--allow-local-http"]
-    artifacts = ROOT / "test-results"
+    artifacts = Path(os.environ.get("BROWSER_ARTIFACTS", ROOT / "test-results"))
     artifacts.mkdir(exist_ok=True)
     receipt = {
         "passed": False,

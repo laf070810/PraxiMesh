@@ -134,12 +134,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--release", type=Path, required=True)
     parser.add_argument("--sha256", required=True)
+    parser.add_argument(
+        "--output-directory",
+        type=Path,
+        help="Keep this run's evidence separate from earlier releases.",
+    )
     options = parser.parse_args()
+    artifacts = options.output_directory or ROOT / "test-results"
+    artifacts.mkdir(parents=True, exist_ok=options.output_directory is None)
     manifest = verify(options.release, options.sha256)
     docker("image", "load", "--input", str(options.release / "images.tar"), capture_output=True)
     inspect_images(manifest)
-    artifacts = ROOT / "test-results"
-    artifacts.mkdir(exist_ok=True)
     output_path = artifacts / "release-acceptance.json"
     output_path.unlink(missing_ok=True)
     token = uuid.uuid4().hex[:12]
@@ -354,6 +359,8 @@ def main():
             ).stdout
         )
         browser_env = browser_environment(os.environ, base)
+        if options.output_directory is not None:
+            browser_env["BROWSER_ARTIFACTS"] = str(artifacts.resolve())
         with (artifacts / "release-browser.log").open("wb") as log:
             subprocess.run(
                 [sys.executable, "tests/browser_smoke.py"],

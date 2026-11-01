@@ -10,11 +10,13 @@
 | **发布协调器单机部署** | 需要域名/HTTPS、PostgreSQL、分离数据库权限、受控升级和失败恢复的长期站点 | Caddy + 固定 Web/worker 镜像 + PostgreSQL；私有配置、部署状态与备份 | worker 通过真实检查后开放评测；AI 使用预先配置的 HTTPS 服务 | [生产部署完整操作](production.md) |
 | **源码开发环境** | 修改应用、调试页面、编写内容或开发评测器 | Python/uv + Django 开发服务器；默认仓库内 SQLite；回环访问 | 默认不启动评测或 AI；按需单独配置 WASI worker 和模型 | [下方源码开发](#development) |
 | **GPU 宿主 worker（开发验收）** | 已获得独占单卡、准备验证完整 CUDA 控制流程 | 普通用户 systemd + RootlessKit/Podman/runsc；持久私有目录与同一应用数据库 | 每次启动完整检查；新 CUDA 路径尚未验收，网站 GPU 提交关闭 | [配置与生命周期](gpu.md#gpu-worker) |
-| **GPU 容器 worker（开发验收）** | 已有 PostgreSQL，准备使用固定镜像和 Compose 验证专用 GPU 节点 | 原私有 rootless Docker、锁/journal、数据库网络；独立 worker 镜像 | 无设备预检与完整启动分开；真实 GPU、队列及升级仍待验收 | [构建、配置和 Compose](container-gpu-worker.md) |
+| **GPU 容器 worker（开发验收）** | 已有 PostgreSQL，准备使用固定镜像和 Compose 验证专用 GPU 节点 | 原私有 rootless Docker、锁/journal、数据库网络；可制作统一四镜像发布包 | 无设备预检与完整启动分开；真实 GPU、队列及升级仍待验收 | [构建、配置和 Compose](container-gpu-worker.md)、[统一发布包](releases.md#gpu-release) |
 
 **想直接用起来，选 Compose。** 想同时体验本地 AI，给同一方案加上 `compose.ai.yaml`。有正式数据库、HTTPS 和受控升级要求时，选择发布协调器；它目前同样是单主机方案，没有交付多机高可用部署。
 
 前三种方式沿用同一套账号、内容版本、学习、社区、组织、项目和挑战功能，主要差别在服务启动、数据存储、网络配置与升级保障。已验收的七种评测均为 CPU/WASI；GPU 宿主和容器入口用于后续独占硬件验收，**目前网站没有开放 GPU 题型**。独立 GPU Compose worker 使用 PostgreSQL，不能直接挂入默认 SQLite 单机方案的数据卷。
+
+需要保存或分发匹配的 Web、CPU worker、GPU worker 和任务镜像时，使用[四镜像发布包](releases.md#gpu-release)。它提供统一构建、校验与导入；当前发布协调器只激活两镜像 CPU 包，GPU 生命周期与升级尚未接入。
 
 GPU 0 的独立环境已通过真实 CUDA 样例、内核参考解/错解和 CPU 限额检查。准备执行节点或排障时使用 [GPU 单卡环境检查](gpu.md#重放单卡环境检查)及[内核组件检查](gpu.md#重放内核正确性检查)。显卡被占用时，可按 [GPU 指南的检查入口表](gpu.md#validation-options)选择控制链、离线 runsc、异常恢复、可信容器监督、容器内 runsc 或[控制端 UID/锁映射检查](gpu.md#container-controller)；它们只运行固定 CPU 程序，尚不能作为接收学员提交的 GPU 部署方案。
 

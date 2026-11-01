@@ -14,7 +14,7 @@ from playwright.sync_api import expect, sync_playwright
 def main():
     base = os.environ.get("BROWSER_URL", "http://127.0.0.1:8765").rstrip("/")
     arguments = launch_arguments(base, os.environ.get("BROWSER_TEST_SPKI", ""))
-    artifacts = Path("test-results")
+    artifacts = Path(os.environ.get("BROWSER_ARTIFACTS", "test-results"))
     artifacts.mkdir(exist_ok=True)
     username = "i18n-browser-" + uuid.uuid4().hex[:12]
     password = secrets.token_urlsafe(32)
