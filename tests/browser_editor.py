@@ -104,6 +104,13 @@ def layouts(page, base, artifacts, *, baseline=False):
                     formRows: [...document.querySelectorAll('form.card > p + p, .card form > p + p')]
                         .map(e => e.getBoundingClientRect().top -
                             e.previousElementSibling.getBoundingClientRect().bottom),
+                    sectionHeadingGaps: [...document.querySelectorAll(
+                        '.section.compact > :is(.card, .table-wrap) + h2'
+                    )].map(e => ({
+                        title: e.textContent,
+                        gap: e.getBoundingClientRect().top -
+                            e.previousElementSibling.getBoundingClientRect().bottom
+                    })),
                     choices: [...document.querySelectorAll('input[type=checkbox]')].map(e => ({
                         rect: e.getBoundingClientRect().toJSON(),
                         label: e.labels[0]?.getBoundingClientRect().toJSON(),
@@ -128,6 +135,7 @@ def layouts(page, base, artifacts, *, baseline=False):
                         assert pair["current"]["top"] - pair["previous"]["bottom"] >= 8, metrics[-1]
                         assert abs(pair["current"]["left"] - pair["previous"]["left"]) <= 2
                     assert all(gap >= 8 for gap in item["formRows"]), metrics[-1]
+                    assert all(row["gap"] >= 16 for row in item["sectionHeadingGaps"]), metrics[-1]
                     for choice in item["choices"]:
                         assert 12 <= choice["rect"]["width"] <= 24
                         assert choice["rect"]["height"] >= 12

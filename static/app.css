@@ -383,7 +383,7 @@ div.choice-list {
 .section.compact:not(.account-grid) > .card + .card {
   margin-top: 14px;
 }
-.section.compact > .card + h2 {
+.section.compact > :is(.card, .table-wrap) + h2 {
   margin-top: 32px;
 }
 .section-heading h1,
