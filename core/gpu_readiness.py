@@ -12,9 +12,8 @@ from core.gpu_startup import recover_controller, startup_identity
 from core.models import GPUDevice
 from judge.container_adapter import ContainerGPUAdapter
 from judge.container_monitor import ContainerDeviceMonitor
-from judge.container_readiness import SCOPE as CONTAINER_SCOPE
 from judge.container_readiness import stage_report as container_stage_report
-from judge.container_readiness import task_identity
+from judge.container_startup_suite import run_startup
 from judge.gpu_execution_contract import canonical_digest
 from judge.gpu_isolation import validate_structure
 from judge.gpu_kernel_checks import CHECKS as KERNEL_CHECKS
@@ -240,42 +239,47 @@ def initialize_controller(
         tick()
         with ReceiptStore(receipt_directory, guard, create=True) as store:
             store.invalidate()
-            record("initial-recovery", recovery)
             startup_job, startup_reservation = startup_identity(guard.device_uuid)
-
-            def run(name, method, *args):
-                tick()
-                service = (adapter.task if container else OwnedJobService)(
-                    guard, startup_job, startup_reservation, purpose="maintenance"
+            if container:
+                evidence = run_startup(
+                    adapter,
+                    recovery,
+                    startup_job,
+                    startup_reservation,
+                    deadline=deadline,
+                    on_tick=tick,
+                    on_progress=on_progress,
                 )
-                try:
-                    report, environment = method(
-                        service,
-                        *args,
-                        deadline=min(deadline, time.monotonic() + CHECK_SECONDS),
-                        on_tick=tick,
-                    )
-                finally:
-                    if container:
-                        if service.cleanup is None:
-                            service.recover()
-                    else:
-                        service.stop()
-                tick()
-                require(environment == adapter.environment, "GPU startup check changed environment")
-                if container:
-                    report = {
-                        "scope": CONTAINER_SCOPE,
-                        "task": task_identity(service),
-                        "report": report,
-                    }
-                record(name, report)
+                completed = [row["name"] for row in evidence]
+            else:
+                record("initial-recovery", recovery)
 
-            run("resources", adapter.check_resources)
-            for name in KERNEL_CHECKS:
-                run("kernel/" + name, adapter.check_kernel, name)
-            for name in CONTROLLER_CHECKS:
-                run("controller/" + name, adapter.check_controller, name)
+                def run(name, method, *args):
+                    tick()
+                    service = OwnedJobService(
+                        guard, startup_job, startup_reservation, purpose="maintenance"
+                    )
+                    try:
+                        report, environment = method(
+                            service,
+                            *args,
+                            deadline=min(deadline, time.monotonic() + CHECK_SECONDS),
+                            on_tick=tick,
+                        )
+                    finally:
+                        service.stop()
+                    tick()
+                    require(
+                        environment == adapter.environment,
+                        "GPU startup check changed environment",
+                    )
+                    record(name, report)
+
+                run("resources", adapter.check_resources)
+                for name in KERNEL_CHECKS:
+                    run("kernel/" + name, adapter.check_kernel, name)
+                for name in CONTROLLER_CHECKS:
+                    run("controller/" + name, adapter.check_controller, name)
             tick()
             require(tuple(completed) == CHECKS, "GPU startup did not complete its full suite")
             value = {
