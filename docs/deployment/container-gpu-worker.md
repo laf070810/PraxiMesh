@@ -201,6 +201,30 @@ DOCKER_HOST="unix://$PRAXIMESH_DOCKER_SOCKET" \
 
 文件、锁和被终止的协调器进程是真实的，Docker、数据库及设备就绪是显式模型，范围见 [G49](../acceptance-g49.md)。这仍是开发中的内部入口，没有可用的完整 GPU 发布/回滚命令。公共 CPU 发布与恢复会拒绝已有 GPU 配置、容器或恢复状态，包括 GPU→CPU；不能删除这些记录来走 CPU 恢复路径。完整 Docker/PostgreSQL、GPU 启动、队列及整站恢复尚待实测。
 
+<a id="candidate-verification"></a>
+### 协调器内部的候选队列检查
+
+候选检查由 `scripts/deploy_gpu_check.py` 调用冻结镜像内的 `deployment_gpu_check` 命令。固定正确/错误 CUDA 程序经正常队列执行，核对正式成绩和原启动环境；该实现仍未接入完整发布命令。Web 与管理容器仅取得原设备的准入名单，不取得 socket、设备或私有凭证。
+
+每次检查保存原操作、发布代、容器启动和环境身份。观察超时保留原提交、账号和内容，重试继续相同提交，480 秒期限从最早提交计算。不能通过重新创建账号、重置阶段或删除预约来重试。成功前须确认全部队列已结束、全部设备预约为空且原设备新鲜就绪；失败后的独立清理也须等待原 worker 完成物理恢复，只删除精确识别的测试记录。
+
+检查命令通过后仍保留原记录；协调器先持久确认成绩，再单独清理并确认清理结果。成功确认丢失时重读原提交，清理响应丢失时只重试清理。直接使用管理命令的维护者也须保存验证结果后单独执行清理；`check` 的通过不表示已完成清理。
+
+不访问 Docker 或 GPU 的组件检查：
+
+```sh
+.venv/bin/pytest -q tests/test_deployment_gpu_check.py \
+  tests/test_deploy_gpu_check.py tests/test_deploy_gpu_recovery.py
+```
+
+原暂停不对其他提交者开放、等待不阻塞 worker 心跳的实际 PostgreSQL 检查入口：
+
+```sh
+.venv/bin/python scripts/postgres_tests.py -q tests/test_deployment_gpu_check_postgres.py
+```
+
+本轮数据库中的设备和成绩为显式合成记录，实际协调器中断使用自有 CPU 子进程；具体结果和跳过项见 [G50](../acceptance-g50.md)。这不能证明 CUDA 程序、计时或物理恢复通过。新命令进入 worker 源码契约，需要匹配的新冻结制品；旧包核验兼容，但不能执行新协议。完整升级/回滚、真实 GPU 队列和曝光验收仍未完成，公共 `apply` 保持关闭。
+
 ## Compose 预检与运行
 
 准备非敏感连接参数。数据库网络须是现有 PostgreSQL 容器所在网络；这里不会新建或改写应用数据库。`PRAXIMESH_GPU_MINOR` 从挂载清单读取物理 minor，不能用 CUDA 逻辑序号代替。

@@ -18,6 +18,8 @@
 - [G48：GPU 发布就绪观察与冻结环境核对](acceptance-g48.md) — 归档只读核验与状态模型；完整部署仍待验收
 - [ADR-065：在原数据库上恢复原 GPU worker](adr/065-original-database-gpu-worker-recovery.md)
 - [G49：原库 GPU worker 恢复与中断续跑](acceptance-g49.md) — 实际文件/进程与状态模型；完整发布仍未开放
+- [ADR-066：固定 CUDA 候选检查与原提交保留](adr/066-gpu-candidate-queue-verification.md)
+- [G50：GPU 候选队列检查与原任务清理](acceptance-g50.md) — 数据库事务、文件与进程检查；实际 CUDA 队列和完整发布待验收
 - [RFC-023：恢复时重建无状态 Web 容器](rfcs/023-web-container-recovery.md) — 已实施，真实复验待完成
 - [ADR-060：在原数据库恢复中重建无状态 Web](adr/060-web-container-recovery.md)
 - [G44：无状态 Web 持久重建的验证范围](acceptance-g44.md)

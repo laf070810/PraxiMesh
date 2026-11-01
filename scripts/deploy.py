@@ -46,6 +46,7 @@ CONTROL_COMMANDS = {
     "content_import",
     "project_import",
     "deployment_check",
+    "deployment_gpu_check",
     "judge_admission",
     "maintain",
     "migrate",
@@ -405,6 +406,11 @@ class Deployment:
             "JUDGE_BACKEND": "wasi",
             "JUDGE_WASI_SHA256": generation["manifest"]["judge"]["bundle_sha256"],
         }
+        if role in {"web", "owner"} and "gpu" in generation["manifest"]:
+            self.check_gpu_attachment()
+            if "gpu" not in self.config:
+                raise DeploymentError("GPU application requires the original bound node")
+            environment["JUDGE_GPU_DEVICES"] = self.config["gpu"]["device"]
         if role == "web" and "coaching" in app:
             from scripts.deploy_coaching import coaching_environment
 
@@ -720,6 +726,12 @@ class Deployment:
 
         return GPUWorkerRecovery(self, generation, release).run()
 
+    def check_gpu_candidate(self, generation, release, *, cleanup=False):
+        """Internal fixed real queue check; public activation remains closed."""
+        from scripts.deploy_gpu_check import GPUCandidateCheck
+
+        return GPUCandidateCheck(self, generation, release).run(cleanup=cleanup)
+
     def require_cpu_lifecycle(self, manifest=None):
         """Until full GPU coordination is connected, CPU paths cannot retire its state."""
         state = self.state or {}
@@ -731,6 +743,7 @@ class Deployment:
             or state.get("gpu_configuration")
             or state.get("gpu_runtime")
             or state.get("gpu_recoveries")
+            or state.get("gpu_candidate_checks")
             or state.get("gpu_workers")
             or state.get("gpu_checks")
         ):

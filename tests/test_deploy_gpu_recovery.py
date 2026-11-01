@@ -382,7 +382,15 @@ def test_later_recovery_of_a_confirmed_stopped_instance_keeps_both_attempts(reco
 
 
 @pytest.mark.parametrize(
-    "key", ["gpu_configuration", "gpu_runtime", "gpu_recoveries", "gpu_workers", "gpu_checks"]
+    "key",
+    [
+        "gpu_configuration",
+        "gpu_runtime",
+        "gpu_recoveries",
+        "gpu_candidate_checks",
+        "gpu_workers",
+        "gpu_checks",
+    ],
 )
 def test_cpu_release_cannot_ignore_gpu_state_when_current_manifest_is_cpu_only(
     tmp_path, monkeypatch, key

@@ -130,6 +130,27 @@ def require_stopped_workers(host, node, binding):
                 or record["metadata_sha256"] != digest(lifecycle["metadata"])
             ):
                 raise ValueError("Finish original GPU recovery before publishing configuration")
+    checks = host.state.get("gpu_candidate_checks", {})
+    if type(checks) is not dict:
+        raise ValueError("Invalid GPU candidate verification journal")
+    if checks:
+        from scripts.deploy_gpu_check import validate_record as validate_candidate
+
+        for key, record in checks.items():
+            validate_candidate(record)
+            lifecycle = transitions.get(record["generation"]["gpu_worker"])
+            if (
+                key != record["operation"] + ":" + record["generation"]["gpu_worker"]
+                or record["phase"] not in {"verified", "cleaned"}
+                or lifecycle is None
+                or record["generation"] != lifecycle["generation"]
+                or record["observation"]["container"] != lifecycle["id"]
+                or record["runtime_sha256"] != lifecycle["runtime_sha256"]
+                or record["observation"]["configuration_sha256"] != digest(lifecycle["metadata"])
+            ):
+                raise ValueError(
+                    "Finish original GPU candidate verification or cleanup before publishing configuration"
+                )
     operation = host.state.get("operation") or {}
     for generation in (
         host.state.get("current"),
