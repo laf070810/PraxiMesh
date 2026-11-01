@@ -23,6 +23,8 @@ GPU 评测 worker 是接收学员提交的产品服务，与 GitHub Actions runn
 
 本地重放同一入口时发现并修复了独立的无头浏览器桌面环境问题，详见 [G61](../acceptance-g61.md)；尚不能确认它与远端旧作业同因。当前应用浏览器 job 和 WASI job 均先执行实际截图预检，WASI 在构建解释器前检查渲染能力。源码浏览器、200 组布局及冻结 CPU 发布包的 PostgreSQL/WASI/浏览器复验均已通过；后续本地提交未推送，托管复验仍待完成。
 
+当前完整应用回归另见 [G62](../acceptance-g62.md)：修正一处过期的资源单位英文断言后，SQLite 为 3697 passed / 194 skipped，独立 PostgreSQL 为 3787 passed / 104 skipped；91 项 PostgreSQL 专属检查实际通过。共同跳过的真实 WASI 与固定 CPU 容器联合检查没有计作通过。这些本地结果不替代托管工作流，运行入口仍在 [README 的开发检查](../../README.md#开发与检查)。
+
 ## 先选择 runner 的权限边界
 
 当前应用仓库公开。**推荐将部署工作流放在独立的私有运维仓库，仅受信维护者可写；部署 runner 只注册到该仓库。** 保持应用 PR 和构建任务在托管 runner 上。运维仓库使用审查过的 `deploy.yml`，固定控制器与发布包仍留在部署主机。

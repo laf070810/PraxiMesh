@@ -10,7 +10,7 @@
 | R-05 账户与隐私 | 登录/退出/恢复、私有数据、可见性、导出/删除；新社区数据需同样覆盖 | 新模块导出/删除/权限、HTTPS 与 schema 升级已验证 |
 | R-06–07 真实安全练习 | 编辑、草稿、Run/Submit、状态/结果/历史、失败分类、安全隔离 | 原三种契约已验证；ML、科学、Agent 的真实 WASI 已验证，C4 镜像浏览器与 C5 源码 HTTPS 已验证；E 类/API的真实队列、HTTPS与固定镜像已验证 |
 | R-08 初始内容质量 | 每题独立契约、参考解/错误变体/边界用例、真实隔离验证 | 当前 26 题、187 参考用例、69 针对性错解；E 已完成全目录真实 WASI 检查，原始失败与复测分别保留，见 [E 验收](acceptance-e.md) |
-| R-09 交付与运维 | 容器、锁定制品、CI/CD、TLS、健康监控、备份恢复、目标环境验收 | Compose 默认包含真实 CPU/WASI worker，可选本地模型，见 [Compose 验收](acceptance-compose.md)；B2→C、C→D 及 E→F 实际迁移升级、F 镜像及回环 HTTPS 有证据；[G59](acceptance-g59.md) 当前 CPU 制品的真实迁移故障、HTTPS/WASI 与完整恢复矩阵、[G60](acceptance-g60.md) 历史 schema 的真实迁移和 [G61](acceptance-g61.md) 冻结包 PostgreSQL/WASI/浏览器复验通过；旧 F 应用整站升级与托管验收仍待完成，远端旧 `d2c6560` 的 WASI 发布包验收失败尚未解决 |
+| R-09 交付与运维 | 容器、锁定制品、CI/CD、TLS、健康监控、备份恢复、目标环境验收 | Compose 默认包含真实 CPU/WASI worker，可选本地模型，见 [Compose 验收](acceptance-compose.md)；B2→C、C→D 及 E→F 实际迁移升级、F 镜像及回环 HTTPS 有证据；[G59](acceptance-g59.md) 当前 CPU 制品的真实迁移故障、HTTPS/WASI 与完整恢复矩阵、[G60](acceptance-g60.md) 历史 schema 的真实迁移、[G61](acceptance-g61.md) 冻结包复验和 [G62](acceptance-g62.md) 完整应用双数据库回归通过；旧 F 应用整站升级与托管验收仍待完成，远端旧 `d2c6560` 的 WASI 发布包验收失败尚未解决 |
 | R-10 文档与设计 | RFC/ADR、开发/贡献、内容、安全、发布、维护、排障 | [部署指南](deployment/README.md)统一方案选择与操作入口；README 保留快速启动，AGENTS 约定集中维护；全新环境初始化、页面访问及发布包兼容性已有验证，随实现更新 |
 | R-11 学习体验 | 多条路径、丰富题库、收藏、私有笔记、领域/概念证据与复习建议 | B1 已实现并通过 PG/WASI、浏览器与镜像升级验证 |
 | R-12 多语言/CPU 工程 | 第二种语言、完整程序/库/工程形态，共享版本/队列/结果与安全门槛 | JavaScript 函数、Python 完整程序和项目已通过应用/镜像验证；E 新增有状态类/API，真实 WASI、PostgreSQL、HTTPS 和冻结镜像浏览器均已通过，见 [E 验收](acceptance-e.md) |
@@ -52,6 +52,8 @@
 2026-10-24 开发指南交付后的只读查询记录在 `test-results/post-onboarding-blockers-1.json`；其中无远端的历史条件已被 2026-10-30 的 GitHub 接入解除。CPU 委派缺口随后由维护者修复，实际限额结果见 `test-results/cpu-controller-restored/result.json`。候选 runsc 的精确驱动版本列表检查见 `test-results/gpu-runtime-preflight/result.json`；后续单卡 CUDA 样例与实际节流已通过，范围及失败修正见 [RFC-018](rfcs/018-gpu-environment-probe.md)。nvproxy 会将受支持的 GPU 调用转交宿主 NVIDIA 驱动，驱动本身仍在信任边界内，详见 [gVisor GPU 官方指南](https://gvisor.dev/docs/user_guide/gpu/)。
 
 ## 分批结果
+
+- 2026-11-02 R-09 完整应用回归：修正挑战模块仍查找旧资源单位英文文案的断言；SQLite 3697 passed / 194 skipped，真实 PostgreSQL 3787 passed / 104 skipped，详见 [G62](acceptance-g62.md)。SQLite 跳过的 91 项数据库专属检查全部实际通过；共同跳过的 103 项真实执行检查单列，不计作通过。临时资源已清理，既有三个服务身份不变；应用行为和执行策略未改，未访问 GPU。
 
 - 2026-11-02 R-09 浏览器绘制环境修复：首次发布包启动的 129 个真实 WASI 探针通过，随后首页截图超时；最小 HTML 也可复现，隔离继承的显示/桌面会话变量后恢复。统一无头启动和实际截图预检已接入，73 项相关回归、完整源码浏览器、200 组布局及冻结包 PostgreSQL/WASI/浏览器复验通过，见 [G61](acceptance-g61.md)。临时资源清理、现有服务身份不变；托管 CI 仍待验证，未访问 GPU。
 
