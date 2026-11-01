@@ -1,6 +1,6 @@
 # RFC-023：恢复时重建无状态 Web 容器
 
-日期：2026-11-01。状态：已实施，真实复验待完成。对应 PRD R-09、AC-07；延续 [RFC-005](005-deployment-coordination.md)。决策见 [ADR-060](../adr/060-web-container-recovery.md)，检查范围见 [G44](../acceptance-g44.md)。
+日期：2026-11-01，验证状态更新于 2026-11-02。状态：已实施，真实 Web 专项通过，完整发布复验待完成。对应 PRD R-09、AC-07；延续 [RFC-005](005-deployment-coordination.md)。决策见 [ADR-060](../adr/060-web-container-recovery.md)，组件与实测范围分别见 [G44](../acceptance-g44.md)、[G58](../acceptance-g58.md)。
 
 ## 已复现的问题
 

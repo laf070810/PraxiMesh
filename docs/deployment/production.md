@@ -149,7 +149,7 @@ export PRAXIMESH_DEPLOYMENT_TOKEN="$(python3 -c 'import uuid; print(uuid.uuid4()
 
 管理命令或所属容器的创建、启动、停止、移除失败时，协调器在私有状态目录保存 `control-failure-<UUID>.json`，文件为 0600。其中记录命令类别、退出码和脱敏后的 stdout/stderr 尾部，每路最多 64 KiB、整个文件最多 1 MiB；常规错误只给文件名定位。恢复失败也会在原部署日志记录失败阶段与诊断文件名，保留当前数据库和恢复阶段。日志不记录命令行或环境，已知配置凭证会被替换，但它仍是仅供部署维护者读取的内部诊断，不应作为公开 CI artifact 上传。诊断无法落盘时，原有控制容器清理和恢复流程仍会执行。
 
-已确认的 RootlessKit 端口冲突见 [G43](../acceptance-g43.md)：同容器重试可能显示 running，但没有发布端口且 HTTP 不可用。当前 `recover` 在维护、排空和停止后重建无状态 Web，沿用原代镜像、配置与数据库，重新分配内部回环端口；先记录原身份和意图，再移除/创建，保存新 ID 后才启动。未知容器、持久挂载或运行契约变化会拒绝自动处理。诊断须同时核对实际 `NetworkSettings.Ports` 和 HTTP，不能按容器运行状态判定恢复成功。该修复的组件验证已通过，真实复验尚未完成，范围见 [G44](../acceptance-g44.md)。
+已确认的 RootlessKit 端口冲突见 [G43](../acceptance-g43.md)：同容器重试可能显示 running，但没有发布端口且 HTTP 不可用。当前 `recover` 在维护、排空和停止后重建无状态 Web，沿用原代镜像、配置与数据库，重新分配内部回环端口；先记录原身份和意图，再移除/创建，保存新 ID 后才启动。未知容器、持久挂载或运行契约变化会拒绝自动处理。诊断须同时核对实际 `NetworkSettings.Ports` 和 HTTP，不能按容器运行状态判定恢复成功。组件验证见 [G44](../acceptance-g44.md)，六项真实 Docker/HTTP 专项已在 [G58](../acceptance-g58.md) 通过；完整应用、数据库与 worker 的发布矩阵仍待完成。
 
 候选或恢复后的版本完成实际隔离探针、健康检查和功能验证后，用原 token 恢复：
 
@@ -167,7 +167,13 @@ export PRAXIMESH_DEPLOYMENT_TOKEN="$(python3 -c 'import uuid; print(uuid.uuid4()
 
 ### Web 端口恢复专项检查
 
-在有本地固定 CPU Web 镜像的独立验收环境执行；镜像 ID 来自已经核验的发布包清单：
+在有本地固定 CPU Web 镜像的独立验收环境执行。`PRAXIMESH_WEB_IMAGE` 使用已经核验的发布包清单中的不可变 ID，也可取自本账号已有的 Compose Web 镜像。例如，将容器名替换为自己的项目 Web：
+
+```sh
+PRAXIMESH_WEB_IMAGE=$(docker inspect --format '{{.Image}}' praximesh-web-1)
+```
+
+此查询只读取镜像身份。探针要求镜像用户为 `65532:65532`，且没有入口脚本或声明的卷；从该镜像创建从未启动的临时容器来派生固定命令，不对现有服务执行 commit、重启或重建。
 
 ```sh
 .venv/bin/python scripts/deploy_web_acceptance.py \
@@ -175,7 +181,7 @@ export PRAXIMESH_DEPLOYMENT_TOKEN="$(python3 -c 'import uuid; print(uuid.uuid4()
     --output test-results/web-recovery
 ```
 
-输出目录须尚不存在。脚本仅在本地派生固定 CPU HTTP 命令，使用自有临时容器、网络和占端口 socket，检查端口冲突、四处 SIGKILL 后继续及同名替换拒绝；结束时清理自有资源并核对基镜像保留。协调器/代理元数据为合成夹具，不使用数据库、学员代码或 GPU。此项通过后，仍须运行下文完整发布演练，验证实际 PostgreSQL、HTTPS、WASI、数据保留和 worker 重启；不能用专项检查替代完整恢复验收。
+输出目录须尚不存在。脚本仅在本地派生固定 CPU HTTP 命令，使用自有临时容器、网络和占端口 socket，检查端口冲突、四处 SIGKILL 后继续及同名替换拒绝；结束时按原身份清理自有资源，通过 `--no-prune` 保留基镜像并重新核对。协调器/代理元数据为合成夹具，不使用数据库、学员代码或 GPU。[G58](../acceptance-g58.md) 使用已有 Compose 镜像通过六项检查。此项通过后，仍须运行下文完整发布演练，验证实际 PostgreSQL、HTTPS、WASI、数据保留和 worker 重启；不能用专项检查替代完整恢复验收。
 
 <a id="database-validation"></a>
 

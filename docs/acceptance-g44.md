@@ -26,3 +26,7 @@
 这些尝试的自有测试容器、网络和派生镜像已清理。只读记录 `test-results/g44-image-cache-scope.json` 确认原发布包摘要与两个无标签镜像，现有三个 Compose 服务使用不同镜像且启动时间未变化。原发布归档保留完整；恢复测试缓存的操作被自动审批阻止，正在等待维护者明确许可。未重启现有服务、修改 daemon 配置或接触 GPU。
 
 本轮尚不能关闭 [G43](acceptance-g43.md) 的端口恢复缺口，也不代表 GPU 发布、硬件、托管 runner 或完整 PRD 已经完成。恢复测试缓存后须先通过实际端口/中断检查，再串行完成真实 PostgreSQL/HTTPS/WASI 发布矩阵。
+
+## 后续实测
+
+2026-11-02 的 [G58](acceptance-g58.md) 改用本账号已有的 Compose Web 不可变镜像 ID，通过六项实际 Docker/HTTP 检查，包括四处真实 SIGKILL；原服务及基镜像均保留。没有导入旧 F 镜像，先前的缓存恢复审批限制仍保留。端口专项缺口已补齐，完整 PostgreSQL/HTTPS/WASI 发布矩阵仍待完成；本页原始失败记录不变。
