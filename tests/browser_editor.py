@@ -32,6 +32,16 @@ def layouts(page, base, artifacts, *, baseline=False):
     page.get_by_role("button", name="保存内容", exact=True).click()
     expect(page.get_by_role("heading", level=1)).to_contain_text("布局检查")
     detail_route = page.url.removeprefix(base).strip("/")
+    page.goto(base + "/learning/notes/new/")
+    page.locator("#id_title").fill(
+        "Layout review: a long private note title with several words that wraps on small screens"
+    )
+    page.locator("#id_body").fill("本次布局检查的私有笔记；随合成账号一起删除。")
+    page.get_by_role("button", name="保存笔记", exact=True).click()
+    expect(page.get_by_role("heading", level=1)).to_contain_text("Layout review")
+    note_route = page.url.removeprefix(base).strip("/")
+    page.goto(base + "/problems/sum-positive/")
+    page.get_by_role("button", name="收藏题目", exact=True).click()
     for language in ("zh-hans", "en"):
         page.context.add_cookies([{"name": "django_language", "value": language, "url": base}])
         for width in (1440, 768, 390, 320):
@@ -39,15 +49,29 @@ def layouts(page, base, artifacts, *, baseline=False):
             for route in (
                 "practice",
                 "learn",
+                "learn/python-to-numerical",
+                "learn/functions",
+                "learning",
+                "learning/achievements",
+                "learning/bookmarks",
+                "learning/notes",
+                note_route,
+                "learning/reading",
+                "me",
+                "accounts/profile",
+                "accounts/tokens",
                 "coaching/goals",
                 "organizations",
                 "problems/sum-positive",
                 "community",
                 "community/mine",
+                "community/blogs",
                 "community/new",
                 detail_route,
                 "projects",
                 "showcase/settings",
+                "showcase/mine",
+                "showcase/boards",
             ):
                 response = page.goto(f"{base}/{route}/")
                 assert response.ok, route
@@ -58,17 +82,28 @@ def layouts(page, base, artifacts, *, baseline=False):
                     heading: document.querySelector('h1').getBoundingClientRect().x,
                     body: [...document.querySelectorAll(
                         '#main > :is(nav, form, p, article, h2, ul, ol), ' +
-                        '#main > .section.compact > :is(nav, form, p, article, h2, ul, ol)'
+                        '#main > .section.compact:not(.account-grid) > :is(nav, form, p, article, h2, ul, ol), ' +
+                        '#main > .account-grid, ' +
+                        '#main > .reading-layout > article'
                     )].map(e => ({
                         tag: e.tagName,
                         rect: e.getBoundingClientRect().toJSON(),
-                        startInset: e.tagName === 'NAV' ? parseFloat(getComputedStyle(e).paddingLeft) : 0,
-                        endInset: e.tagName === 'NAV' ? parseFloat(getComputedStyle(e).paddingRight) : 0
+                        startInset: e.matches('nav, .account-grid') ? parseFloat(getComputedStyle(e).paddingLeft) : 0,
+                        endInset: e.matches('nav, .account-grid') ? parseFloat(getComputedStyle(e).paddingRight) : 0
                     })),
                     filters: [...document.querySelectorAll('.filters label')].map(e => ({
                         text: e.firstChild.textContent, rect: e.getBoundingClientRect().toJSON(),
                         control: e.querySelector('input, select').getBoundingClientRect().toJSON()
                     })),
+                    cardStacks: [...document.querySelectorAll('.section.compact > .card + .card')]
+                        .filter(e => getComputedStyle(e.parentElement).display !== 'grid')
+                        .map(e => ({
+                            previous: e.previousElementSibling.getBoundingClientRect().toJSON(),
+                            current: e.getBoundingClientRect().toJSON()
+                        })),
+                    formRows: [...document.querySelectorAll('form.card > p + p, .card form > p + p')]
+                        .map(e => e.getBoundingClientRect().top -
+                            e.previousElementSibling.getBoundingClientRect().bottom),
                     choices: [...document.querySelectorAll('input[type=checkbox]')].map(e => ({
                         rect: e.getBoundingClientRect().toJSON(),
                         label: e.labels[0]?.getBoundingClientRect().toJSON(),
@@ -84,11 +119,15 @@ def layouts(page, base, artifacts, *, baseline=False):
                     assert not item["overflow"], metrics[-1]
                     assert item["heading"] >= 16, metrics[-1]
                     for block in item["body"]:
-                        # Full-width navigation can inset its link content with padding.
+                        # Navigation and grid containers inset their content with padding.
                         left = block["rect"]["left"] + block["startInset"]
                         right = block["rect"]["right"] - block["endInset"]
                         assert abs(left - item["heading"]) <= 2, metrics[-1]
                         assert right <= width - 16, metrics[-1]
+                    for pair in item["cardStacks"]:
+                        assert pair["current"]["top"] - pair["previous"]["bottom"] >= 8, metrics[-1]
+                        assert abs(pair["current"]["left"] - pair["previous"]["left"]) <= 2
+                    assert all(gap >= 8 for gap in item["formRows"]), metrics[-1]
                     for choice in item["choices"]:
                         assert 12 <= choice["rect"]["width"] <= 24
                         assert choice["rect"]["height"] >= 12

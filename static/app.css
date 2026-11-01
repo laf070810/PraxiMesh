@@ -379,8 +379,12 @@ div.choice-list {
 .workspace-page > form {
   max-width: 800px;
 }
-.workspace-page > .card + .card {
+.workspace-page > .card + .card,
+.section.compact:not(.account-grid) > .card + .card {
   margin-top: 14px;
+}
+.section.compact > .card + h2 {
+  margin-top: 32px;
 }
 .section-heading h1,
 .section-heading h2,
@@ -417,6 +421,10 @@ a.card:hover {
   font-size: 14px;
   color: var(--muted);
   margin-bottom: 0;
+}
+form.card > p,
+.card form > p {
+  margin-bottom: 14px;
 }
 .card h2 {
   font-size: 21px;
