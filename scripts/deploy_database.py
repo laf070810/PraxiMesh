@@ -1011,3 +1011,66 @@ class DeploymentDatabase:
                 check()
         except (psycopg.Error, OSError):
             raise DeploymentDatabaseError("GPU configuration database checks failed") from None
+
+    def gpu_worker_snapshot(self, name, token, device):
+        """One read-only MVCC view; never hold rows while the worker starts."""
+        from judge.gpu_device_lock import GPU_UUID
+
+        try:
+            valid = type(token) is str and str(uuid.UUID(token)) == token
+        except ValueError:
+            valid = False
+        if not valid or type(device) is not str or not GPU_UUID.fullmatch(device):
+            raise DeploymentDatabaseError("GPU observation requires the original operation/device")
+        self._require_operation_lock()
+        try:
+            with self.connection(name) as connection:
+                connection.execute("SET TRANSACTION READ ONLY")
+                if "core_gpudevice" not in worker_privileges(connection):
+                    raise DeploymentDatabaseError(
+                        "GPU observation requires the recorded GPU schema"
+                    )
+                row = connection.execute(
+                    "SELECT statement_timestamp(), q.pause_token, q.paused_at, "
+                    "d.id, d.state, d.worker_id, d.owner_token, d.fingerprint, "
+                    "d.environment, d.checked_at, d.job_id, d.reservation_token, "
+                    "EXISTS (SELECT 1 FROM public.core_submission "
+                    "WHERE status IN ('queued', 'running')), "
+                    "EXISTS (SELECT 1 FROM public.core_gpudevice "
+                    "WHERE job_id IS NOT NULL OR reservation_token IS NOT NULL) "
+                    "FROM public.core_queuelock q LEFT JOIN public.core_gpudevice d "
+                    "ON d.id=%s WHERE q.id=1",
+                    (device,),
+                ).fetchone()
+                if row is None or str(row[1]) != token or row[2] is None:
+                    raise DeploymentDatabaseError(
+                        "GPU observation lost its original admission pause"
+                    )
+                result = {
+                    "observed_at": row[0],
+                    "pending": row[12],
+                    "reservations": row[13],
+                    "device": dict(
+                        zip(
+                            (
+                                "id",
+                                "state",
+                                "worker_id",
+                                "owner_token",
+                                "fingerprint",
+                                "environment",
+                                "checked_at",
+                                "job_id",
+                                "reservation_token",
+                            ),
+                            row[3:12],
+                            strict=True,
+                        )
+                    )
+                    if row[3] is not None
+                    else None,
+                }
+            self._require_operation_lock()
+            return result
+        except (psycopg.Error, OSError):
+            raise DeploymentDatabaseError("GPU readiness observation failed") from None

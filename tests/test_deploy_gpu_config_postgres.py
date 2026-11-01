@@ -128,3 +128,53 @@ def test_worker_pause_allows_original_reservation_and_releases_its_connection(gu
             )
     device.refresh_from_db()
     assert device.job_id == job and device.reservation_token == reservation
+
+
+def test_readiness_snapshot_keeps_original_pause_and_observes_other_device_reservation(guarded_pg):
+    database, device, token = guarded_pg
+    other = GPUDevice.objects.create(
+        id="GPU-" + str(uuid.uuid4()),
+        worker_id="other-original-worker",
+        owner_token=uuid.uuid4(),
+        fingerprint="b" * 64,
+        job_id=uuid.uuid4(),
+        reservation_token=uuid.uuid4(),
+    )
+    with database.operation_lock():
+        result = database.gpu_worker_snapshot("owned-test-database", token, device.pk)
+    assert result["device"]["id"] == device.pk
+    assert result["device"]["owner_token"] == device.owner_token
+    assert result["reservations"] is True and result["pending"] is False
+    assert result["observed_at"] <= timezone.now()
+    other.refresh_from_db()
+    assert other.job_id and other.reservation_token
+
+
+def test_readiness_snapshot_is_read_only_and_does_not_block_worker_heartbeat(
+    guarded_pg, monkeypatch
+):
+    from scripts import deploy_database
+
+    database, device, token = guarded_pg
+    original = deploy_database.worker_privileges
+
+    def check(session):
+        assert session.execute("SHOW transaction_read_only").fetchone() == ("on",)
+        with database._connect("probe", autocommit=True) as probe:
+            probe.execute("SET lock_timeout = '150ms'")
+            assert (
+                probe.execute(
+                    "UPDATE core_gpudevice SET checked_at=NULL WHERE id=%s", (device.pk,)
+                ).rowcount
+                == 1
+            )
+            assert (
+                probe.execute("UPDATE core_queuelock SET paused_at=paused_at WHERE id=1").rowcount
+                == 1
+            )
+        return original(session)
+
+    monkeypatch.setattr(deploy_database, "worker_privileges", check)
+    with database.operation_lock():
+        result = database.gpu_worker_snapshot("owned-test-database", token, device.pk)
+    assert result["device"]["checked_at"] is None

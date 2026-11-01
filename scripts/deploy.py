@@ -707,6 +707,13 @@ class Deployment:
         runtime = WorkerRuntime(self, generation, mode=mode)
         return getattr(runtime, action)()
 
+    def gpu_worker_ready(self, generation, release, *, wait=False):
+        """Internal observation only; full GPU apply/exposure remains closed."""
+        from scripts.deploy_gpu_readiness import GPUReadiness
+
+        check = GPUReadiness(self, generation, release)
+        return check.wait() if wait else check.observe()
+
     def expose(self, generation, token, phase="active"):
         self.control(generation, "judge_admission", "resume", "--token", token)
         if not self.ready(generation):

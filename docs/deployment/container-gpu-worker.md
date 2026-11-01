@@ -169,6 +169,22 @@ DOCKER_HOST="unix://$PRAXIMESH_DOCKER_SOCKET" \
 
 此入口使用真实私有文件、文件锁和协调器 CPU 子进程，Docker、数据库及代理为显式测试模型。真实 PostgreSQL 使用上节的一次性数据库命令；实际 Docker 契约、镜像入口、完整 GPU 启动、清理、队列及部署恢复仍待验收，不能从模型通过推断已可运行。当前证据和跳过项见 [G47](../acceptance-g47.md)，设计约束见 [ADR-063](../adr/063-durable-gpu-worker-lifecycle.md)。
 
+<a id="readiness-observation"></a>
+### 协调器内部的就绪观察
+
+`scripts/deploy_gpu_readiness.py` 将原运行实例、配置、冻结发布环境及数据库状态一起核对。固定 runtime、runsc、NVRTC 和 Docker CLI 声明从已验证的归档字节读取，不执行归档 Python。设备须属于本代 worker，完整启动后发布的心跳仍新鲜，全部待执行任务和物理预约均已排空；同名旧启动或不同环境不能通过。
+
+每次快照使用单条只读 SQL，环境检查后重新观察容器、心跳与数据库。等待从原容器启动时间计算完整预算，重试不会延长期限；超时保留原容器及任务记录。该组件不缓存成功为曝光凭据，不生成 receipt，也尚未接通 GPU `apply`。
+
+不调用实际 Docker 或设备的检查：
+
+```sh
+.venv/bin/pytest -q tests/test_deploy_gpu_readiness.py \
+  tests/test_deploy_gpu_readiness_database.py
+```
+
+测试使用真实临时文件/源码归档和明确的 Docker、数据库模型，不能证明实际 worker 已就绪。数据库只读事务、其他设备孤立预约及心跳不被阻塞的检查已纳入 `tests/test_deploy_gpu_config_postgres.py`，执行入口见上节；具体结果和未执行项见 [G48](../acceptance-g48.md)。
+
 ## Compose 预检与运行
 
 准备非敏感连接参数。数据库网络须是现有 PostgreSQL 容器所在网络；这里不会新建或改写应用数据库。`PRAXIMESH_GPU_MINOR` 从挂载清单读取物理 minor，不能用 CUDA 逻辑序号代替。
