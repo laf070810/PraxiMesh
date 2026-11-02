@@ -42,6 +42,18 @@ def test_coordinator_owned_configuration_requires_generation_record(tmp_path, co
         read_config(tmp_path)
 
 
+@pytest.mark.parametrize("name", ["local-practice.json", "local-operation.json"])
+def test_local_state_is_rejected_before_reading_worker_settings(tmp_path, name):
+    journal = tmp_path / "journal"
+    journal.mkdir(mode=0o700)
+    marker = journal / name
+    marker.write_bytes(b"invalid but explicitly local")
+    marker.chmod(0o600)
+    with pytest.raises(ValueError, match="Local GPU practice"):
+        read_config(tmp_path)
+    assert marker.read_bytes() == b"invalid but explicitly local"
+
+
 @pytest.mark.parametrize(
     "arguments",
     [
@@ -304,6 +316,27 @@ def test_standalone_configuration_cannot_write_coordinator_owned_state(
     write_private(tmp_path / "mounts.json", {"version": 4, "device_observer": observer})
     write_private(tmp_path / preparation.OWNER, {"synthetic": "already assigned"})
     with pytest.raises(ValueError, match="deployment coordinator"):
+        configure(
+            tmp_path,
+            configuration["worker_id"],
+            configuration["task_image"],
+            configuration["driver_manifest"],
+            configuration["database"],
+        )
+    assert not (tmp_path / "worker.json").exists()
+
+
+@pytest.mark.parametrize("name", ["local-practice.json", "local-operation.json"])
+def test_standalone_configuration_cannot_take_over_local_state(
+    tmp_path, configured, configuration, name
+):
+    (tmp_path / "locks").mkdir(mode=0o700)
+    (tmp_path / "journal").mkdir(mode=0o700)
+    observer = copy.deepcopy(configured.control.saved["device_observer"])
+    observer.update(schema=2, minor=0)
+    write_private(tmp_path / "mounts.json", {"version": 4, "device_observer": observer})
+    write_private(tmp_path / "journal" / name, {"local": "already assigned"})
+    with pytest.raises(ValueError, match="Local GPU practice"):
         configure(
             tmp_path,
             configuration["worker_id"],

@@ -8,6 +8,7 @@ from urllib.parse import unquote, urlsplit
 from judge.container_controller import STATE
 from judge.container_deployment_config import check_generation
 from judge.container_journal import private
+from judge.container_practice_state import reject_local_state
 from judge.container_service import IMAGE_ID
 from judge.driver_artifacts import validate_manifest
 from judge.gpu_device_lock import GPU_UUID
@@ -85,6 +86,7 @@ def read_config(directory=STATE, *, worker_contract=None, with_generation=False)
     fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
     try:
         private(os.fstat(fd), directory=True)
+        reject_local_state(fd)
         source_fd = os.open(
             "worker.json",
             os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC,

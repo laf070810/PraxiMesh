@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT))
 from judge.container_controller import manifest  # noqa: E402
 from judge.container_journal import ContainerJournal, private  # noqa: E402
 from judge.container_monitor import validate_observer  # noqa: E402
+from judge.container_practice_state import reject_local_state  # noqa: E402
 from judge.container_service import IMAGE_ID, LocalEngine  # noqa: E402
 from judge.container_worker_config import MAX_CONFIG, validate_config  # noqa: E402
 from judge.driver_artifacts import validate_manifest  # noqa: E402
@@ -126,6 +127,11 @@ def configure(directory, worker_id, task_image, driver_manifest, database, *, en
     )
     # Never replace a live worker's configuration or create a second lock namespace.
     with DeviceLock(directory / "locks", value["gpu"]):
+        fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+        try:
+            reject_local_state(fd)
+        finally:
+            os.close(fd)
         try:
             (directory / OWNER).lstat()
         except FileNotFoundError:

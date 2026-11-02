@@ -366,6 +366,7 @@ def main():
                     "public-config-rejected": "Container GPU worker stopped: SandboxUnavailable",
                     "column-grant-rejected": "stage=database error=ValueError",
                     "source-rejected": "Container GPU worker stopped: ValueError",
+                    "local-state-rejected": "Container GPU worker stopped: ValueError",
                     "legacy-control-rejected": "stage=controller error=ValueError",
                 }[name]
                 assert message.encode() in raw, "Rejection did not occur at its expected boundary"
@@ -392,6 +393,16 @@ def main():
             run_check("public-config-rejected", expected=1)
         finally:
             (state / "worker.json").chmod(0o600)
+        local_journal = state / "journal"
+        local_journal.mkdir(mode=0o700)
+        local_marker = local_journal / "local-practice.json"
+        local_marker.write_text('{"scope":"synthetic-local-state"}\n')
+        local_marker.chmod(0o600)
+        try:
+            run_check("local-state-rejected", expected=1)
+        finally:
+            local_marker.unlink()
+            local_journal.rmdir()
         with psycopg.connect(admin, sslmode="disable", autocommit=True) as database:
             database.execute("GRANT SELECT (password) ON auth_user TO gpu_worker")
             try:

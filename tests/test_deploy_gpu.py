@@ -213,6 +213,8 @@ def test_gpu_configuration_rejects_ambiguous_node_selection(prepared, defect):
         "receipts",
         "journal/unknown.active.json",
         "journal/old.archive.json",
+        "journal/local-practice.json",
+        "journal/local-operation.json",
         "locks/another.lock",
         deploy_gpu.OWNER,
     ],

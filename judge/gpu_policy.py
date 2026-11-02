@@ -63,6 +63,8 @@ EXECUTION_SOURCES = (
     "judge/container_lifecycle.py",
     "judge/container_readiness.py",
     "judge/container_startup_suite.py",
+    "judge/container_practice_state.py",
+    "judge/container_practice.py",
     "judge/gpu_receipt.py",
     "judge/gpu_probes.py",
     "judge/gpu_device_lock.py",
