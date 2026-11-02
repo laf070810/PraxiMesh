@@ -495,7 +495,7 @@ def main():
         if created_admin_network:
             engine.run("network", "rm", admin_network)
         if (output / "worker/image-id").exists():
-            engine.run("image", "rm", tag)
+            engine.run("image", "rm", "--no-prune", tag)
         shutil.rmtree(temporary)
         assert not engine.run(
             "container", "ls", "--all", "--quiet", "--filter", "label=" + label

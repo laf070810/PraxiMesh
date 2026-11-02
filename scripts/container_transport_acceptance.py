@@ -202,7 +202,7 @@ def main():
     finally:
         try:
             if image is not None:
-                engine.run("image", "rm", out.name)
+                engine.run("image", "rm", "--no-prune", out.name)
                 report["owned_image_tag_removed"] = True
         finally:
             save()

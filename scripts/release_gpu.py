@@ -197,7 +197,7 @@ def build_images(context, work, options, docker, log_directory):
                 shutil.copyfile(path, log_directory / name)
         for name in (tag + "-task", tag):
             if engine.run("image", "inspect", name, check=False).returncode == 0:
-                engine.run("image", "rm", name)
+                engine.run("image", "rm", "--no-prune", name)
 
 
 def main():

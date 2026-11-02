@@ -141,7 +141,7 @@ def main():
     finally:
         if image is not None:
             report["image_tag_removed"] = (
-                engine.run("image", "rm", output.name, check=False).returncode == 0
+                engine.run("image", "rm", "--no-prune", output.name, check=False).returncode == 0
             )
             if not report["image_tag_removed"]:
                 report["passed"] = False

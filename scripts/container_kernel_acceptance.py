@@ -289,7 +289,7 @@ def main():
             shutil.rmtree(base)
             report["storage_removed"] = True
         if image is not None:
-            engine.run("image", "rm", out.name)
+            engine.run("image", "rm", "--no-prune", out.name)
             report["image_tag_removed"] = True
         save(out / "result.json", report)
     assert report["passed"]

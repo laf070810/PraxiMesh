@@ -321,7 +321,7 @@ def main():
                 errors.append(type(error).__name__ + ": " + str(error))
         report["tag_cleanup"] = []
         for tag in tags:
-            removed = engine.run("image", "rm", tag, check=False).returncode == 0
+            removed = engine.run("image", "rm", "--no-prune", tag, check=False).returncode == 0
             report["tag_cleanup"].append({"tag": tag, "removed": removed})
             if not removed:
                 errors.append("Test image tag removal failed: " + tag)

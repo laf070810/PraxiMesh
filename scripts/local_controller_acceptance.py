@@ -406,7 +406,7 @@ def main():
             assert config.is_dir() and not config.is_symlink()
             shutil.rmtree(config)
         result["client_configs_removed"] = not list(args.out.glob("px-local-attach-*"))
-        engine.run("image", "rm", tag, check=False)
+        engine.run("image", "rm", "--no-prune", tag, check=False)
         save(args.out / "result.json", result)
     print(json.dumps(result, indent=2))
 

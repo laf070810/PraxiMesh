@@ -203,7 +203,7 @@ def main():
                 identifier = image_id.read_text().strip()
                 info = json.loads(engine.run("image", "inspect", tag).stdout)
                 assert len(info) == 1 and info[0]["Id"] == identifier
-                engine.run("image", "rm", tag)
+                engine.run("image", "rm", "--no-prune", tag)
                 report["tag_cleanup"].append({"tag": tag, "removed": True})
             shutil.rmtree(base)
             report["storage_removed"] = True

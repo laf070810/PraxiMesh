@@ -210,7 +210,7 @@ def main():
                 current = json.loads(engine.run("image", "inspect", output.name).stdout)
                 if len(current) != 1 or current[0]["Id"] != identifier:
                     raise RuntimeError("Owned driver image tag changed")
-                engine.run("image", "rm", output.name)
+                engine.run("image", "rm", "--no-prune", output.name)
                 report["owned_image_tag_removed"] = True
         finally:
             if report.get("retain_storage"):
