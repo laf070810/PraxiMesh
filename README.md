@@ -38,7 +38,7 @@ docker compose -f compose.yaml -f compose.ai.yaml up --build -d
 | --- | --- |
 | 用 Python 修改代码或内容 | [源码开发环境](docs/deployment/README.md#development) |
 | 接入 GitHub CI 或准备 GPU 节点 | [CI 与部署 runner](docs/deployment/ci.md)、[GPU 方案与检查入口](docs/deployment/gpu.md#validation-options)、[容器 worker 及协调器开发状态](docs/deployment/container-gpu-worker.md) |
-| 在自己的编辑器中做题 | [本地公开测试、CUDA 隔离编译与提交工具](docs/local-practice.md)；完整本地 GPU 执行仍在开发 |
+| 在自己的编辑器中做题 | [本地公开测试、CUDA 隔离编译与提交工具](docs/local-practice.md)；[本地 GPU 命令](docs/deployment/local-gpu.md)已接入，真实 GPU 全路径尚未验收 |
 | 新增题目、课程或学习路径 | [内容规范](docs/content.md)、[工程项目](projects/README.md)、[组织题库](docs/rfcs/009-organizations-and-packages.md) |
 | 贡献代码或查看设计 | [贡献指南](CONTRIBUTING.md)、[AGENTS.md](AGENTS.md)、[设计索引](docs/README.md) |
 

@@ -44,7 +44,7 @@ CUDA 下载与提交适用于维护者提供的固定版本题目；默认题库
 
 工具检查 bundle、解释器依赖与沙箱政策，随后在 WASI 内运行学员程序，不执行宿主 Python/Node 或下载的构建脚本。结果带 `formal_result: false`、bundle 和政策摘要。成功退出码为 0，公开测试未通过为 1，配置或传输错误为 2。此功能要求受支持的非 root Linux x86_64 环境；不可用时仍可编辑并提交服务器。
 
-`test` 仅支持 CPU/WASI 题，CUDA 会明确报错并保留本地文件。当前没有本地 GPU 执行入口；可用下面的 `submit --mode run` 请求具有已验收 GPU 环境的服务器执行公开样例。服务器不可用时返回 503，不会改用宿主编译器或普通容器。
+`test` 仅支持 CPU/WASI 题，CUDA 会明确报错并保留本地文件。`test-gpu` 已连接完整启动检查与公开样例执行，适用于明确配置的独占单卡；当前真实 GPU 全路径尚未验收。镜像构建、首次绑定、运行和 `recover-gpu` 集中在[本地 GPU 指南](deployment/local-gpu.md)。也可用下面的 `submit --mode run` 请求具有已验收 GPU 环境的服务器执行公开样例。服务器不可用时返回 503，不会改用宿主编译器或普通容器。
 
 <a id="cuda-compilation"></a>
 

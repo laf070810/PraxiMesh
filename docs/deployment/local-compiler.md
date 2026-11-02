@@ -1,6 +1,6 @@
 # 本地 CUDA 编译工具
 
-适合在自己的编辑器中编写 CUDA、检查能否编译，同时不占用显卡的场景。它使用独立 rootless Docker 和 gVisor 内的 NVRTC，不需要网站、数据库、CUDA 驱动或 GPU。公开样例执行和性能测试仍需已验收的 GPU 服务；完整本地 GPU 执行尚未交付。
+适合在自己的编辑器中编写 CUDA、检查能否编译，同时不占用显卡的场景。它使用独立 rootless Docker 和 gVisor 内的 NVRTC，不需要网站、数据库、CUDA 驱动或 GPU。公开样例执行另见[本地 GPU 命令](local-gpu.md)，该路径已连接但真实硬件全路径尚未验收；正式性能成绩仍需已验收的 GPU 服务。
 
 ## 准备与构建
 

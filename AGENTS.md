@@ -120,6 +120,8 @@
 
 ## 文档与 Git 提交
 
+- 本地 GPU 公开命令经 `scripts/practice.py` 和 `judge/container_practice_client.py` 调用原控制器，操作统一在[本地 GPU 指南](docs/deployment/local-gpu.md)。只有协议、原进程/容器成功退出和内部终态同时确认才返回结果；中断沿原物理状态恢复，不重放源码。`build_local_gpu.py` 仅静态构建，`prepare-gpu`/`initialize-gpu`/`test-gpu`/`recover-gpu` 均可能访问设备，不得因“不占 GPU 的开发”而执行。CPU 管道验收与镜像构建不能证明硬件通过。
+
 - README 面向首次使用者，说明当前能力、快速体验、真实评测、自部署与开发入口；历史执行细节放对应验收文档。保持需求追踪、RFC/ADR、使用指南和 CHANGELOG 与实际行为一致。
 - 部署操作统一维护在 [docs/deployment/](docs/deployment/README.md)：首页负责方案和场景选择，专页负责对应操作。README 只保留最短启动入口，旧文档路径只做跳转；新增部署选项时同步更新选择表，避免在多处复制完整步骤。
 - **工作过程中及时 git commit**：每完成一个可审阅的相关增量，就记录具体问题、变化和验证结果。提交前检查差异，只包含本次任务文件；未完成或未验证部分必须如实说明。用户未要求时不推送、不改写既有共享历史。

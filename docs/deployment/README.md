@@ -10,6 +10,7 @@
 | **发布协调器单机部署** | 需要域名/HTTPS、PostgreSQL、分离数据库权限、受控升级和失败恢复的长期站点 | Caddy + 固定 Web/worker 镜像 + PostgreSQL；私有配置、部署状态与备份 | worker 通过真实检查后开放评测；AI 使用预先配置的 HTTPS 服务 | [生产部署完整操作](production.md) |
 | **源码开发环境** | 修改应用、调试页面、编写内容或开发评测器 | Python/uv + Django 开发服务器；默认仓库内 SQLite；回环访问 | 默认不启动评测或 AI；按需单独配置 WASI worker 和模型 | [下方源码开发](#development) |
 | **本地 CUDA 编译工具** | 用自己的编辑器写 CUDA，需要编译检查且不占 GPU | 私有 rootless Docker + 固定 gVisor/NVRTC 镜像；独立状态目录 | 只编译，不运行样例；不需要网站或数据库 | [构建、使用与恢复](local-compiler.md) |
+| **本地 GPU 公开样例（待硬件验收）** | 已获独占单卡，准备在自己的编辑器中调试公开 CUDA 样例 | 私有 rootless Docker + 固定控制/任务镜像；原物理状态；无需网站或数据库 | 每次完整启动检查，仅返回非正式公开结果；当前未完成真实 GPU 验收 | [构建、首次绑定、运行与恢复](local-gpu.md) |
 | **GPU 宿主 worker（开发验收）** | 已获得独占单卡、准备验证完整 CUDA 控制流程 | 普通用户 systemd + RootlessKit/Podman/runsc；持久私有目录与同一应用数据库 | 每次启动完整检查；新 CUDA 路径尚未验收，网站 GPU 提交关闭 | [配置与生命周期](gpu.md#gpu-worker) |
 | **GPU 容器 worker（开发验收）** | 已有 PostgreSQL，准备使用固定镜像和 Compose 验证专用 GPU 节点 | 原私有 rootless Docker、锁/journal、数据库网络；可制作统一四镜像发布包 | 无设备预检与完整启动分开；真实 GPU、队列及升级仍待验收 | [构建、配置和 Compose](container-gpu-worker.md)、[统一发布包](releases.md#gpu-release) |
 
@@ -101,7 +102,7 @@ uv sync --frozen
 | 运行 `*acceptance.py` | 在可销毁环境做验证，脚本会清理自有服务和数据；日常站点应使用对应安装入口 |
 | 配好 Git 远端后是否还要部署 runner | 应用/WASI CI 使用托管 runner；只有自动操作发布协调器时才需专用部署 runner，见 [CI 接入](ci.md) |
 | 添加 GPU 或 Actions runner 后能否评测 CUDA | 还需 GPU 评测器、隔离、设备预约及真实验收；已定位的 rootless CPU 配额问题和实施顺序见 [GPU 准备](gpu.md) |
-| WASI、gVisor 是其他部署套餐吗 | 它们是代码执行后端。当前两种自部署入口使用已验证的 WASI；gVisor 路径未完成本机验收，也不代表已有 GPU 支持 |
+| WASI、gVisor 是其他部署套餐吗 | 它们是代码执行后端。当前两种自部署入口使用已验证的 WASI；当前 gVisor GPU 全路径仍待硬件验收，安装运行时本身不能开放 GPU 提交 |
 | 页面能打开但不能评测 | 先看 `/health/` 的 `evaluation` 和 worker 日志，再按[排障手册](operations.md)检查探针、心跳、暂停和额度 |
 
 ## 按任务查阅
