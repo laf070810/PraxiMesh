@@ -52,7 +52,10 @@ class Control:
         proc_path="/proc",
         proc_readonly=True,
         observation_devices=(),
+        local_mode=None,
     ):
+        if local_mode is not None and local_mode not in {"initialize", "run", "recover"}:
+            raise ValueError("Unknown fixed local controller mode")
         self.engine, self.image = engine, image
         self.name = "px-controller-" + uuid.uuid4().hex
         self.label = "io.praximesh.controller.acceptance=" + self.name
@@ -77,6 +80,21 @@ class Control:
             config["job"],
             config["reservation"],
         ]
+        entrypoint = []
+        self.entrypoint = [PYTHON, "-I", "/opt/praximesh/scripts/container_controller_fixture.py"]
+        if local_mode is not None:
+            from judge.container_practice_protocol import ENTRY
+
+            entrypoint = ["--entrypoint", PYTHON]
+            self.entrypoint = [PYTHON]
+            self.arguments = [
+                "-I",
+                ENTRY,
+                local_mode,
+                config["device"],
+                uuid.uuid4().hex,
+                str(time.monotonic() + 30),
+            ]
         self.container_id = (
             engine.run(
                 "container",
@@ -111,6 +129,7 @@ class Control:
                 f"type=bind,source={socket_path or engine.path},target={SOCKET},readonly",
                 *observer_mount,
                 *(f"--device={device}:{device}:rw" for device in self.observation_devices),
+                *entrypoint,
                 image,
                 *self.arguments,
             )
@@ -140,6 +159,7 @@ class Control:
         value = json.loads(result.stdout)[0]
         assert value["Id"] == self.container_id and value["Image"] == self.image
         assert value["Name"] == "/" + self.name and value["Config"]["Cmd"] == self.arguments
+        assert value["Config"]["Entrypoint"] == self.entrypoint
         key, expected = self.label.split("=", 1)
         assert value["Config"]["Labels"][key] == expected
         if hasattr(self, "original"):
@@ -365,6 +385,14 @@ def main():
                 )
                 report["controller_image"] = controller_image
             save(result_path, report)
+        for mode in ("initialize", "run", "recover"):
+            path, config = new_state("local-entry-" + mode)
+            current = control(path, config, "normal", local_mode=mode)
+            failure = current.wait(2).strip()
+            assert failure == "Local controller unavailable; retain original state for recovery."
+            assert not (path / "journal" / "local-practice.json").exists()
+            assert not (path / "journal" / (config["device"] + ".active.json")).exists()
+            passed("local-entry-rejects-v1-" + mode, {"no_task_created": True, "failure": failure})
         if options.observe_device:
             from scripts.container_monitor_acceptance import observation_checks
 
