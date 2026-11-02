@@ -6,6 +6,7 @@
 
 - [阶段计划与安全发布门槛](plan.md)
 - [完整 PRD 需求追踪](requirements.md) — 全目标实施中，当前 F 自部署制品及版本题目反馈已验证
+- [G71：当前默认 Compose 的完整重放](acceptance-g71.md) — 当前镜像内真实评测、直接 IP、离线关闭与重建保留通过
 - [G70：父镜像清理、桥接退出同步与无设备工具验证](acceptance-g70.md)
 - [RFC-024：本地 CUDA 练习工具](rfcs/024-local-cuda-practice.md) — 编译与本地 GPU 命令已连接；真实 GPU 全路径尚待验收
 - [本地 GPU 操作指南](deployment/local-gpu.md) — 构建、首次绑定、公开样例和恢复集中入口
