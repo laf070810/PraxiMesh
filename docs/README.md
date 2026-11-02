@@ -10,6 +10,8 @@
 - [ADR-073：本地 CUDA 编译复用无设备隔离任务](adr/073-local-device-free-cuda-compilation.md)
 - [ADR-074：本地公开样例使用独立 GPU 任务协议](adr/074-public-only-gpu-task-protocol.md) — 命令与完整启动接入待完成
 - [ADR-075：复用完整容器启动检查](adr/075-shared-container-startup-suite.md) — 共用流程不依赖数据库，就绪事务仍由服务端负责
+- [ADR-076：本地 GPU 操作绑定原物理状态](adr/076-local-gpu-operation-lifecycle.md) — 内部完整执行与原操作恢复；外部命令/通信及硬件待验收
+- [G66：本地 GPU 内部生命周期与原状态恢复](acceptance-g66.md) — 真实文件/进程与明确模型边界
 - [G65：独立容器启动流程与无设备部署复验](acceptance-g65.md) — 完整本地命令与 GPU 硬件验收仍待完成
 - [G64：GPU 公开任务协议与真实 CPU 调用链](acceptance-g64.md) — 628 项相关检查、27 个 CPU/runsc 场景；不代表 GPU 验收
 - [G63：本地 CUDA 无设备编译与恢复](acceptance-g63.md) — 真实编译、CLI 中断恢复与源码交付；不访问 GPU

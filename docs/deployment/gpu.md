@@ -54,12 +54,14 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 ```sh
 .venv/bin/pytest -q tests/test_container_startup_suite.py \
   tests/test_container_readiness.py tests/test_gpu_readiness.py tests/test_gpu_receipt.py
+.venv/bin/pytest -q tests/test_container_practice.py \
+  tests/test_container_worker_config.py tests/test_deploy_gpu.py
 .venv/bin/python scripts/postgres_tests.py -q \
   tests/test_container_readiness.py tests/test_gpu_readiness_postgres.py \
   tests/test_gpu_admission_postgres.py tests/test_gpu_container_recovery.py
 ```
 
-第一条还验证共用流程在未加载 Django 的独立进程中导入，以及每阶段失败、取消、环境变化和清理未完成时扣留结果。第二条命令创建并清理自有 PostgreSQL 容器和卷，检查宿主与容器的发布竞争、预约保留以及 Web 只读权限；GPU 方法仍是测试替身。不得将临时测试文档复制到实际 receipt 目录。实际无设备控制镜像依赖与锁/恢复重放沿用[控制端映射入口](#container-controller)，应用镜像/Compose 预检见[容器 worker 指南](container-gpu-worker.md#开发时不占-gpu-的验证)。原始就绪验证见 [G40](../acceptance-g40.md)，共用流程及本轮重放见 [G65](../acceptance-g65.md)。
+第一条还验证共用流程在未加载 Django 的独立进程中导入，以及每阶段失败、取消、环境变化和清理未完成时扣留结果。第二条验证开发中的本地生命周期、实际私有文件/锁、进程 SIGKILL 与服务端/协调器互斥；GPU 和容器执行为模型，不是本地 GPU 运行入口。第三条创建并清理自有 PostgreSQL 容器和卷，检查宿主与容器的发布竞争、预约保留以及 Web 只读权限；GPU 方法仍是测试替身。不得将临时测试文档复制到实际 receipt 目录。实际无设备控制镜像依赖与锁/恢复重放沿用[控制端映射入口](#container-controller)，应用镜像/Compose 预检见[容器 worker 指南](container-gpu-worker.md#开发时不占-gpu-的验证)。原始就绪验证见 [G40](../acceptance-g40.md)，共用流程见 [G65](../acceptance-g65.md)，本地生命周期与互斥复验见 [G66](../acceptance-g66.md)。
 
 宿主到容器的切换必须先由原宿主控制器完成恢复并停止，留下无预约的已恢复状态；不能让容器清理 systemd 服务或把未完成的宿主任务改成容器指纹。已有容器升级继续使用同一私有锁和 journal，由冻结的原记录识别旧实例。
 
