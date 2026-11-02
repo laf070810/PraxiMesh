@@ -67,6 +67,7 @@ EXECUTION_SOURCES = (
     "judge/container_practice.py",
     "judge/container_practice_protocol.py",
     "judge/container_practice_transport.py",
+    "judge/container_practice_host.py",
     "scripts/container_practice_entry.py",
     "judge/gpu_receipt.py",
     "judge/gpu_probes.py",

@@ -143,41 +143,47 @@ def environment(operator):
     return {"uid": os.getuid(), "gid": os.getgid(), "mapped_operator": [uid, gid], "limits": limits}
 
 
+def validate_mounts(saved, device):
+    """Validate the same frozen declaration on the host and inside its controller."""
+    expected = {"version", "operator", "root", "locks", "journal", "socket", "engine"}
+    version = saved.get("version") if type(saved) is dict else None
+    if type(version) is not int or version not in {1, 2, 3, 4}:
+        raise SandboxUnavailable("Unknown controller mount contract")
+    if version >= 2:
+        expected.add("host_processes")
+    if version >= 3:
+        expected.add("device_observer")
+    if set(saved) != expected:
+        raise SandboxUnavailable("Unknown controller mount contract")
+    if version >= 2:
+        validate_manifest(saved["host_processes"])
+    if version >= 3:
+        validate_observer(saved["device_observer"])
+        if version != saved["device_observer"]["schema"] + 2:
+            raise SandboxUnavailable("NVIDIA observer and controller profiles differ")
+        if saved["device_observer"]["target"]["uuid"] != device:
+            raise SandboxUnavailable("Controller and NVIDIA observer select different devices")
+    for key in ("operator", "root", "locks", "journal", "socket"):
+        value = saved[key]
+        if (
+            type(value) is not list
+            or len(value) != 2
+            or any(type(i) is not int or i < 0 for i in value)
+        ):
+            raise SandboxUnavailable("Invalid controller mount identity")
+    try:
+        if str(uuid.UUID(saved["engine"])) != saved["engine"]:
+            raise ValueError
+    except (ValueError, TypeError, AttributeError):
+        raise SandboxUnavailable("Invalid controller engine identity") from None
+    return saved
+
+
 class ContainerController:
     def __init__(self, device):
         self.guard = self.journal = self.engine = self.host_processes = None
-        self.saved = self.read_manifest()
-        expected = {"version", "operator", "root", "locks", "journal", "socket", "engine"}
-        version = self.saved.get("version")
-        if type(version) is not int or version not in {1, 2, 3, 4}:
-            raise SandboxUnavailable("Unknown controller mount contract")
-        if version >= 2:
-            expected.add("host_processes")
-        if version >= 3:
-            expected.add("device_observer")
-        if set(self.saved) != expected:
-            raise SandboxUnavailable("Unknown controller mount contract")
-        if version >= 2:
-            validate_manifest(self.saved["host_processes"])
-        if version >= 3:
-            validate_observer(self.saved["device_observer"])
-            if version != self.saved["device_observer"]["schema"] + 2:
-                raise SandboxUnavailable("NVIDIA observer and controller profiles differ")
-            if self.saved["device_observer"]["target"]["uuid"] != device:
-                raise SandboxUnavailable("Controller and NVIDIA observer select different devices")
-        for key in ("operator", "root", "locks", "journal", "socket"):
-            value = self.saved[key]
-            if (
-                type(value) is not list
-                or len(value) != 2
-                or any(type(i) is not int or i < 0 for i in value)
-            ):
-                raise SandboxUnavailable("Invalid controller mount identity")
-        try:
-            if str(uuid.UUID(self.saved["engine"])) != self.saved["engine"]:
-                raise ValueError
-        except (ValueError, TypeError, AttributeError):
-            raise SandboxUnavailable("Invalid controller engine identity") from None
+        self.saved = validate_mounts(self.read_manifest(), device)
+        version = self.saved["version"]
         self.process_identity = environment(self.saved["operator"])
         try:
             if version >= 2:

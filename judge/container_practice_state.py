@@ -33,6 +33,21 @@ def inode(info):
     return [info.st_dev, info.st_ino]
 
 
+def validate_marker(marker, binding):
+    require(
+        type(marker) is dict
+        and set(marker) == {"schema", "scope", "id", "binding"}
+        and type(marker["schema"]) is int
+        and marker["schema"] == 1
+        and marker["scope"] == SCOPE
+        and type(marker["id"]) is str
+        and re.fullmatch(r"[a-f0-9]{32}", marker["id"])
+        and canonical_digest(marker["binding"]) == canonical_digest(binding),
+        "Local practice belongs to a different original installation",
+    )
+    return marker
+
+
 def reject_local_state(directory_fd):
     """Worker configuration reads must reject even an invalid local marker."""
     try:
@@ -75,18 +90,7 @@ class LocalPracticeState:
                 )
                 marker = {"schema": 1, "scope": SCOPE, "id": uuid.uuid4().hex, "binding": binding}
                 journal.write(MARKER, marker, create=True)
-            require(
-                type(marker) is dict
-                and set(marker) == {"schema", "scope", "id", "binding"}
-                and type(marker["schema"]) is int
-                and marker["schema"] == 1
-                and marker["scope"] == SCOPE
-                and type(marker["id"]) is str
-                and re.fullmatch(r"[a-f0-9]{32}", marker["id"])
-                and marker["binding"] == binding,
-                "Local practice belongs to a different original installation",
-            )
-            self.marker = deepcopy(marker)
+            self.marker = deepcopy(validate_marker(marker, binding))
             self.check()
         except BaseException:
             self.close()
