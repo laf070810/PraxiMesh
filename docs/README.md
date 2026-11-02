@@ -13,6 +13,7 @@
 - [ADR-076：本地 GPU 操作绑定原物理状态](adr/076-local-gpu-operation-lifecycle.md) — 内部完整执行与原操作恢复；外部命令/通信及硬件待验收
 - [ADR-077：本地固定控制入口与有界管道协议](adr/077-local-gpu-controller-protocol.md) — 握手与完整启动接入；宿主启动器及硬件待验收
 - [ADR-078：宿主命令保留原客户端与物理状态身份](adr/078-local-controller-host-ownership.md) — 原客户端互斥、状态绑定和持久记录；启动器实施中
+- [G68：本地宿主状态与原控制容器生命周期](acceptance-g68.md) — 实际 CPU 容器与原实例清理；公开 CLI 和 GPU 验收仍待完成
 - [G67：本地固定入口、管道与当前镜像检查](acceptance-g67.md)
 - [G66：本地 GPU 内部生命周期与原状态恢复](acceptance-g66.md) — 真实文件/进程与明确模型边界
 - [G65：独立容器启动流程与无设备部署复验](acceptance-g65.md) — 完整本地命令与 GPU 硬件验收仍待完成

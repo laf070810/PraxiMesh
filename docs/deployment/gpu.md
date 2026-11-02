@@ -32,6 +32,7 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 | 容器控制连接、启动身份与断连恢复 | [受信通信检查](#container-transport)；真实 CPU guest，不生成 GPU 凭证 |
 | 持久容器身份、创建中断及旧制品清理 | [持久恢复检查](#container-journal)；固定 CPU，不释放数据库 GPU 预约 |
 | 容器化控制端的 UID、共用锁与重启接管 | [控制端映射检查](#container-controller)；固定 CPU，不连接应用数据库或 GPU |
+| 本地宿主命令的原容器登记、中断与移除 | [本地宿主生命周期检查](#local-controller)；固定 CPU 夹具，不是 GPU 运行入口 |
 | 持久容器记录与数据库预约、锁超时和重试 | [数据库/容器联合检查](#container-database)；一次性 PostgreSQL 与固定 CPU guest，不开放 GPU |
 | 固定 CUDA 编译器、候选语法和编译后清理 | [无设备编译检查](#container-compiler)；真实 NVRTC 在 gVisor guest 中运行，不占 GPU、不判题 |
 | 任务总预算、CPU/内存/PID/存储上限和故障恢复 | [任务预算检查](#container-workload)；整个任务容器含运行时开销，不等同于 guest 独占资源或 GPU 显存 |
@@ -56,6 +57,7 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
   tests/test_container_readiness.py tests/test_gpu_readiness.py tests/test_gpu_receipt.py
 .venv/bin/pytest -q tests/test_container_practice.py \
   tests/test_container_practice_protocol.py tests/test_container_practice_entry.py \
+  tests/test_container_practice_host.py tests/test_container_practice_controller.py \
   tests/test_container_worker_config.py tests/test_deploy_gpu.py
 .venv/bin/python scripts/postgres_tests.py -q \
   tests/test_container_readiness.py tests/test_gpu_readiness_postgres.py \
@@ -64,11 +66,28 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 
 第一条还验证共用流程在未加载 Django 的独立进程中导入，以及每阶段失败、取消、环境变化和清理未完成时扣留结果。第二条验证开发中的本地生命周期、实际私有文件/锁、管道与信号、进程 SIGKILL 及服务端/协调器互斥；GPU 和容器执行为模型，不是本地 GPU 运行入口。第三条创建并清理自有 PostgreSQL 容器和卷，检查宿主与容器的发布竞争、预约保留以及 Web 只读权限；GPU 方法仍是测试替身。不得将临时测试文档复制到实际 receipt 目录。实际无设备控制镜像依赖与锁/恢复重放沿用[控制端映射入口](#container-controller)，应用镜像/Compose 预检见[容器 worker 指南](container-gpu-worker.md#开发时不占-gpu-的验证)。原始就绪验证见 [G40](../acceptance-g40.md)，共用流程见 [G65](../acceptance-g65.md)，本地生命周期与互斥复验见 [G66](../acceptance-g66.md)。
 
-开发中的固定本地入口已连接原生命周期，使用握手、完整环境和有界管道控制源码发送，见 [ADR-077](../adr/077-local-gpu-controller-protocol.md)及 [G67](../acceptance-g67.md)。它尚未提供可使用的宿主 CLI；原控制容器的持久登记、成功退出核对和回收仍须接入。不能直接把该内部脚本作为已验收的 GPU 部署命令，现有 `compile`/`test` 用途保持不变。
+开发中的固定本地入口已连接原生命周期，使用握手、完整环境和有界管道控制源码发送，见 [ADR-077](../adr/077-local-gpu-controller-protocol.md)及 [G67](../acceptance-g67.md)。宿主原状态、客户端互斥与控制容器登记/清理组件见 [ADR-078](../adr/078-local-controller-host-ownership.md)。完整管道调用、成功退出与内部终态的联合核对，以及公开 CLI 仍须接入；现有 `compile`/`test` 用途保持不变。
 
 宿主到容器的切换必须先由原宿主控制器完成恢复并停止，留下无预约的已恢复状态；不能让容器清理 systemd 服务或把未完成的宿主任务改成容器指纹。已有容器升级继续使用同一私有锁和 journal，由冻结的原记录识别旧实例。
 
 容器凭证采用独立 schema，绑定宿主 boot ID、映射操作者、原安装/daemon/挂载和全部环境身份。专用 `container_gpu_worker` 命令、镜像和独立 Compose 的配置统一见[容器 worker 部署](container-gpu-worker.md)；不能通过旧 receipt 或手工修改数据库状态开放提交。实际设备与完整 CUDA 验收仍待完成。
+
+<a id="local-controller"></a>
+
+## 不占 GPU 的本地宿主生命周期检查
+
+修改本地宿主记录、容器创建/启动意图或原实例清理时，先运行上方 `test_container_practice_host.py` 和 `test_container_practice_controller.py`，再运行实际容器检查。输出目录必须不存在，CLI 归档使用[控制端映射检查](#container-controller)的固定版本与摘要。
+
+```sh
+.venv/bin/python scripts/local_controller_acceptance.py \
+  --docker-socket /run/user/$(id -u)/docker.sock \
+  --docker-cli-archive /absolute/path/to/docker-29.9.2.tgz \
+  --out /absolute/path/to/new-local-controller-check
+```
+
+该工具构建独立测试镜像，在测试进程内使用固定 CPU 入口并移除全部设备参数；设备声明为合成数据，不查询 NVIDIA、加载管理库或运行 CUDA。检查实际 UID/cgroup/procfs、原物理文件锁、创建后清理、附着后停止、改名拒绝、真实移除后的响应丢失，以及宿主客户端 SIGKILL 后的原容器恢复。结果、构建日志写入输出目录；只清理精确自有容器、临时状态与测试标签。
+
+这个入口验证外层宿主组件，不能代替生产固定入口的正向协议调用、完整本地 GPU 工具或硬件验收。它不签发凭证，也不改站点配置；CPU 夹具不会成为生产命令的回退。
 
 <a id="container-controller-faults"></a>
 
