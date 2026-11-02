@@ -11,6 +11,8 @@
 - [ADR-074：本地公开样例使用独立 GPU 任务协议](adr/074-public-only-gpu-task-protocol.md) — 命令与完整启动接入待完成
 - [ADR-075：复用完整容器启动检查](adr/075-shared-container-startup-suite.md) — 共用流程不依赖数据库，就绪事务仍由服务端负责
 - [ADR-076：本地 GPU 操作绑定原物理状态](adr/076-local-gpu-operation-lifecycle.md) — 内部完整执行与原操作恢复；外部命令/通信及硬件待验收
+- [ADR-077：本地固定控制入口与有界管道协议](adr/077-local-gpu-controller-protocol.md) — 握手与完整启动接入；宿主启动器及硬件待验收
+- [G67：本地固定入口、管道与当前镜像检查](acceptance-g67.md)
 - [G66：本地 GPU 内部生命周期与原状态恢复](acceptance-g66.md) — 真实文件/进程与明确模型边界
 - [G65：独立容器启动流程与无设备部署复验](acceptance-g65.md) — 完整本地命令与 GPU 硬件验收仍待完成
 - [G64：GPU 公开任务协议与真实 CPU 调用链](acceptance-g64.md) — 628 项相关检查、27 个 CPU/runsc 场景；不代表 GPU 验收

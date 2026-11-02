@@ -55,13 +55,16 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 .venv/bin/pytest -q tests/test_container_startup_suite.py \
   tests/test_container_readiness.py tests/test_gpu_readiness.py tests/test_gpu_receipt.py
 .venv/bin/pytest -q tests/test_container_practice.py \
+  tests/test_container_practice_protocol.py tests/test_container_practice_entry.py \
   tests/test_container_worker_config.py tests/test_deploy_gpu.py
 .venv/bin/python scripts/postgres_tests.py -q \
   tests/test_container_readiness.py tests/test_gpu_readiness_postgres.py \
   tests/test_gpu_admission_postgres.py tests/test_gpu_container_recovery.py
 ```
 
-第一条还验证共用流程在未加载 Django 的独立进程中导入，以及每阶段失败、取消、环境变化和清理未完成时扣留结果。第二条验证开发中的本地生命周期、实际私有文件/锁、进程 SIGKILL 与服务端/协调器互斥；GPU 和容器执行为模型，不是本地 GPU 运行入口。第三条创建并清理自有 PostgreSQL 容器和卷，检查宿主与容器的发布竞争、预约保留以及 Web 只读权限；GPU 方法仍是测试替身。不得将临时测试文档复制到实际 receipt 目录。实际无设备控制镜像依赖与锁/恢复重放沿用[控制端映射入口](#container-controller)，应用镜像/Compose 预检见[容器 worker 指南](container-gpu-worker.md#开发时不占-gpu-的验证)。原始就绪验证见 [G40](../acceptance-g40.md)，共用流程见 [G65](../acceptance-g65.md)，本地生命周期与互斥复验见 [G66](../acceptance-g66.md)。
+第一条还验证共用流程在未加载 Django 的独立进程中导入，以及每阶段失败、取消、环境变化和清理未完成时扣留结果。第二条验证开发中的本地生命周期、实际私有文件/锁、管道与信号、进程 SIGKILL 及服务端/协调器互斥；GPU 和容器执行为模型，不是本地 GPU 运行入口。第三条创建并清理自有 PostgreSQL 容器和卷，检查宿主与容器的发布竞争、预约保留以及 Web 只读权限；GPU 方法仍是测试替身。不得将临时测试文档复制到实际 receipt 目录。实际无设备控制镜像依赖与锁/恢复重放沿用[控制端映射入口](#container-controller)，应用镜像/Compose 预检见[容器 worker 指南](container-gpu-worker.md#开发时不占-gpu-的验证)。原始就绪验证见 [G40](../acceptance-g40.md)，共用流程见 [G65](../acceptance-g65.md)，本地生命周期与互斥复验见 [G66](../acceptance-g66.md)。
+
+开发中的固定本地入口已连接原生命周期，使用握手、完整环境和有界管道控制源码发送，见 [ADR-077](../adr/077-local-gpu-controller-protocol.md)及 [G67](../acceptance-g67.md)。它尚未提供可使用的宿主 CLI；原控制容器的持久登记、成功退出核对和回收仍须接入。不能直接把该内部脚本作为已验收的 GPU 部署命令，现有 `compile`/`test` 用途保持不变。
 
 宿主到容器的切换必须先由原宿主控制器完成恢复并停止，留下无预约的已恢复状态；不能让容器清理 systemd 服务或把未完成的宿主任务改成容器指纹。已有容器升级继续使用同一私有锁和 journal，由冻结的原记录识别旧实例。
 
@@ -250,7 +253,9 @@ curl --fail --location \
 
 随后运行真实 CPU guest，终止其可信控制容器，由另一容器或宿主读取原 journal 清理，并验证宿主创建的新预算任务（journal v2）可以被容器接管；其余场景继续覆盖原开发预算和 v1 记录。新调用使用新的实例和 nonce。任务容器继续无宿主挂载、无网络、无设备，使用独立期限。控制端拥有所选 daemon 的控制权；只读 socket 挂载不是 API 权限隔离，生产必须使用专用可信执行环境。
 
-结果保存在 `test-results/px-container-controller-*/result.json`；核对每项检查、原进程树消失、任务和控制容器清理、镜像标签及临时存储移除。失败时保留原始报告；无法确认清理时保留恢复目录，不能手动清空记录来绕过身份检查。资源与权限决策见 [ADR-041](../adr/041-containerized-control-identity.md)，初次及当前预算兼容检查分别见 [G25](../acceptance-g25.md)和 [G28](../acceptance-g28.md)，镜像内完整策略核对见 [G36](../acceptance-g36.md)。此工具不部署常驻 GPU worker，不连接应用数据库、不生成 receipt；正式 worker 的环境发布、完整启动与 GPU Compose 仍待交付。
+当前无设备模式共十项，还包括固定本地入口的初始化、公开执行和恢复对旧 v1 状态的三项拒绝；拒绝发生在创建本地标记和任务之前。这些检查只证明入口打包和拒绝行为，正向 GPU 执行仍待硬件验收。
+
+结果保存在 `test-results/px-container-controller-*/result.json`；核对每项检查、原进程树消失、任务和控制容器清理、镜像标签及临时存储移除。失败时保留原始报告；无法确认清理时保留恢复目录，不能手动清空记录来绕过身份检查。资源与权限决策见 [ADR-041](../adr/041-containerized-control-identity.md)，初次及当前预算兼容检查分别见 [G25](../acceptance-g25.md)和 [G28](../acceptance-g28.md)，镜像内完整策略核对见 [G36](../acceptance-g36.md)，固定入口复验见 [G67](../acceptance-g67.md)。此工具不部署常驻 GPU worker、不连接应用数据库、不生成 receipt；完整 worker 与 Compose 的当前状态见[容器部署](container-gpu-worker.md)，本工具通过不替代真实 GPU 验收。
 
 <a id="container-device-observer"></a>
 
@@ -268,13 +273,13 @@ curl --fail --location \
 
 Debian/Ubuntu 的库目录通常为 `/usr/lib/x86_64-linux-gnu`。构建只从受信系统目录静态复制当前版本的 `libnvidia-ml` 与固定查询工具，校验 ELF、SONAME、内核版本、大小和摘要；不改宿主驱动、不从学员输入选择文件，也不把本机驱动快照作为源码发布。管理制品与四库 CUDA/PTX 任务镜像不同。管理镜像没有 CUDA 库时，版本输出中的 `CUDA Version: N/A` 是允许的非身份信息；工具与驱动版本仍须精确匹配。
 
-完整来源模式采用显式 v4 挂载契约和管理制品 v2，预期共十九项：十项配置拒绝、实际完整查询与无设备 CPU 任务、v2 进程视图兼容，再加原来的七组 v1 控制端检查。仅向可信控制端映射所选卡和 `nvidiactl`，保持私有 PID/cgroup、只读宿主 procfs 及原控制预算。NVML 自建的 `nvidia-caps` 只允许为私有空目录；任何额外文件、设备、链接或可写共享目录均拒绝。任务容器与 CPU guest 不获得 NVIDIA 设备。
+完整来源模式采用显式 v4 挂载契约和管理制品 v2，当前预期共二十二项：十项配置拒绝、实际完整查询与无设备 CPU 任务、v2 进程视图兼容、原七组 v1 控制端检查及新增的三项本地入口拒绝。仅向可信控制端映射所选卡和 `nvidiactl`，保持私有 PID/cgroup、只读宿主 procfs 及原控制预算。NVML 自建的 `nvidia-caps` 只允许为私有空目录；任何额外文件、设备、链接或可写共享目录均拒绝。任务容器与 CPU guest 不获得 NVIDIA 设备。
 
 计算、图形、MPS 及完整 XML 查询都必须成功。完整进程列表不按类型过滤，包含 `O`、组合类型及未知类型；三个上下文列表必须是它的子集。权限不足、不支持、缺失/重复字段、部分结果、来源不一致、数量超限、版本变化和超时不能视为空闲。原始 XML 和进程名称不写入普通报告。
 
 报告中的 `real_external_gpu_processes_observed` 表示本次是否实际看到了外部 GPU 进程；为 false 时，只证明身份/空列表读取和原任务生命周期，不证明实际 CUDA、其他或无上下文 PID 的来源与归属。不得为补造此项证据擅自运行 GPU 程序。完整列表也不授予排他访问，正式执行仍需持续监测和硬件验收。
 
-去掉 `--full-device-inventory` 可重放原 v3、仅 NVML 三类上下文的十七项兼容检查；该模式不能提供完整占用语义。两种模式均须核对报告中的清理与原任务停止，不得用作 GPU 就绪凭证。完整来源与结果见 [ADR-049](../adr/049-container-full-device-inventory.md)、[G33](../acceptance-g33.md)，原接口见 [ADR-048](../adr/048-container-nvml-observation.md)、[G32](../acceptance-g32.md)。完整任务设备隔离、启动与 CUDA 故障恢复、worker/Compose/发布集成继续待完成。
+去掉 `--full-device-inventory` 可重放原 v3、仅 NVML 三类上下文的兼容检查，加上新增的本地入口拒绝，当前预期二十项；该模式不能提供完整占用语义。两种模式均须核对报告中的清理与原任务停止，不得用作 GPU 就绪凭证。完整来源与历史结果见 [ADR-049](../adr/049-container-full-device-inventory.md)、[G33](../acceptance-g33.md)，原接口见 [ADR-048](../adr/048-container-nvml-observation.md)、[G32](../acceptance-g32.md)。G67 只重放无设备模式，没有重新查询 GPU；当前完整设备执行、故障恢复及产品部署仍待硬件验收。
 
 <a id="container-journal"></a>
 
