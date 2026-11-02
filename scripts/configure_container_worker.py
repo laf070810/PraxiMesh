@@ -4,28 +4,23 @@ Never starts a workload, changes a daemon or publishes readiness.
 """
 
 import argparse
-import json
 import os
 import stat
 import sys
-import uuid
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from judge.container_controller import manifest  # noqa: E402
-from judge.container_journal import ContainerJournal, private  # noqa: E402
+from judge.container_deployment_config import OWNER  # noqa: E402
+from judge.container_journal import private  # noqa: E402
 from judge.container_monitor import validate_observer  # noqa: E402
 from judge.container_practice_state import reject_local_state  # noqa: E402
+from judge.container_preparation import create_json, initialize_state  # noqa: E402
 from judge.container_service import IMAGE_ID, LocalEngine  # noqa: E402
 from judge.container_worker_config import MAX_CONFIG, validate_config  # noqa: E402
 from judge.driver_artifacts import validate_manifest  # noqa: E402
 from judge.gpu_device_lock import DeviceLock  # noqa: E402
-from judge.gpu_monitor import identify, processes, query  # noqa: E402
 from judge.gpu_session import decode_frame  # noqa: E402
-from judge.nvml_artifacts import validate_manifest as validate_management  # noqa: E402
-from scripts.deploy_gpu import OWNER  # noqa: E402
 
 
 def read_private(path, *, artifact=False):
@@ -41,66 +36,6 @@ def read_private(path, *, artifact=False):
         if len(data) > MAX_CONFIG:
             raise ValueError("Private input exceeds its size limit")
         return data
-
-
-def create_json(path, value):
-    temporary = path.with_name("." + path.name + "." + uuid.uuid4().hex)
-    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-    try:
-        with os.fdopen(fd, "w") as target:
-            json.dump(value, target, sort_keys=True)
-            target.write("\n")
-            target.flush()
-            os.fsync(target.fileno())
-        os.link(temporary, path)
-    finally:
-        temporary.unlink()
-    directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-    try:
-        os.fsync(directory_fd)
-    finally:
-        os.close(directory_fd)
-
-
-def initialize_state(directory, engine, device, management):
-    """Explicit new installation only; caller must authorize metadata access."""
-    directory = Path(directory)
-    if not directory.is_absolute() or directory.resolve() != directory or directory.exists():
-        raise ValueError("Initialization requires a new absolute private state directory")
-    validate_management(management)
-    if management["schema"] != 2:
-        raise ValueError("The full pinned management bundle is required")
-    target = identify(device)
-    observation = query("-i", device, "--query", "--xml-format")
-    if processes(observation, target):
-        raise ValueError("Selected GPU has external processes; nothing was stopped")
-    minor = ET.fromstring(observation).findtext("gpu/minor_number", "")
-    if not minor.isascii() or not minor.isdecimal():
-        raise ValueError("The selected physical device minor is missing")
-    observer = validate_observer(
-        {
-            "schema": 2,
-            "target": target,
-            "minor": int(minor),
-            "library": management,
-        }
-    )
-    engine.verify()
-    directory.mkdir(mode=0o700)
-    for name in ("locks", "journal"):
-        (directory / name).mkdir(mode=0o700)
-    with DeviceLock(directory / "locks", device) as guard:
-        with ContainerJournal(directory / "journal", guard, engine):
-            create_json(
-                directory / "mounts.json",
-                manifest(
-                    directory,
-                    engine,
-                    host_processes=True,
-                    device_observer=observer,
-                ),
-            )
-    return observer
 
 
 def configure(directory, worker_id, task_image, driver_manifest, database, *, enabled=False):

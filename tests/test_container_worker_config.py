@@ -372,7 +372,7 @@ def test_explicit_new_state_uses_original_mount_and_lock_identities(
     monkeypatch,
     occupied,
 ):
-    from scripts import configure_container_worker as module
+    from judge import container_preparation as module
     from tests.test_container_journal import Engine
 
     target = configured.adapter.target

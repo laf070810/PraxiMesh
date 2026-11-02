@@ -150,7 +150,7 @@ def lifecycle(prepared, monkeypatch):
             elif args[:2] == ("container", "create"):
                 assert host.read(RECORD)["phase"] == "prepared"
                 assert list(args[2:]) == host.read(RECORD)["arguments"]
-                value.state = snapshot(host, control.record)
+                value.state = snapshot(host, host.read(RECORD))
                 data = value.state["Id"].encode()
             elif args[:2] == ("container", "inspect"):
                 assert args[-1] == value.state["Id"]

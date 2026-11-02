@@ -30,6 +30,29 @@ from judge.gpu_task_protocol import public_task_request, task_request
 from judge.sandbox import SandboxUnavailable
 
 
+def configured_environment(
+    target, selection, *, image, driver_manifest, management_manifest, engine
+):
+    """Build the same strict identity from independently observed metadata."""
+    artifacts = {
+        "task_image": image,
+        "task_contract": gpu_task_digest(),
+        "runtime_contract": contract_digest(),
+        "controller_contract": controller_digest(),
+        "driver_manifest": validate_manifest(driver_manifest),
+        "management_manifest": management_manifest,
+        "runsc_sha256": gpu_artifacts.RUNSC_SHA256,
+        "runsc_release": gpu_artifacts.RELEASE,
+        "nvrtc_archive_sha256": gpu_artifacts.NVRTC_ARCHIVE_SHA256,
+        "nvrtc_libraries": dict(gpu_artifacts.LIBRARIES),
+        "docker_cli_version": CLI_VERSION,
+        "docker_cli_sha256": CLI_SHA256,
+        "engine": engine_identity(engine),
+        "controller_limits": LIMITS,
+    }
+    return environment_identity(target, selection, artifacts, execution_digest=execution_digest())
+
+
 class ContainerGPUAdapter:
     def __init__(self, control, *, image, driver_manifest):
         if type(control) is not ContainerController:
@@ -46,24 +69,13 @@ class ContainerGPUAdapter:
         self.control.check()
         monitor = ContainerDeviceMonitor(self.control)
         selection = monitor.task_device_spec()
-        artifacts = {
-            "task_image": self.image,
-            "task_contract": gpu_task_digest(),
-            "runtime_contract": contract_digest(),
-            "controller_contract": controller_digest(),
-            "driver_manifest": self.driver_manifest,
-            "management_manifest": monitor.saved["library"],
-            "runsc_sha256": gpu_artifacts.RUNSC_SHA256,
-            "runsc_release": gpu_artifacts.RELEASE,
-            "nvrtc_archive_sha256": gpu_artifacts.NVRTC_ARCHIVE_SHA256,
-            "nvrtc_libraries": dict(gpu_artifacts.LIBRARIES),
-            "docker_cli_version": CLI_VERSION,
-            "docker_cli_sha256": CLI_SHA256,
-            "engine": engine_identity(self.control.engine.verify()),
-            "controller_limits": LIMITS,
-        }
-        return environment_identity(
-            monitor.saved["target"], selection, artifacts, execution_digest=execution_digest()
+        return configured_environment(
+            monitor.saved["target"],
+            selection,
+            image=self.image,
+            driver_manifest=self.driver_manifest,
+            management_manifest=monitor.saved["library"],
+            engine=self.control.engine.verify(),
         )
 
     def check(self):

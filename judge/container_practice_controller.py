@@ -570,6 +570,7 @@ class ControllerInvocation:
             require(not raw.strip(), "An existing controller name cannot be adopted")
             self.save("prepared")
             self.fresh = True
+            return deepcopy(operation)
 
     def check_fresh(self):
         require(self.fresh, "Recovered controller intents may only be cleaned, never started")

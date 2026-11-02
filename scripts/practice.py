@@ -1,8 +1,9 @@
-"""Download exercises, test in WASI, compile CUDA, and submit to a trusted server.
+"""Download exercises, test in WASI/GPU isolation, compile CUDA, and submit.
 
 Network commands use only the Python standard library. Local tests additionally
 require this checkout's locked judge dependencies and a verified WASI bundle;
-CUDA compilation uses an explicitly configured device-free runsc compiler image.
+CUDA compilation uses an explicitly configured device-free runsc compiler image;
+GPU examples require separately prepared original state and matching images.
 No downloaded or submitted program is executed by the host interpreter.
 """
 
@@ -432,8 +433,8 @@ def local_test(directory, bundle, digest):
     _, package, source = load_exercise(directory)
     if package["problem"]["evaluator"] == "cuda-kernel-v1":
         raise PracticeError(
-            "CUDA public tests cannot run in WASI. Use submit --mode run against a server "
-            "with verified GPU evaluation; local CUDA execution is not available. "
+            "CUDA public tests cannot run in WASI. Use test-gpu with an explicitly prepared "
+            "local GPU, or submit --mode run against a server with verified GPU evaluation. "
             "The compile command checks CUDA compilation only, without a GPU."
         )
     sys.path.insert(0, str(ROOT))
@@ -534,6 +535,35 @@ def local_compiler(args):
         ) from None
 
 
+def local_gpu(args):
+    package = source = problem = None
+    if args.command == "test-gpu":
+        _, package, source = load_exercise(args.directory)
+        if package["problem"]["evaluator"] != "cuda-kernel-v1":
+            raise PracticeError("test-gpu accepts CUDA exercises only; use test for WASI.")
+        problem = gpu_payload(package)
+    sys.path.insert(0, str(ROOT))
+    from judge.gpu_device_lock import DeviceLockError
+    from judge.sandbox import SandboxUnavailable
+    from scripts.practice_gpu import run_local
+
+    try:
+        result = run_local(args, problem=problem, source=source)
+        return {**result, "version_id": package["version_id"]} if package else result
+    except InterruptedError:
+        raise PracticeError(
+            "Local GPU operation cancelled. Retain the original state and use recover-gpu before another run."
+        ) from None
+    except DeviceLockError:
+        raise PracticeError(
+            "The original GPU lock is busy or changed. Retain its state; do not create another lock directory."
+        ) from None
+    except (OSError, ValueError, SandboxUnavailable):
+        raise PracticeError(
+            "Local GPU operation is unavailable. Check the current image bundle, rootless Docker and original private state; retain state and use recover-gpu after interruption."
+        ) from None
+
+
 def submit(client, directory, token, key, mode):
     server, package, source = load_exercise(directory)
     if server != client.origin:
@@ -582,6 +612,42 @@ def main(argv=None):
         command.add_argument(
             "--docker-socket", required=True, help="Explicit rootless Docker socket"
         )
+    prepare_gpu = commands.add_parser(
+        "prepare-gpu",
+        help="Operator only: read the authorized idle GPU and create new original physical state",
+    )
+    prepare_gpu.add_argument(
+        "--gpu", required=True, help="Full authorized physical GPU UUID, never an index"
+    )
+    initialize_gpu = commands.add_parser(
+        "initialize-gpu",
+        help="Bind unused original GPU state to local practice and check the fixed controller",
+    )
+    test_gpu = commands.add_parser(
+        "test-gpu",
+        help="Run CUDA public examples after complete GPU startup checks; no formal score",
+    )
+    test_gpu.add_argument("directory", type=Path)
+    recover_gpu = commands.add_parser(
+        "recover-gpu",
+        help="Recover only the original local GPU invocation without replaying source",
+    )
+    for command in (prepare_gpu, initialize_gpu, test_gpu, recover_gpu):
+        command.add_argument(
+            "--gpu-bundle",
+            required=True,
+            type=Path,
+            help="Private local-gpu.json from scripts/build_local_gpu.py",
+        )
+        command.add_argument(
+            "--state",
+            required=True,
+            type=Path,
+            help="Absolute original physical GPU state; shared across all exercises",
+        )
+        command.add_argument(
+            "--docker-socket", required=True, help="Explicit rootless Docker socket"
+        )
     send = commands.add_parser(
         "submit", help="Submit source to the server's trusted evaluation queue"
     )
@@ -598,6 +664,8 @@ def main(argv=None):
             result = local_test(args.directory, args.bundle, args.bundle_sha256)
         elif args.command in {"compile", "recover-compiler"}:
             result = local_compiler(args)
+        elif args.command in {"prepare-gpu", "initialize-gpu", "test-gpu", "recover-gpu"}:
+            result = local_gpu(args)
         else:
             if not args.server:
                 raise PracticeError("Network commands require an explicit --server origin.")
@@ -623,7 +691,13 @@ def main(argv=None):
             if result["status"] == "platform_error":
                 return 2
             return 0 if result["status"] == "compiled" else 1
-        return 0 if args.command != "test" or result["result"]["verdict"] == "accepted" else 1
+        if args.command == "test-gpu" and result["result"]["verdict"] == "platform_error":
+            return 2
+        return (
+            0
+            if args.command not in {"test", "test-gpu"} or result["result"]["verdict"] == "accepted"
+            else 1
+        )
     except (PracticeError, ImportError) as exc:
         message = (
             str(exc)
