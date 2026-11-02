@@ -102,6 +102,48 @@ def peer(sock, *, child=None):
     return pid
 
 
+def bridge_process(sock):
+    """Pin the verified live peer; never wait on a subsequently reused PID."""
+    pid = peer(sock)
+    try:
+        descriptor = os.pidfd_open(pid)
+    except (AttributeError, OSError):
+        raise SandboxUnavailable("Original bridge process could not be observed") from None
+    try:
+        if peer(sock) != pid or select.select([descriptor], [], [], 0)[0]:
+            raise SandboxUnavailable("Original bridge process changed before acceptance")
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+class ContainerChannel(Channel):
+    """Keep the supervised controller alive until its original bridge exits."""
+
+    def __init__(self, sock, *, bridge_fd, deadline, on_tick):
+        super().__init__(sock, deadline=deadline, on_tick=on_tick)
+        self.bridge_fd = bridge_fd
+
+    def close(self):
+        descriptor, self.bridge_fd = self.bridge_fd, None
+        try:
+            super().close()  # EOF lets the bridge drain its output and return.
+            if descriptor is None:
+                return
+            end = min(self.deadline, time.monotonic() + 3)
+            while True:
+                self.on_tick()
+                remaining = end - time.monotonic()
+                if remaining <= 0:
+                    raise SandboxUnavailable("Original container bridge did not exit")
+                if select.select([descriptor], [], [], min(0.05, remaining))[0]:
+                    return
+        finally:
+            if descriptor is not None:
+                os.close(descriptor)
+
+
 class ContainerListener:
     def __init__(self, *, on_tick):
         self.status = readiness()
@@ -125,10 +167,14 @@ class ContainerListener:
                 if not select.select([self.sock], [], [], 0.05)[0]:
                     continue
                 connection, _ = self.sock.accept()
+                descriptor = None
                 try:
-                    peer(connection)
-                    channel = Channel(
-                        connection, deadline=self.status["deadline"], on_tick=self.on_tick
+                    descriptor = bridge_process(connection)
+                    channel = ContainerChannel(
+                        connection,
+                        bridge_fd=descriptor,
+                        deadline=self.status["deadline"],
+                        on_tick=self.on_tick,
                     )
                     channel.send(hello(self.status))
                     if channel.receive() != {
@@ -139,6 +185,8 @@ class ContainerListener:
                     return channel
                 except BaseException:
                     connection.close()
+                    if descriptor is not None:
+                        os.close(descriptor)
                     raise
             raise SandboxUnavailable("Container control connection deadline expired")
         finally:

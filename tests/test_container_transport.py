@@ -141,25 +141,34 @@ def test_listener_requires_original_ack_and_never_reconnects(monkeypatch, tmp_pa
     path = str(tmp_path / "control.sock")
     monkeypatch.setattr(container_transport, "SOCKET", path)
     monkeypatch.setattr(container_transport, "readiness", lambda: status)
-    monkeypatch.setattr(container_transport, "peer", lambda _sock: 123)
+    exit_read, exit_write = os.pipe()
+    monkeypatch.setattr(container_transport, "bridge_process", lambda _sock: os.dup(exit_read))
     listener = ContainerListener(on_tick=lambda: None)
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-        sock.connect(path)
-        channel = Channel(sock, deadline=status["deadline"], on_tick=lambda: None)
-        with ThreadPoolExecutor(1) as pool:
-            result = pool.submit(listener.accept)
-            assert channel.receive() == hello(status)
-            channel.send(
-                {"event": "transport-accepted", "nonce": status["nonce"] if accepted else "wrong"}
-            )
-            if accepted:
-                result.result(timeout=4).close()
-            else:
-                with pytest.raises(SandboxUnavailable, match="acknowledgement"):
-                    result.result(timeout=4)
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as another:
-            with pytest.raises(ConnectionRefusedError):
-                another.connect(path)
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+            sock.connect(path)
+            channel = Channel(sock, deadline=status["deadline"], on_tick=lambda: None)
+            with ThreadPoolExecutor(1) as pool:
+                result = pool.submit(listener.accept)
+                assert channel.receive() == hello(status)
+                channel.send(
+                    {
+                        "event": "transport-accepted",
+                        "nonce": status["nonce"] if accepted else "wrong",
+                    }
+                )
+                os.write(exit_write, b"x")  # Handshake fixture's process-exit observation.
+                if accepted:
+                    result.result(timeout=4).close()
+                else:
+                    with pytest.raises(SandboxUnavailable, match="acknowledgement"):
+                        result.result(timeout=4)
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as another:
+                with pytest.raises(ConnectionRefusedError):
+                    another.connect(path)
+    finally:
+        os.close(exit_read)
+        os.close(exit_write)
 
 
 def test_non_main_process_cannot_listen(monkeypatch):

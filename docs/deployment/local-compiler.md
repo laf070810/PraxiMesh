@@ -4,7 +4,7 @@
 
 ## 准备与构建
 
-使用非 root Linux x86_64 环境、当前源码的[锁定 judge 依赖](README.md#development)，以及启用了 CPU、内存、swap、PID 控制器的私有 rootless Docker。限额缺失时见 [CPU 控制器配置](gpu.md#其他主机遇到-cpu-配额缺失时)。需要的两个固定离线归档与 GPU 开发检查共用：[gVisor 下载](gpu.md#提前保存固定镜像减少下载依赖)、[NVRTC 13.1.115 下载](gpu.md#重放内核正确性检查)。下载和本页构建均不访问设备；归档摘要由构建器核对。
+使用非 root Linux x86_64 环境、当前源码的[锁定 judge 依赖](README.md#development)，以及启用了 CPU、内存、swap、PID 控制器的私有 rootless Docker。内核须支持 [pidfd（Linux 5.3+）](https://docs.python.org/3.11/library/os.html#os.pidfd_open)，供固定镜像中的控制器确认原连接进程退出。限额缺失时见 [CPU 控制器配置](gpu.md#其他主机遇到-cpu-配额缺失时)。需要的两个固定离线归档与 GPU 开发检查共用：[gVisor 下载](gpu.md#提前保存固定镜像减少下载依赖)、[NVRTC 13.1.115 下载](gpu.md#重放内核正确性检查)。下载和本页构建均不访问设备；归档摘要由构建器核对。
 
 下面的输出目录必须不存在，父目录必须已存在。构建器不会覆盖旧构建，也不会操作站点容器。
 

@@ -73,7 +73,7 @@
 - GPU 服务监督在 `judge/gpu_service.py`，短事务回调在 `core/gpu_control.py`；仅可信控制器可传入启动命令，源码/答案/密钥不得放进命令行或日志。终止前核对预约及服务调用身份，终止后核对整个 cgroup；数据库等待失败不直接释放设备。服务控制改动用 [非 GPU 控制链检查](docs/deployment/gpu.md#不占-gpu-的控制链检查)和实际 PostgreSQL 验证；固定 CPU 进程树通过不替代 CUDA 清理、设备空闲与正确性恢复。
 - 容器监督基础在 `judge/container_service.py` 和 `judge/container_entry.py`。仅可信程序可使用固定镜像，保留私有 rootless socket、空白客户端配置、最小环境、绝对期限和实际容器实例核对；不能把 runc 容器用于学员代码。按[集中检查入口](docs/deployment/gpu.md#container-supervision)重放固定 CPU 故障及清理；同名替换或无法确认停止时不得清空预约，不以此检查生成 GPU 凭证。
 - 容器内 runsc 使用 `judge/container_runtime_service.py` 和 `judge/container_oci.py` 的独立配置及身份范围；按[嵌套运行时入口](docs/deployment/gpu.md#container-runtime)验证。固定 Moby 配置及七项额外调用不能改成 unconfined；完整运行时归档须先校验，外层代码和状态不得进入 guest。外层总配额与 guest 子配额必须分别说明；此开发路径不生成 GPU 凭证，未接入正式提交。
-- 容器控制通信在 `judge/container_connection.py`、`judge/container_transport.py`；只对已持锁、完整配置核对后的容器 ID 启动固定桥接器，原启动握手通过前不发送任务。不要加任意 exec、主机 socket 挂载或环境继承；断连不能重连续跑，关闭 CLI 不等于 guest 清理。按[通信验收入口](docs/deployment/gpu.md#container-transport)实测背压、错配、断连、取消和独立期限；不使用 GPU。
+- 容器控制通信在 `judge/container_connection.py`、`judge/container_transport.py`；只对已持锁、完整配置核对后的容器 ID 启动固定桥接器，原启动握手通过前不发送任务。容器内关闭连接后须在原期限内通过 pidfd 等待原桥接进程退出，再结束主控制器；不能忽略 Docker exec 非零退出码或延长期限。不要加任意 exec、主机 socket 挂载或环境继承；断连不能重连续跑，关闭 CLI 不等于 guest 清理。按[通信验收入口](docs/deployment/gpu.md#container-transport)实测背压、错配、断连、取消和独立期限；不使用 GPU。
 - 持久容器身份在 `judge/container_journal.py`。先记录意图、再创建，启动前持久保存 ID；记录绑定私有安装身份、同一 daemon 和锁目录，不能靠当前 UID 或新源码认领旧任务。恢复只停止/移除已保存契约匹配的对象，归档前保留活动记录，不执行旧镜像、不直接释放数据库预约。修改后按[持久恢复入口](docs/deployment/gpu.md#container-journal)重放真实中断、旧制品和同名替换检查。
 - 容器化可信控制端在 `judge/container_controller.py`。镜像内 UID/GID 0 必须映射到原非 root 操作者，按私有清单核对同一 socket、锁和 journal inode；不能改成宽松文件权限、挂整个用户目录或用第二套锁绕过竞争。Docker socket 只能给可信控制端，不能进入 Web、任务容器或 guest；只读 socket 挂载不限制 daemon API 权限。修改后按[控制端映射入口](docs/deployment/gpu.md#container-controller)重放真实 CPU 双向锁与跨容器接管，不生成 GPU 凭证。
 - 容器内宿主进程归属在 `judge/container_processes.py`，只在显式挂载契约 v2/v3/v4 下启用；保留 v1 无宿主 procfs 的语义。可信控制端核对 procfs dev/inode、boot ID、递归只读和 rprivate，固定读取 stat/status/cgroup；不把 `..` cgroup 文本当作路径，不向任务或 guest 暴露挂载。归属绑定原 journal、容器 ID/启动实例、PID 1 出生时间和实际 cgroup；观察失败不等于设备空闲，不停止未知 PID。按[进程归属检查](docs/deployment/gpu.md#container-process-observer)及原控制端回归实测；CPU PID 证据不能替代 NVIDIA 进程来源与 CUDA 恢复检查。
@@ -113,7 +113,7 @@
 - 无头 Chromium 统一通过 `tests/browser_runtime.py` 启动，只对浏览器子进程移除显示连接与 D-Bus 会话环境，保留调用者环境、缓存路径及原 TLS 参数。长时验收前运行 `python -m tests.browser_runtime`，实际截图成功才算渲染就绪；不能仅凭浏览器启动成功、延长超时或跳过截图宣称通过。发布验收的预检失败须在 Docker 操作前结束，并清除本轮入口的旧成功摘要。
 - Compose 单机入口为 `core/selfhost.py`，复用 `core/preview.py` 的原子数据库初始化；默认包括真实 WASI worker，可选 `compose.ai.yaml` 启动本地模型。修改时重放 `python3 scripts/compose_acceptance.py`；涉及模型或界面时使用 `--ai --browsers`。核对真实探针与七种题型、worker 离线关闭提交、直接 IP/CSRF、初始化恢复、旧内容不重导及成绩/会话跨重建保留。不得用旧 receipt 或宿主缓存代替镜像内自检。此入口不替代生产发布协调器。
 - 重型 WASI/worker 验收按资源预算串行安排，避免争用造成假超时。长进程须跟踪原进程或工具句柄；观察超时不代表进程结束，不据此重复启动。
-- 验收派生镜像仅改变自有测试对象；删除临时镜像使用 `--no-prune`，并核对原固定基镜像仍存在，避免 Docker 连带清掉未打标签的原镜像缓存。不得覆盖原发布归档或未知镜像标签。
+- 构建和验收的镜像清理仅操作自有对象，包括失败路径的 `finally`；删除临时镜像使用 `--no-prune`，并核对原固定基镜像仍存在，避免 Docker 连带清掉未打标签的原镜像缓存。不得覆盖原发布归档或未知镜像标签。构建脚本若参与冻结源码契约，修复清理逻辑后也须重建匹配镜像，不能沿用旧身份。
 - 托管 CI、部署 runner 与 GPU 评测 worker 分别验证；接入步骤见 [CI 指南](docs/deployment/ci.md)。自定义 runner 标签不构成权限隔离，公开 PR 不能接触持有站点权限的 runner。GitHub 管理 API 查询失败不得当作 runner 不存在；部署 `status` 只验证记录读取，不证明站点健康。
 - 保留原始失败和修复后的结果，记录代码/策略/制品身份。结果文件放忽略目录 `test-results/`，必要的结论写入对应验收文档；不以单元 mock 证明真实隔离、GPU、模型或部署成功。
 - 文档变更核对链接、命令参数和当前行为。初始化、导入和恢复示例尽量在临时副本/数据库验证，避免改变开发者已有数据。

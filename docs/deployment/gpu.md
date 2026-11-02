@@ -320,7 +320,7 @@ Debian/Ubuntu 的库目录通常为 `/usr/lib/x86_64-linux-gnu`。构建只从�
 
 ## 不占 GPU 的容器控制通信检查
 
-使用与下方容器内 runsc 检查相同的 rootless Docker 环境和固定归档：
+使用与下方容器内 runsc 检查相同的 rootless Docker 环境和固定归档。内核需要 Linux 5.3+ 的 pidfd 支持；固定镜像中的控制器以原进程句柄确认桥接器退出，接口缺失时拒绝运行。
 
 ```sh
 .venv/bin/python scripts/container_transport_acceptance.py \
@@ -330,7 +330,7 @@ Debian/Ubuntu 的库目录通常为 `/usr/lib/x86_64-linux-gnu`。构建只从�
 
 此入口核对固定容器身份及启动握手，再经过真实控制连接驱动固定 CPU guest。检查包括 1 MiB 消息双向传输、guest 不可见通信路径、身份错配、超长帧、断连、客户端退出、取消、额外输入、独立期限及新调用恢复。它不接受任意程序输入，不创建应用数据库，也不会开放 GPU 提交。
 
-报告在 `test-results/px-container-transport-*/result.json`。只有全部检查和自有容器、镜像标签清理成功才有 `passed: true`。断连或 CLI 退出不是清理完成，报告还需有 guest 清理或外层独立停止及进程身份消失的证据。机制与边界见 [ADR-039](../adr/039-container-control-transport.md)，实测结果见 [G23](../acceptance-g23.md)。
+报告在 `test-results/px-container-transport-*/result.json`。只有全部检查和自有容器、镜像标签清理成功才有 `passed: true`。断连或 CLI 退出不是清理完成，报告还需有 guest 清理或外层独立停止及进程身份消失的证据。机制与边界见 [ADR-039](../adr/039-container-control-transport.md)，实测结果见 [G23](../acceptance-g23.md) 与[退出同步修复](../acceptance-g70.md)。
 
 <a id="container-runtime"></a>
 
