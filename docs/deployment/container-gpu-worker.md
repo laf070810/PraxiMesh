@@ -365,4 +365,4 @@ docker --config "$PRAXIMESH_GPU_DOCKER_CONFIG" --host "unix://$PRAXIMESH_DOCKER_
   --management-library-dir /usr/lib64
 ```
 
-第一个入口使用真实 PostgreSQL 和明确的 GPU 运行时替身验证生命周期。第二个构建实际镜像，使用自有数据库、角色和 Compose 项目检查无设备预检、权限拒绝、配置保护及重建；不查询或映射 GPU，不启动常驻 worker，不签发 GPU 凭证。报告在 `test-results/px-container-worker-*/`，检查结束后核对自有容器、网络、卷、密钥和镜像标签清理。当前结果与未完成项见 [G41 验收](../acceptance-g41.md)。
+第一个入口使用真实 PostgreSQL 和明确的 GPU 运行时替身验证生命周期。第二个构建实际镜像，使用自有数据库、角色和 Compose 项目检查无设备预检、权限拒绝、配置保护及重建；不查询或映射 GPU，不启动常驻 worker，不签发 GPU 凭证。报告在 `test-results/px-container-worker-*/`，检查结束后核对自有容器、网络、卷、密钥和镜像标签清理。初次交付见 [G41](../acceptance-g41.md)，共用启动流程接入后的镜像与数据库复验见 [G65](../acceptance-g65.md)。

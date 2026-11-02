@@ -49,16 +49,17 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 
 ## 容器完整启动的组件检查
 
-适用于修改启动次序、原预约恢复、凭证身份、发布事务或网页准入。共同入口 `core.gpu_readiness.initialize_controller` 按精确适配器类型选择后端；容器使用原 `ContainerController` 和私有 journal。它串行完成初始正确恢复、九项资源检查、十九项内核检查和三项控制器故障，最后才发布凭证与环境。开发验证不使用 GPU：
+适用于修改启动次序、原预约恢复、凭证身份、发布事务或网页准入。服务端入口 `core.gpu_readiness.initialize_controller` 按精确适配器类型选择后端；容器使用原 `ContainerController` 和私有 journal。初始正确恢复之后，服务端调用无数据库依赖的 `judge.container_startup_suite`，依序完成九项资源检查、十九项内核检查和三项控制器故障。全部通过后，仍须由服务端核对原预约并发布凭证与环境。共用函数只返回完整证据，不提供导入旧报告或发布 ready 的外部入口；完整本地 GPU 命令仍待接入。开发验证不使用 GPU：
 
 ```sh
-.venv/bin/pytest -q tests/test_container_readiness.py tests/test_gpu_readiness.py tests/test_gpu_receipt.py
+.venv/bin/pytest -q tests/test_container_startup_suite.py \
+  tests/test_container_readiness.py tests/test_gpu_readiness.py tests/test_gpu_receipt.py
 .venv/bin/python scripts/postgres_tests.py -q \
   tests/test_container_readiness.py tests/test_gpu_readiness_postgres.py \
   tests/test_gpu_admission_postgres.py tests/test_gpu_container_recovery.py
 ```
 
-第二条命令创建并清理自有 PostgreSQL 容器和卷，检查宿主与容器的发布竞争、预约保留以及 Web 只读权限；GPU 方法仍是测试替身。不得将临时测试文档复制到实际 receipt 目录。实际无设备控制镜像依赖与锁/恢复重放沿用[控制端映射入口](#container-controller)。结果与范围见 [G40](../acceptance-g40.md)。
+第一条还验证共用流程在未加载 Django 的独立进程中导入，以及每阶段失败、取消、环境变化和清理未完成时扣留结果。第二条命令创建并清理自有 PostgreSQL 容器和卷，检查宿主与容器的发布竞争、预约保留以及 Web 只读权限；GPU 方法仍是测试替身。不得将临时测试文档复制到实际 receipt 目录。实际无设备控制镜像依赖与锁/恢复重放沿用[控制端映射入口](#container-controller)，应用镜像/Compose 预检见[容器 worker 指南](container-gpu-worker.md#开发时不占-gpu-的验证)。原始就绪验证见 [G40](../acceptance-g40.md)，共用流程及本轮重放见 [G65](../acceptance-g65.md)。
 
 宿主到容器的切换必须先由原宿主控制器完成恢复并停止，留下无预约的已恢复状态；不能让容器清理 systemd 服务或把未完成的宿主任务改成容器指纹。已有容器升级继续使用同一私有锁和 journal，由冻结的原记录识别旧实例。
 
