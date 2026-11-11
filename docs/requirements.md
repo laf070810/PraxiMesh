@@ -1,6 +1,6 @@
 # 全部 PRD 要求的实施与证据
 
-更新：2026-11-11。目标：按 PRD 实施阶段 A/B/C 与 D/E/F 补充。维护者已明确当前先交付可本地验证的自部署版本；公开运营和许可证选择稍后确定，GPU 正式题型及完整验收仍未完成。**C 的专业评测、组织与辅导，D 的完整筛选、私有成就与挑战，E 的类/API，以及 F 的版本题目反馈均已通过本地验收。外部部署与授权事项仍未完成。** 当前固定制品及 E→F HTTPS 升级见 [F 验收](acceptance-f.md)，类/API见 [E 验收](acceptance-e.md)，筛选与挑战见 [D 验收](acceptance-d.md)，既有阶段 A 验收见 [acceptance.md](acceptance.md)，架构见 [RFC-006](rfcs/006-complete-product.md)和 [ADR-011](adr/011-specialists-organizations-coaching.md)。
+更新：2026-11-12。目标：按 PRD 实施阶段 A/B/C 与 D/E/F 补充。维护者已明确当前先交付可本地验证的自部署版本；公开运营和许可证选择稍后确定，GPU 正式题型及完整验收仍未完成。**C 的专业评测、组织与辅导，D 的完整筛选、私有成就与挑战，E 的类/API，以及 F 的版本题目反馈均已通过本地验收。外部部署与授权事项仍未完成。** 当前固定制品及 E→F HTTPS 升级见 [F 验收](acceptance-f.md)，类/API见 [E 验收](acceptance-e.md)，筛选与挑战见 [D 验收](acceptance-d.md)，既有阶段 A 验收见 [acceptance.md](acceptance.md)，架构见 [RFC-006](rfcs/006-complete-product.md)和 [ADR-011](adr/011-specialists-organizations-coaching.md)。
 
 ## 功能要求
 
@@ -41,6 +41,7 @@
 
 | 未完成项 | 当前证据与限制 | 后续完成所需条件 |
 | --- | --- | --- |
+| 后续提交的托管 CI（R-09） | `2f2c9b0` 两项工作流成功；`853b526`、`fc59265` 的 SQLite 和后者 Chromium 安装仍有失败。本地冻结 `853b526` 为 4023 passed / 195 skipped，未复现远端问题；`10242e5` 增加经过十七项检查的失败位置摘要，见[托管记录](acceptance-hosted-ci.md#later-runs)。 | 取得新提交的确切失败位置和日志，修复后验证同一提交的完整工作流；不以本地结果覆盖远端失败。 |
 | 旧 F 应用到当前版本的整站升级（R-09） | [G58](acceptance-g58.md) 的六项实际端口恢复专项及 [G59](acceptance-g59.md) 的当前 CPU/HTTPS/WASI 完整发布恢复矩阵均通过，RootlessKit 恢复缺口已补齐。[G60](acceptance-g60.md)使用与冻结 F 字节相同的历史迁移重建数据库，实际复制并升级到当前 schema，旧数据、序列、写入兼容及权限检查通过。已补充[F→当前 CPU 整站入口](deployment/production.md#f-current-upgrade)，94 项组件及六项真实 PostgreSQL 检查通过；仍未运行旧应用。 | 继续验证旧 F 应用到当前版本的完整升级及真实评测。此前旧 F 镜像缓存恢复被自动审批拒绝，未获许可前不重试该操作；重建数据库的组件验证和当前版本代际恢复均不能代替跨版本应用升级。 |
 | GPU 题型（§2.2 C、§4.2/4.4、R-16） | [G1](acceptance-g1.md)、[G2](acceptance-g2.md) 有早期单卡正确性与故障实测；当前 worker、持久成绩、健康准入、CUDA 候选内容、编辑和分享已接入。[G42](acceptance-g42.md) 通过统一四镜像制品检查，[G56](acceptance-g56.md) 实现内部完整发布恢复编排，公共 GPU 激活仍关闭。[G57](acceptance-g57.md) 的 77 项真实 PostgreSQL 检查及 [G59](acceptance-g59.md) 的当前 CPU 发布矩阵通过；设备和成绩的模型结果不代表当前 GPU 路径或性能通过。分批实现与原始失败记录保留在下方。 | 当前遵循维护者“先继续不占 GPU 的开发”。待设备授权与独占条件具备，验证完整启动、真实执行/性能、故障恢复、队列和 GPU 部署升级，再发布候选内容及开放产品入口；[本地 GPU 命令](deployment/local-gpu.md)已连接，真实硬件全路径尚待验收。 |
 | 专用部署 runner 与 CD（§8.2、R-09） | 提交 `2f2c9b0` 已于 2026-11-02 通过[托管应用与真实 WASI 工作流](acceptance-hosted-ci.md)，2026-11-11 复核成功终态。专用部署工作流仍需单独接入目标站点，默认操作为 `status`；此前 runner 管理 API 的未认证 401 不能证明注册情况。 | 按 [CI 指南](deployment/ci.md)设置受信运维仓库/有效访问限制、分支/environment、专用部署节点，再验收状态、发布和恢复。部署 runner 不依赖 GPU；代码 CI 成功不代替目标站点验收。 |
@@ -52,6 +53,8 @@
 2026-10-24 开发指南交付后的只读查询记录在 `test-results/post-onboarding-blockers-1.json`；其中无远端的历史条件已被 2026-10-30 的 GitHub 接入解除。CPU 委派缺口随后由维护者修复，实际限额结果见 `test-results/cpu-controller-restored/result.json`。候选 runsc 的精确驱动版本列表检查见 `test-results/gpu-runtime-preflight/result.json`；后续单卡 CUDA 样例与实际节流已通过，范围及失败修正见 [RFC-018](rfcs/018-gpu-environment-probe.md)。nvproxy 会将受支持的 GPU 调用转交宿主 NVIDIA 驱动，驱动本身仍在信任边界内，详见 [gVisor GPU 官方指南](https://gvisor.dev/docs/user_guide/gpu/)。
 
 ## 分批结果
+
+- 2026-11-12 R-09 升级准备与诊断：F→当前入口的 94 项组件和六项真实 PostgreSQL 检查通过；`fc59265` 冻结 CPU 包在更新的外部浏览器脚本下通过 129 项真实启动探针、三组基础及七组扩展旅程，见[升级准备记录](acceptance-upgrade-preparation.md)。原导航错误未独立复现，服务末次审计发现原 worker 启动时间变化并保留记录；没有操作既有服务或使用 GPU。旧 F 整站升级仍待许可和实测，后续提交的托管失败继续定位。
 
 - 2026-11-11 R-09 托管证据复核：2026-11-02 经授权推送的 `2f2c9b0` 已通过应用五项 job 及完整 WASI 工作流，包含发布包导入、真实迁移失败和中断恢复；官方 API 再次确认提交身份与成功终态，见[托管验收记录](acceptance-hosted-ci.md)。本次复核没有重跑测试；旧 F 整站升级、专用部署节点、GPU 和外部运营事项继续保留。
 

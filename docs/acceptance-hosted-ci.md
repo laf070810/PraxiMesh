@@ -13,7 +13,7 @@
 
 ## 已关闭的验收缺口
 
-当前提交的应用与 CPU/WASI 托管验收已完成，发布包导入步骤也已实际成功。旧提交 `d2c6560` 的[失败工作流](https://github.com/laf070810/PraxiMesh/actions/runs/41002028143)保留为历史记录；没有取得其完整日志，仍不能认定它与 [G61](acceptance-g61.md) 的本地浏览器问题同因。
+提交 `2f2c9b0` 的应用与 CPU/WASI 托管验收已完成，发布包导入步骤也已实际成功。旧提交 `d2c6560` 的[失败工作流](https://github.com/laf070810/PraxiMesh/actions/runs/41002028143)保留为历史记录；没有取得其完整日志，仍不能认定它与 [G61](acceptance-g61.md) 的本地浏览器问题同因。
 
 ## 制品与部署范围
 
@@ -21,6 +21,23 @@
 
 这些工作流运行在一次性 GitHub 托管节点。专用部署 runner 的访问限制、目标站点发布与恢复、长期运维、旧 F 应用到当前版本的整站升级，以及真实 GPU 全路径仍需分别验收。GPU、目标站点和维护者外部事项继续见[需求追踪](requirements.md)。本次结果不表示完整 PRD 已完成。
 
+<a id="later-runs"></a>
+
+## 后续提交：失败仍待定位
+
+2026-11-11 至 12 日核对后续 push；以下结果独立于 `2f2c9b0` 的成功记录。
+
+| 提交 | 应用工作流 | WASI 工作流 |
+| --- | --- | --- |
+| `853b526` | [43031396429](https://github.com/laf070810/PraxiMesh/actions/runs/43031396429)：SQLite 测试失败，PostgreSQL 被取消；编辑器、浏览器、容器通过 | [43031396286](https://github.com/laf070810/PraxiMesh/actions/runs/43031396286)：成功 |
+| `fc59265` | [43043838329](https://github.com/laf070810/PraxiMesh/actions/runs/43043838329)：SQLite 测试和 Chromium 安装失败，PostgreSQL 被取消；最后一次可用查询时容器 job 尚在运行 | [43043837878](https://github.com/laf070810/PraxiMesh/actions/runs/43043837878)：Chromium 安装失败 |
+
+失败注释只有退出码；日志接口返回 403，后续匿名 API 查询也遇到限流。没有取得完整失败文本，不能确认 SQLite 或安装失败的原因。Node 弃用警告不作为失败原因。
+
+从 `git archive 853b526` 创建独立源码和环境，使用冻结依赖、Python 3.11.15 与 uv 0.11.8，本地 SQLite 全套为 **4023 passed / 195 skipped**，未复现远端错误；临时环境已经删除。宿主与 GitHub Ubuntu runner 不同，跳过项也未计作通过。相关记录为 `sqlite-reproduction.json`、`sqlite-reproduction.xml`；主服务虚拟环境没有同步依赖。
+
+提交 `10242e5` 增加只公布固定提交测试位置的失败摘要，保留原失败；两种数据库取消联动，并拆分系统依赖安装与浏览器下载。诊断模块的十七项检查通过，覆盖真实 Git 对象、替换对象和私有参数边界；工作流 YAML、内嵌命令及失败条件通过校验。远端是否通过仍须核对该提交的实际运行。当前 CPU 包的本地实际评测、浏览器等待调整及范围另见[升级准备](acceptance-upgrade-preparation.md)。
+
 ## 原始证据
 
-首次推送和运行期间的公开 API、运行页面、job 页面及最终步骤记录保存在忽略目录 `test-results/github-main-2f2c9b0/`。2026-11-11 的只读复核在 `test-results/hosted-ci-2026-11-11/`，包含工作流、job、制品列表及查询摘要。本轮复核没有重跑测试或部署站点。
+首次推送和运行期间的公开 API、运行页面、job 页面及最终步骤记录保存在忽略目录 `test-results/github-main-2f2c9b0/`。后续复核与诊断在 `test-results/hosted-ci-2026-11-11/`，包含工作流、job、制品列表、本地复现和查询摘要。对 `2f2c9b0` 的复核没有重跑其工作流或部署站点。

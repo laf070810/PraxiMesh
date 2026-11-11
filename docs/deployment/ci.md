@@ -19,11 +19,19 @@ GPU 评测 worker 是接收学员提交的产品服务，与 GitHub Actions runn
 | [应用与内容检查](https://github.com/laf070810/PraxiMesh/actions/runs/41413486972) | `success`：两种数据库、编辑器、浏览器和 Compose |
 | [真实 WASI 验收](https://github.com/laf070810/PraxiMesh/actions/runs/41413486898) | `success`：真实评测、HTTPS、发布包构建/导入、迁移失败及中断恢复、依赖审计和制品上传 |
 
-旧提交 `d2c6560` 的[WASI 运行](https://github.com/laf070810/PraxiMesh/actions/runs/41002028143)在发布包导入步骤失败，完整日志未取得，其具体原因仍未确定；当前提交已实际通过该步骤及后续恢复检查。后续代码修改仍须核对对应提交的结果，不能借用旧版本或其他分支的成功记录。
+旧提交 `d2c6560` 的[WASI 运行](https://github.com/laf070810/PraxiMesh/actions/runs/41002028143)在发布包导入步骤失败，完整日志未取得，其具体原因仍未确定；`2f2c9b0` 已实际通过该步骤及后续恢复检查。后续代码修改仍须核对对应提交的结果，不能借用旧版本或其他分支的成功记录。
 
 应用浏览器 job 和 WASI job 均先执行实际截图预检，WASI 在构建解释器前检查渲染能力。相关本地修复、200 组布局及冻结包检查见 [G61](../acceptance-g61.md)。托管检查成功后，仍需在下面选定的专用部署节点验证 runner、目标站点发布和恢复；它们没有随这次 push 自动完成。
 
 当前完整应用回归另见 [G62](../acceptance-g62.md)：修正一处过期的资源单位英文断言后，SQLite 为 3697 passed / 194 skipped，独立 PostgreSQL 为 3787 passed / 104 skipped；91 项 PostgreSQL 专属检查实际通过。共同跳过的真实 WASI 与固定 CPU 容器联合检查没有计作通过。这些本地结果不替代托管工作流，运行入口仍在 [README 的开发检查](../../README.md#开发与检查)。
+
+## 查看后续提交及失败位置
+
+2026-11-11 推送的 `853b526`：WASI 工作流通过，应用 SQLite 测试失败。`fc59265`：SQLite 测试仍失败，应用浏览器及 WASI 又在 Chromium 安装步骤失败。完整日志接口需要额外 GitHub 权限，具体原因尚未确定；确切运行链接、本地复现和后续结果保存在[托管验收记录](../acceptance-hosted-ci.md#later-runs)。
+
+应用与 WASI 的 pytest 失败后，`Report failed test locations` 步骤读取保留的 JUnit 报告，将最多十个不同测试位置写入运行注释。文件、行号和函数名均来自 `${{ github.sha }}` 的原始 Git 对象，参数值、异常正文和测试输出不进入摘要。无法映射或报告损坏时仅输出固定错误提示，原失败状态保留。需要完整原因时，使用有权限的 GitHub 账号查看失败步骤及对应报告。
+
+SQLite 和 PostgreSQL job 独立完成，单项失败不会取消另一项。浏览器安装分别显示 `Install Chromium system dependencies` 和 `Install pinned Chromium`；随后仍须通过真实截图预检。按实际失败阶段检查系统依赖、浏览器下载或渲染，不将拆分步骤本身视为故障已经修复。
 
 ## 先选择 runner 的权限边界
 
