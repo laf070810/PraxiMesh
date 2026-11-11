@@ -31,12 +31,18 @@
 | --- | --- | --- |
 | `853b526` | [43031396429](https://github.com/laf070810/PraxiMesh/actions/runs/43031396429)：SQLite 测试失败，PostgreSQL 被取消；编辑器、浏览器、容器通过 | [43031396286](https://github.com/laf070810/PraxiMesh/actions/runs/43031396286)：成功 |
 | `fc59265` | [43043838329](https://github.com/laf070810/PraxiMesh/actions/runs/43043838329)：SQLite 测试和 Chromium 安装失败，PostgreSQL 被取消；最后一次可用查询时容器 job 尚在运行 | [43043837878](https://github.com/laf070810/PraxiMesh/actions/runs/43043837878)：Chromium 安装失败 |
+| `10242e5` | [43058131760](https://github.com/laf070810/PraxiMesh/actions/runs/43058131760)：SQLite、PostgreSQL、编辑器、容器通过；浏览器系统依赖安装失败 | [43058132599](https://github.com/laf070810/PraxiMesh/actions/runs/43058132599)：系统依赖安装失败 |
+| `369a881` | [43058725539](https://github.com/laf070810/PraxiMesh/actions/runs/43058725539)：SQLite、PostgreSQL、编辑器、容器通过；浏览器系统依赖安装失败 | [43058725571](https://github.com/laf070810/PraxiMesh/actions/runs/43058725571)：系统依赖安装失败 |
 
 失败注释只有退出码；日志接口返回 403，后续匿名 API 查询也遇到限流。没有取得完整失败文本，不能确认 SQLite 或安装失败的原因。Node 弃用警告不作为失败原因。
 
 从 `git archive 853b526` 创建独立源码和环境，使用冻结依赖、Python 3.11.15 与 uv 0.11.8，本地 SQLite 全套为 **4023 passed / 195 skipped**，未复现远端错误；临时环境已经删除。宿主与 GitHub Ubuntu runner 不同，跳过项也未计作通过。相关记录为 `sqlite-reproduction.json`、`sqlite-reproduction.xml`；主服务虚拟环境没有同步依赖。
 
-提交 `10242e5` 增加只公布固定提交测试位置的失败摘要，保留原失败；两种数据库取消联动，并拆分系统依赖安装与浏览器下载。诊断模块的十七项检查通过，覆盖真实 Git 对象、替换对象和私有参数边界；工作流 YAML、内嵌命令及失败条件通过校验。远端是否通过仍须核对该提交的实际运行。当前 CPU 包的本地实际评测、浏览器等待调整及范围另见[升级准备](acceptance-upgrade-preparation.md)。
+提交 `10242e5` 增加只公布固定提交测试位置的失败摘要，保留原失败；两种数据库取消联动，并拆分系统依赖安装与浏览器下载。诊断模块的十七项检查通过，覆盖真实 Git 对象、替换对象和私有参数边界；工作流 YAML、内嵌命令及失败条件通过校验。对应远端结果已列在上表。当前 CPU 包的本地实际评测、浏览器等待调整及范围另见[升级准备](acceptance-upgrade-preparation.md)。
+
+11 月 12 日进一步核对确认，两个后续提交的两种数据库均已通过；这不能还原此前 SQLite 失败的具体原因。安装失败发生在 `install-deps chromium`，尚未执行浏览器下载、截图或 WASI 验收。锁定 Playwright 的该入口依次调用 `apt-get update` 与安装，公开注释仍只有退出码，尚不能确定具体 APT 错误。
+
+本轮增加内存中的安装错误分类，保留原命令、job 输出和退出状态。原始日志制品方案因可能外发内部地址等元数据被自动审批拒绝，已改为不生成日志文件、只输出固定类别。十一项新检查与原十七项诊断检查共 **28 passed**，包括实际固定子进程的正常/非零/信号退出、无新增文件及诊断容量边界。没有在开发主机运行 APT；这些结果不证明远端安装故障已经解决。分类规则和运行方式见 [CI 指南](deployment/ci.md)。
 
 ## 原始证据
 

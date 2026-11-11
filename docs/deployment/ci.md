@@ -27,11 +27,13 @@ GPU 评测 worker 是接收学员提交的产品服务，与 GitHub Actions runn
 
 ## 查看后续提交及失败位置
 
-2026-11-11 推送的 `853b526`：WASI 工作流通过，应用 SQLite 测试失败。`fc59265`：SQLite 测试仍失败，应用浏览器及 WASI 又在 Chromium 安装步骤失败。完整日志接口需要额外 GitHub 权限，具体原因尚未确定；确切运行链接、本地复现和后续结果保存在[托管验收记录](../acceptance-hosted-ci.md#later-runs)。
+2026-11-11 推送的 `853b526`：WASI 工作流通过，应用 SQLite 测试失败。`fc59265`：SQLite 测试仍失败，应用浏览器及 WASI 又在 Chromium 安装步骤失败。后续 `10242e5` 和 `369a881` 的两种数据库、编辑器和容器检查均通过，浏览器与 WASI 的失败已定位到系统依赖安装。完整日志接口需要额外 GitHub 权限，安装失败的具体原因尚未确定；确切运行链接、本地复现和后续结果保存在[托管验收记录](../acceptance-hosted-ci.md#later-runs)。
 
 应用与 WASI 的 pytest 失败后，`Report failed test locations` 步骤读取保留的 JUnit 报告，将最多十个不同测试位置写入运行注释。文件、行号和函数名均来自 `${{ github.sha }}` 的原始 Git 对象，参数值、异常正文和测试输出不进入摘要。无法映射或报告损坏时仅输出固定错误提示，原失败状态保留。需要完整原因时，使用有权限的 GitHub 账号查看失败步骤及对应报告。
 
 SQLite 和 PostgreSQL job 独立完成，单项失败不会取消另一项。浏览器安装分别显示 `Install Chromium system dependencies` 和 `Install pinned Chromium`；随后仍须通过真实截图预检。按实际失败阶段检查系统依赖、浏览器下载或渲染，不将拆分步骤本身视为故障已经修复。
+
+系统依赖步骤通过 `scripts/ci_install_diagnostics.py` 执行同一固定 Playwright 安装命令。失败时的公开注释只含预定义错误及已知公共软件源类别，帮助区分网络、APT 索引/依赖、签名、锁、空间和权限问题；不会自动重试、替换软件源或跳过安装。最多在内存中解析 4 MiB，原退出码和已有 job 输出保留，原始日志不写入额外文件或上传制品。分类不足时仍需有权限的维护者查看完整 job 日志。
 
 ## 先选择 runner 的权限边界
 
