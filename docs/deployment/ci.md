@@ -12,22 +12,13 @@
 
 GPU 评测 worker 是接收学员提交的产品服务，与 GitHub Actions runner 职责不同。当前已提供默认关闭的宿主及[容器 worker 开发入口](container-gpu-worker.md)；完整硬件和 GPU 部署升级仍未验收，也没有 GPU 评测工作流，见 [GPU 接入准备](gpu.md)。
 
-远端为 `git@github.com:laf070810/PraxiMesh.git`，默认分支 `main`。维护者授权后，2026-11-02 推送的提交 `2f2c9b0f95ead9f0c02646217c6af53d813a1f9c` 已通过以下两项工作流；2026-11-11 再次复核其提交身份和成功终态，详见[托管验收记录](../acceptance-hosted-ci.md)。
+远端为 `git@github.com:laf070810/PraxiMesh.git`，默认分支 `main`。每次验收都绑定确切提交；最新结果、历史失败、复现与制品范围统一保存在[托管验收记录](../acceptance-hosted-ci.md)。后续修改须核对同一提交的工作流，不能借用旧版本或其他分支的成功记录。
 
-| 工作流 | 最终结果与范围 |
-| --- | --- |
-| [应用与内容检查](https://github.com/laf070810/PraxiMesh/actions/runs/41413486972) | `success`：两种数据库、编辑器、浏览器和 Compose |
-| [真实 WASI 验收](https://github.com/laf070810/PraxiMesh/actions/runs/41413486898) | `success`：真实评测、HTTPS、发布包构建/导入、迁移失败及中断恢复、依赖审计和制品上传 |
-
-旧提交 `d2c6560` 的[WASI 运行](https://github.com/laf070810/PraxiMesh/actions/runs/41002028143)在发布包导入步骤失败，完整日志未取得，其具体原因仍未确定；`2f2c9b0` 已实际通过该步骤及后续恢复检查。后续代码修改仍须核对对应提交的结果，不能借用旧版本或其他分支的成功记录。
-
-应用浏览器 job 和 WASI job 均先执行实际截图预检，WASI 在构建解释器前检查渲染能力。相关本地修复、200 组布局及冻结包检查见 [G61](../acceptance-g61.md)。托管检查成功后，仍需在下面选定的专用部署节点验证 runner、目标站点发布和恢复；它们没有随这次 push 自动完成。
-
-当前完整应用回归另见 [G62](../acceptance-g62.md)：修正一处过期的资源单位英文断言后，SQLite 为 3697 passed / 194 skipped，独立 PostgreSQL 为 3787 passed / 104 skipped；91 项 PostgreSQL 专属检查实际通过。共同跳过的真实 WASI 与固定 CPU 容器联合检查没有计作通过。这些本地结果不替代托管工作流，运行入口仍在 [README 的开发检查](../../README.md#开发与检查)。
+应用浏览器 job 和 WASI job 均先执行实际截图预检，WASI 在构建解释器前检查渲染能力。托管检查成功后，仍需在下方选定的专用部署节点验证 runner、目标站点发布和恢复。完整产品的剩余门槛见[需求追踪](../requirements.md)，本地检查入口见 [README](../../README.md#开发与检查)。
 
 ## 查看后续提交及失败位置
 
-2026-11-11 推送的 `853b526`：WASI 工作流通过，应用 SQLite 测试失败。`fc59265`：SQLite 测试仍失败，应用浏览器及 WASI 又在 Chromium 安装步骤失败。后续 `10242e5` 和 `369a881` 的两种数据库、编辑器和容器检查均通过，浏览器与 WASI 的失败已定位到系统依赖安装。完整日志接口需要额外 GitHub 权限，安装失败的具体原因尚未确定；确切运行链接、本地复现和后续结果保存在[托管验收记录](../acceptance-hosted-ci.md#later-runs)。
+先核对运行的提交 SHA，再查看具体 job 和失败步骤。工作流整体成功不表示内部按条件跳过的检查已经执行；各数据库及实际运行时的结果应分别确认。若匿名 API 被限流，可以查看公开运行页面；完整日志和制品下载可能需要有权限的 GitHub 账号。
 
 应用与 WASI 的 pytest 失败后，`Report failed test locations` 步骤读取保留的 JUnit 报告，将最多十个不同测试位置写入运行注释。文件、行号和函数名均来自 `${{ github.sha }}` 的原始 Git 对象，参数值、异常正文和测试输出不进入摘要。无法映射或报告损坏时仅输出固定错误提示，原失败状态保留。需要完整原因时，使用有权限的 GitHub 账号查看失败步骤及对应报告。
 
@@ -35,7 +26,7 @@ SQLite 和 PostgreSQL job 独立完成，单项失败不会取消另一项。浏
 
 系统依赖步骤通过 `scripts/ci_install_diagnostics.py` 执行同一固定 Playwright 安装命令。失败时的公开注释只含预定义错误及已知公共软件源类别，帮助区分网络、APT 索引/依赖、签名、锁、空间和权限问题；不会自动重试、替换软件源或跳过安装。最多在内存中解析 4 MiB，原退出码和已有 job 输出保留，原始日志不写入额外文件或上传制品。分类不足时仍需有权限的维护者查看完整 job 日志。
 
-后续 `f89a480` 的安装与浏览器检查已通过；SQLite 位置注释发现一个控制器测试失败，本地固定分数时钟复现了夹具及三个生产入口的预算误拒绝。具体修复、匹配镜像及托管验证状态见[分数时钟记录](../acceptance-hosted-ci.md#fractional-clock)，不将模拟设备检查计作 GPU 通过。
+失败位置提示及本地复现的实例见[分数时钟记录](../acceptance-hosted-ci.md#fractional-clock)。修改执行源码后须重新验证匹配镜像；模拟设备检查不计作 GPU 通过。
 
 ## 先选择 runner 的权限边界
 

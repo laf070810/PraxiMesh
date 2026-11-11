@@ -18,7 +18,7 @@
 
 **统一入口：[部署指南：方案选择、启动与维护](docs/deployment/README.md)。** 指南比较 Compose 单机自部署、PostgreSQL/HTTPS 发布协调器和源码开发，说明各自的适用场景、数据位置、AI 选择及升级方式。
 
-PostgreSQL/HTTPS 协调器已通过 CPU 版本的完整发布与中断恢复演练；验证范围和重放入口见[生产部署检查](docs/deployment/production.md#full-deployment-validation)。近期 CPU 发布包的真实评测与浏览器检查见[升级准备记录](docs/acceptance-upgrade-preparation.md)。GitHub 托管检查按提交记录结果：`2f2c9b0` 两项工作流通过，后续提交仍有待定位的失败；当前状态和专用部署 runner 接入见 [CI 指南](docs/deployment/ci.md)。
+PostgreSQL/HTTPS 协调器已通过 CPU 版本的完整发布与中断恢复演练；验证范围和重放入口见[生产部署检查](docs/deployment/production.md#full-deployment-validation)。近期 CPU 发布包的真实评测与浏览器检查见[升级准备记录](docs/acceptance-upgrade-preparation.md)。GitHub 托管检查按确切提交记录；最新结果、待验收项及专用部署 runner 接入统一见 [CI 指南](docs/deployment/ci.md)。
 
 想直接做题，在 Linux x86_64 主机准备 Docker Engine 和 Docker Compose，于仓库根目录执行：
 

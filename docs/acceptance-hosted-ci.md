@@ -1,8 +1,8 @@
 # GitHub 托管应用与 WASI 验收
 
-执行日期：2026-11-02。复核日期：2026-11-11。对应 PRD R-09、AC-07。
+基线执行日期：2026-11-02。记录更新：2026-11-12。对应 PRD R-09、AC-07。
 
-维护者授权后，`main` 的 111 个本地提交已推送到 `origin/main`。本次验收绑定提交 `2f2c9b0f95ead9f0c02646217c6af53d813a1f9c`；两项工作流均由该次 push 触发，并在首次运行中成功结束。
+维护者授权后，`main` 的 111 个本地提交于 2026-11-02 推送到 `origin/main`。以下基线验收绑定提交 `2f2c9b0f95ead9f0c02646217c6af53d813a1f9c`；两项工作流均由该次 push 触发，并在首次运行中成功结束。后续结果在本页按各自提交分别记录。
 
 | 工作流 | 结果 | 实际覆盖范围 |
 | --- | --- | --- |
@@ -33,7 +33,8 @@
 | `fc59265` | [43043838329](https://github.com/laf070810/PraxiMesh/actions/runs/43043838329)：SQLite 测试和 Chromium 安装失败，PostgreSQL 被取消；最后一次可用查询时容器 job 尚在运行 | [43043837878](https://github.com/laf070810/PraxiMesh/actions/runs/43043837878)：Chromium 安装失败 |
 | `10242e5` | [43058131760](https://github.com/laf070810/PraxiMesh/actions/runs/43058131760)：SQLite、PostgreSQL、编辑器、容器通过；浏览器系统依赖安装失败 | [43058132599](https://github.com/laf070810/PraxiMesh/actions/runs/43058132599)：系统依赖安装失败 |
 | `369a881` | [43058725539](https://github.com/laf070810/PraxiMesh/actions/runs/43058725539)：SQLite、PostgreSQL、编辑器、容器通过；浏览器系统依赖安装失败 | [43058725571](https://github.com/laf070810/PraxiMesh/actions/runs/43058725571)：系统依赖安装失败 |
-| `f89a480` | [43063191247](https://github.com/laf070810/PraxiMesh/actions/runs/43063191247)：PostgreSQL、编辑器、浏览器、容器通过；SQLite 的一个测试函数失败，已取得位置注释 | [43063191233](https://github.com/laf070810/PraxiMesh/actions/runs/43063191233)：安装、截图、解释器构建和启动探针通过；17:19 UTC 观察时仍在执行真实回归 |
+| `f89a480` | [43063191247](https://github.com/laf070810/PraxiMesh/actions/runs/43063191247)：PostgreSQL、编辑器、浏览器、容器通过；SQLite 的一个测试函数失败，已取得位置注释 | [43063191233](https://github.com/laf070810/PraxiMesh/actions/runs/43063191233)：成功，包含真实评测、HTTPS、发布包和迁移失败/中断恢复 |
+| `a5d96c7` | [43071071772](https://github.com/laf070810/PraxiMesh/actions/runs/43071071772)：两种数据库、编辑器、浏览器和容器全部通过 | [43071071748](https://github.com/laf070810/PraxiMesh/actions/runs/43071071748)：18:10 UTC 观察时仍在执行真实回归，尚未记录为通过 |
 
 失败注释只有退出码；日志接口返回 403，后续匿名 API 查询也遇到限流。没有取得完整失败文本，不能确认 SQLite 或安装失败的原因。Node 弃用警告不作为失败原因。
 
@@ -59,7 +60,16 @@
 
 三个文件已在执行源码契约中，故障模块也在运行时源码契约中；本轮会改变环境/镜像摘要，需要匹配制品重新验收。当前没有取得远端异常正文，因此本地确定性复现不能证明所有历史 SQLite 失败都同因。预算决定见 [RFC-021](rfcs/021-gpu-container-supervision.md#监督契约)及 [ADR-055](adr/055-container-controller-faults.md)。
 
-最终六个相关模块 **225 passed / 0 skipped**，包括新增数值边界、全部启动后变化、独立恢复拒绝、真实私有文件/锁和进程中断；结果为 `deadline-components-final.xml`。源码契约已按实际文件摘要核对。匹配镜像、真实无设备故障及 PostgreSQL 复验仍须单独记录完成结果，组件通过不替代这些检查或硬件验收。
+修复已提交并推送为 `a5d96c740355e20933f979626f5aef934c11cf53`。六个相关模块 **225 passed / 0 skipped**，包括新增数值边界、全部启动后变化、独立恢复拒绝、真实私有文件/锁和进程中断；结果为 `deadline-components-final.xml`。源码契约已按实际文件摘要核对。
+
+该提交随后完成以下本地实际检查，按资源预算串行运行：
+
+- 自有 PostgreSQL 的启动、凭证、就绪竞争、准入与预约恢复：**128 passed / 0 skipped**。
+- 重建匹配运行时的五组 CPU/gVisor 故障、准备/恢复失败和新正确调用：**全部通过，十五个原容器实例完成清理**；独立超时仍在主动清理前观察退出。
+- 当前 worker 镜像、Compose 与 PostgreSQL 只读预检：**十项通过，十一个自有容器及相关网络、卷、临时存储清理完成**。没有查询、映射或执行 GPU。
+- 原 Web、CPU worker 和 tutor 的容器 ID、镜像、启动时间均未变，健康状态正常。
+
+这些检查的汇总在 `test-results/deadline-bounds-2026-11-12/`，包括 `postgres-summary.json`、`lifecycle-process.json`、`worker-confirmation.json` 和 `final-resource-audit.json`；原始实际报告分别为 `test-results/px-container-lifecycle-cb2a8e188ab8/result.json` 与 `test-results/px-container-worker-e1b55b4536db/result.json`。测试镜像标签已经清理，不作为现成部署制品交付；正式使用须按新源码构建匹配镜像并完成真实硬件启动。应用 CI 五项 job 已通过，完整 WASI 结果继续绑定上表中的同一提交，不能借用 `f89a480` 的成功。
 
 原始证据包括 `f89a480-sqlite-annotations.json`、`late-startup-original.xml`、`late-startup-fractional-before.xml`、`late-startup-regression-before.xml`、`late-startup-components-after.xml`、`production-deadline-boundaries-before.xml`、`startup-total-boundary-before.xml` 和 `deadline-source-contracts.json`，均位于下述忽略目录。这些检查使用真实临时文件/锁与明确的设备模型，没有访问 GPU。
 
