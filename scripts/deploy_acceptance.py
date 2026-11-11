@@ -1406,8 +1406,8 @@ def parse_options(arguments=None):
         "--upgrade-only",
         action="store_true",
         help=(
-            "Rehearse A-to-B1, B1-to-B2, B2-to-C or C-to-D schema preservation; "
-            "later stages explicitly publish reviewed content after verifying preservation"
+            "Rehearse A-to-B1, B1-to-B2, B2-to-C, C-to-D, D/E-to-F or F-to-current CPU "
+            "schema preservation; stage-specific content checks follow preservation"
         ),
     )
     parser.add_argument("--caddy", type=Path, required=True)
@@ -1456,6 +1456,10 @@ def validate_upgrade_manifests(previous, target):
     c_paths = {f"{app}/migrations/{name}.py" for app, name in C_MIGRATIONS}
     d_paths = {f"{app}/migrations/{name}.py" for app, name in D_MIGRATIONS}
     f_paths = {f"{app}/migrations/{name}.py" for app, name in F_MIGRATIONS}
+    if f_paths <= previous["source_files"].keys():
+        from scripts.deploy_current_acceptance import validate_f_upgrade
+
+        return validate_f_upgrade(previous, target)
     if paths | b2_paths | c_paths | d_paths <= previous["source_files"].keys():
         if f_paths.intersection(previous["source_files"]):
             raise ValueError("The previous release must precede the F schema")
@@ -1558,6 +1562,10 @@ def main():
             from scripts.deploy_f_acceptance import FRehearsal
 
             rehearsal_type = FRehearsal
+        elif upgrade_kind == "post-f":
+            from scripts.deploy_current_acceptance import CurrentRehearsal
+
+            rehearsal_type = CurrentRehearsal
         docker(
             "image", "load", "--input", str(options.previous_release / "images.tar"), timeout=900
         )

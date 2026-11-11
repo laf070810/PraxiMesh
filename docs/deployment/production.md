@@ -322,3 +322,23 @@ F 新增 `community.0003_problem_feedback`，为题目反馈增加明确版本�
 ```
 
 实际站点使用前述 `deploy.py apply`，保留配置、状态目录与站点 UUID，并安装与 F 匹配的控制器；不加 `--initial-content`。此次演练不能替代目标主机的容量、公有证书或监管验收。
+
+<a id="f-current-upgrade"></a>
+
+## F 到当前 CPU 版本的整站升级复验
+
+使用包含 `scripts/deploy_current_acceptance.py` 和冻结 F 迁移清单的当前控制器。同一个 `--upgrade-only` 入口可识别 F→当前 CPU 组合：前代匹配冻结的 17 项项目迁移，目标保留原文件并新增 `core.0004_gpu_resources`、`core.0005_gpu_admission_environment` 和 `showcase.0002_shared_metric_scope`。两份制品均须为 format 1，Web 和 worker 镜像都须变化；未知迁移组合、GPU 制品或历史改写在导入前拒绝。
+
+```sh
+.venv/bin/python scripts/deploy_acceptance.py \
+  --release /path/to/current-cpu-release --manifest-sha256 TRUSTED_CURRENT_DIGEST \
+  --upgrade-only \
+  --previous-release /path/to/f-release \
+  --previous-manifest-sha256 TRUSTED_F_DIGEST \
+  --caddy /path/to/caddy-2.11.7 \
+  --artifacts test-results/f-current-upgrade
+```
+
+该命令会导入两份已核验的镜像归档，并在临时 PostgreSQL、私有网络和回环 HTTPS 中运行原 F 与新站点。只在新建测试库初始导入目录；升级保留账号、草稿、正式 CPU 结果与预约、版本反馈、课程/计划、令牌、分享和目录。新增分享字段必须为原有 `sequential-v1` 范围，新增 GPU 表必须为空且 Web 只能读取。原会话、令牌重放、新提交、浏览器和账号删除均须实际通过；不执行 GPU。
+
+为每次新尝试选择独立证据目录，并先确认上一次进程已终止。清单/组件验证和上面的历史 schema 重建均不等于此整站验收完成。本机旧 F 缓存导入仍待先前自动审批拒绝后的明确许可，当前范围见[需求追踪](../requirements.md)；本节命令尚不能作为已经运行成功的证据。
