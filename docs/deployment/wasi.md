@@ -60,6 +60,6 @@ OS alarm 处理阻塞调用；父进程死亡信号处理 worker 异常退出。
 
 生产使用独立无其他业务凭证的执行账号/节点，最小数据库角色按[运维手册](operations.md)配置。示例服务为 `deploy/praximesh-wasi-worker.service.example`；其主机级 cgroup 配置须在目标环境实际验证，本地测试不代表 systemd/生产网络已验收。Web 继续执行 TLS、代理与注册限制。每日检查记录过期会停止 worker；在维护窗口停止 worker、跑探针并重启，不自动忽略过期门槛。
 
-`wasi.yml` 定义在一次性托管 CI runner 构建并跑真实检查，随后执行 [HTTPS 部署验收](validation.md)；它不使用共享特权节点。gVisor 工作流仍只允许受保护的专用 runner。这些工作流尚未在托管服务端运行；临时回环 TLS/容量成功不能替代公有证书、目标生产节点、自动部署或运营许可。native cache 的跨节点兼容性尚未验证，目标节点需可信构建或实测兼容性后再启用。
+`wasi.yml` 定义在一次性托管 CI runner 构建并跑真实检查，随后执行 [HTTPS 部署验收](validation.md)；它不使用共享特权节点。gVisor 工作流仍只允许受保护的专用 runner。提交 `2f2c9b0` 的 WASI 工作流已在托管服务端完整运行并通过，见[托管验收记录](../acceptance-hosted-ci.md)；专用 gVisor runner 仍需独立验收。托管节点的 TLS/容量成功不能替代公有证书、目标生产节点、自动部署或运营许可。native cache 的跨节点兼容性尚未验证，目标节点需可信构建或实测兼容性后再启用。
 
 worker 也可使用与 Web 同源的独立镜像，具体构建和导入见[发布制品指南](releases.md)。镜像入口在当前容器执行实际探针后才开始取任务，内部 WASI 能力和资源限制保持不变；无需 Docker socket，也不复用构建机 receipt。

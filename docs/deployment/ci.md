@@ -12,16 +12,16 @@
 
 GPU 评测 worker 是接收学员提交的产品服务，与 GitHub Actions runner 职责不同。当前已提供默认关闭的宿主及[容器 worker 开发入口](container-gpu-worker.md)；完整硬件和 GPU 部署升级仍未验收，也没有 GPU 评测工作流，见 [GPU 接入准备](gpu.md)。
 
-远端已配置为 `git@github.com:laf070810/PraxiMesh.git`，默认分支 `main`。2026-11-02 再次通过公开 API 复核，远端仍为 `d2c6560825211d60dd48c742e470ab188d69e612`，该提交的两项工作流均已结束：
+远端为 `git@github.com:laf070810/PraxiMesh.git`，默认分支 `main`。维护者授权后，2026-11-02 推送的提交 `2f2c9b0f95ead9f0c02646217c6af53d813a1f9c` 已通过以下两项工作流；2026-11-11 再次复核其提交身份和成功终态，详见[托管验收记录](../acceptance-hosted-ci.md)。
 
 | 工作流 | 最终结果与范围 |
 | --- | --- |
-| [应用与内容检查](https://github.com/laf070810/PraxiMesh/actions/runs/41002028127) | `success` |
-| [真实 WASI 验收](https://github.com/laf070810/PraxiMesh/actions/runs/41002028143) | `failure`，失败步骤为 `Import and exercise the packaged release` |
+| [应用与内容检查](https://github.com/laf070810/PraxiMesh/actions/runs/41413486972) | `success`：两种数据库、编辑器、浏览器和 Compose |
+| [真实 WASI 验收](https://github.com/laf070810/PraxiMesh/actions/runs/41413486898) | `success`：真实评测、HTTPS、发布包构建/导入、迁移失败及中断恢复、依赖审计和制品上传 |
 
-失败注释只有退出码 1，公开作业日志下载接口本次返回 403，尚未取得详细错误，不能据此判断是构建、部署还是浏览器问题。维护者可登录 GitHub 查看该步骤和 `real-wasi-acceptance` 报告，再按实际失败修复并重放。其他依赖 PR 或分支成功不能替代此提交的完整验收；这些历史作业也不覆盖随后未推送的本地增量。本次复核没有触发工作流、推送代码或改动 runner。
+旧提交 `d2c6560` 的[WASI 运行](https://github.com/laf070810/PraxiMesh/actions/runs/41002028143)在发布包导入步骤失败，完整日志未取得，其具体原因仍未确定；当前提交已实际通过该步骤及后续恢复检查。后续代码修改仍须核对对应提交的结果，不能借用旧版本或其他分支的成功记录。
 
-本地重放同一入口时发现并修复了独立的无头浏览器桌面环境问题，详见 [G61](../acceptance-g61.md)；尚不能确认它与远端旧作业同因。当前应用浏览器 job 和 WASI job 均先执行实际截图预检，WASI 在构建解释器前检查渲染能力。源码浏览器、200 组布局及冻结 CPU 发布包的 PostgreSQL/WASI/浏览器复验均已通过；后续本地提交未推送，托管复验仍待完成。
+应用浏览器 job 和 WASI job 均先执行实际截图预检，WASI 在构建解释器前检查渲染能力。相关本地修复、200 组布局及冻结包检查见 [G61](../acceptance-g61.md)。托管检查成功后，仍需在下面选定的专用部署节点验证 runner、目标站点发布和恢复；它们没有随这次 push 自动完成。
 
 当前完整应用回归另见 [G62](../acceptance-g62.md)：修正一处过期的资源单位英文断言后，SQLite 为 3697 passed / 194 skipped，独立 PostgreSQL 为 3787 passed / 104 skipped；91 项 PostgreSQL 专属检查实际通过。共同跳过的真实 WASI 与固定 CPU 容器联合检查没有计作通过。这些本地结果不替代托管工作流，运行入口仍在 [README 的开发检查](../../README.md#开发与检查)。
 
@@ -69,7 +69,7 @@ runner 只需主动连接 GitHub；无需为 runner 额外开放入站控制端�
 
 ## 发布与恢复
 
-1. 选择受信默认分支上最终通过的 WASI 工作流及确切 commit，取得 `immutable-release` artifact；当前保留七天。PR 制品不能直接作为生产批准依据。
+1. 选择受信默认分支上最终通过的 WASI 工作流及确切 commit，取得 `immutable-release` artifact；当前保留七天。若制品已不在运行页面的列表中，重新准备并验证完整发布包；历史绿色记录不是可下载制品。PR 制品不能直接作为生产批准依据。
 2. 通过受信传输预置三个发布文件到摘要命名目录，使用[发布校验命令](releases.md)核对独立确认的 manifest SHA-256。下载制品本身不等于批准发布。
 3. 明确选择 `apply`，输入 64 位小写十六进制摘要。仅首次安装且明确希望导入示例目录时启用 `initial_content`；升级保持关闭。
 4. 检查部署 job、协调器阶段、HTTPS 健康和实际评测。超时或中断先查询 `status` 和私有 journal，按[恢复流程](production.md)明确选择 `recover`；不要自动重试另一个版本。

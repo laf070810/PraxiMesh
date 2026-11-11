@@ -1,6 +1,6 @@
 # 全部 PRD 要求的实施与证据
 
-更新：2026-11-02。目标：按 PRD 实施阶段 A/B/C 与 D/E/F 补充。维护者已明确当前先交付可本地验证的自部署版本；公开运营和许可证选择稍后确定，GPU 正式题型及完整验收仍未完成。**C 的专业评测、组织与辅导，D 的完整筛选、私有成就与挑战，E 的类/API，以及 F 的版本题目反馈均已通过本地验收。外部部署与授权事项仍未完成。** 当前固定制品及 E→F HTTPS 升级见 [F 验收](acceptance-f.md)，类/API见 [E 验收](acceptance-e.md)，筛选与挑战见 [D 验收](acceptance-d.md)，既有阶段 A 验收见 [acceptance.md](acceptance.md)，架构见 [RFC-006](rfcs/006-complete-product.md)和 [ADR-011](adr/011-specialists-organizations-coaching.md)。
+更新：2026-11-11。目标：按 PRD 实施阶段 A/B/C 与 D/E/F 补充。维护者已明确当前先交付可本地验证的自部署版本；公开运营和许可证选择稍后确定，GPU 正式题型及完整验收仍未完成。**C 的专业评测、组织与辅导，D 的完整筛选、私有成就与挑战，E 的类/API，以及 F 的版本题目反馈均已通过本地验收。外部部署与授权事项仍未完成。** 当前固定制品及 E→F HTTPS 升级见 [F 验收](acceptance-f.md)，类/API见 [E 验收](acceptance-e.md)，筛选与挑战见 [D 验收](acceptance-d.md)，既有阶段 A 验收见 [acceptance.md](acceptance.md)，架构见 [RFC-006](rfcs/006-complete-product.md)和 [ADR-011](adr/011-specialists-organizations-coaching.md)。
 
 ## 功能要求
 
@@ -10,7 +10,7 @@
 | R-05 账户与隐私 | 登录/退出/恢复、私有数据、可见性、导出/删除；新社区数据需同样覆盖 | 新模块导出/删除/权限、HTTPS 与 schema 升级已验证 |
 | R-06–07 真实安全练习 | 编辑、草稿、Run/Submit、状态/结果/历史、失败分类、安全隔离 | 原三种契约已验证；ML、科学、Agent 的真实 WASI 已验证，C4 镜像浏览器与 C5 源码 HTTPS 已验证；E 类/API的真实队列、HTTPS与固定镜像已验证 |
 | R-08 初始内容质量 | 每题独立契约、参考解/错误变体/边界用例、真实隔离验证 | 当前 26 题、187 参考用例、69 针对性错解；E 已完成全目录真实 WASI 检查，原始失败与复测分别保留，见 [E 验收](acceptance-e.md) |
-| R-09 交付与运维 | 容器、锁定制品、CI/CD、TLS、健康监控、备份恢复、目标环境验收 | Compose 默认包含真实 CPU/WASI worker，可选本地模型，见 [Compose 验收](acceptance-compose.md)；B2→C、C→D 及 E→F 实际迁移升级、F 镜像及回环 HTTPS 有证据；[G59](acceptance-g59.md) 当前 CPU 制品的真实迁移故障、HTTPS/WASI 与完整恢复矩阵、[G60](acceptance-g60.md) 历史 schema 的真实迁移、[G61](acceptance-g61.md) 冻结包复验和 [G62](acceptance-g62.md) 完整应用双数据库回归通过；旧 F 应用整站升级与托管验收仍待完成，远端旧 `d2c6560` 的 WASI 发布包验收失败尚未解决 |
+| R-09 交付与运维 | 容器、锁定制品、CI/CD、TLS、健康监控、备份恢复、目标环境验收 | Compose 默认包含真实 CPU/WASI worker，可选本地模型，见 [Compose 验收](acceptance-compose.md)；B2→C、C→D 及 E→F 实际迁移升级、F 镜像及回环 HTTPS 有证据；[G59](acceptance-g59.md) 当前 CPU 制品的真实迁移故障、HTTPS/WASI 与完整恢复矩阵、[G60](acceptance-g60.md) 历史 schema 的真实迁移、[G61](acceptance-g61.md) 冻结包复验和 [G62](acceptance-g62.md) 完整应用双数据库回归通过；提交 `2f2c9b0` 的[托管应用与 CPU/WASI 验收](acceptance-hosted-ci.md)已通过，包括发布包及恢复矩阵；旧 F 应用整站升级、专用部署 runner 与目标站点验收仍待完成 |
 | R-10 文档与设计 | RFC/ADR、开发/贡献、内容、安全、发布、维护、排障 | [部署指南](deployment/README.md)统一方案选择与操作入口；README 保留快速启动，AGENTS 约定集中维护；全新环境初始化、页面访问及发布包兼容性已有验证，随实现更新 |
 | R-11 学习体验 | 多条路径、丰富题库、收藏、私有笔记、领域/概念证据与复习建议 | B1 已实现并通过 PG/WASI、浏览器与镜像升级验证 |
 | R-12 多语言/CPU 工程 | 第二种语言、完整程序/库/工程形态，共享版本/队列/结果与安全门槛 | JavaScript 函数、Python 完整程序和项目已通过应用/镜像验证；E 新增有状态类/API，真实 WASI、PostgreSQL、HTTPS 和冻结镜像浏览器均已通过，见 [E 验收](acceptance-e.md) |
@@ -43,7 +43,7 @@
 | --- | --- | --- |
 | 旧 F 应用到当前版本的整站升级（R-09） | [G58](acceptance-g58.md) 的六项实际端口恢复专项及 [G59](acceptance-g59.md) 的当前 CPU/HTTPS/WASI 完整发布恢复矩阵均通过，RootlessKit 恢复缺口已补齐。[G60](acceptance-g60.md)使用与冻结 F 字节相同的历史迁移重建数据库，实际复制并升级到当前 schema，旧数据、序列、写入兼容及权限检查通过；未运行旧应用。 | 继续验证旧 F 应用到当前版本的完整升级及真实评测。此前旧 F 镜像缓存恢复被自动审批拒绝，未获许可前不重试该操作；重建数据库的组件验证和当前版本代际恢复均不能代替跨版本应用升级。 |
 | GPU 题型（§2.2 C、§4.2/4.4、R-16） | [G1](acceptance-g1.md)、[G2](acceptance-g2.md) 有早期单卡正确性与故障实测；当前 worker、持久成绩、健康准入、CUDA 候选内容、编辑和分享已接入。[G42](acceptance-g42.md) 通过统一四镜像制品检查，[G56](acceptance-g56.md) 实现内部完整发布恢复编排，公共 GPU 激活仍关闭。[G57](acceptance-g57.md) 的 77 项真实 PostgreSQL 检查及 [G59](acceptance-g59.md) 的当前 CPU 发布矩阵通过；设备和成绩的模型结果不代表当前 GPU 路径或性能通过。分批实现与原始失败记录保留在下方。 | 当前遵循维护者“先继续不占 GPU 的开发”。待设备授权与独占条件具备，验证完整启动、真实执行/性能、故障恢复、队列和 GPU 部署升级，再发布候选内容及开放产品入口；[本地 GPU 命令](deployment/local-gpu.md)已连接，真实硬件全路径尚待验收。 |
-| 托管 CI/CD（§8.2、R-09） | 2026-11-02 复核远端仍为 `d2c6560`：应用 CI 成功，WASI 在发布包导入验收步骤失败；公开日志接口仍返回 403，详细原因未取得。[G61](acceptance-g61.md)修复本地独立的无头浏览器环境问题，冻结 CPU 发布包完整重放通过；尚不能认定与远端同因。后续本地增量未推送，不能借用旧结果。部署工作流默认 `status`；此前 runner 管理 API 的未认证 401 不能证明注册情况。 | 取得失败日志，按确切提交定位、修复并完成托管复验；按 [CI 指南](deployment/ci.md)设置受信运维仓库/有效访问限制、分支/environment、专用部署节点，再验收状态、发布和恢复。部署 runner 不依赖 GPU。 |
+| 专用部署 runner 与 CD（§8.2、R-09） | 提交 `2f2c9b0` 已于 2026-11-02 通过[托管应用与真实 WASI 工作流](acceptance-hosted-ci.md)，2026-11-11 复核成功终态。专用部署工作流仍需单独接入目标站点，默认操作为 `status`；此前 runner 管理 API 的未认证 401 不能证明注册情况。 | 按 [CI 指南](deployment/ci.md)设置受信运维仓库/有效访问限制、分支/environment、专用部署节点，再验收状态、发布和恢复。部署 runner 不依赖 GPU；代码 CI 成功不代替目标站点验收。 |
 | 目标站点运维（§8.2/8.4、AC-07） | 本地固定镜像、回环 HTTPS、备份恢复、升级与容量样本已验证；没有指定长期部署目标。 | 在目标主机验收服务监管、容量、公有证书与续期、日志/备份保留和故障恢复。公开运营仍按维护者决定后续处理。 |
 | 开源与公开发布政策（§1、§8.3、§13） | `LICENSES.md` 仍为待确认状态；`SECURITY.md` 尚无正式私密报告渠道和负责人。维护者明确先交付自部署、公开运营及许可证后定。 | 维护者确认代码/内容/投稿授权，以及需要公开运营时的品牌、资源、治理、隐私和安全响应安排。开发者不能代为批准这些事项。 |
 
@@ -52,6 +52,8 @@
 2026-10-24 开发指南交付后的只读查询记录在 `test-results/post-onboarding-blockers-1.json`；其中无远端的历史条件已被 2026-10-30 的 GitHub 接入解除。CPU 委派缺口随后由维护者修复，实际限额结果见 `test-results/cpu-controller-restored/result.json`。候选 runsc 的精确驱动版本列表检查见 `test-results/gpu-runtime-preflight/result.json`；后续单卡 CUDA 样例与实际节流已通过，范围及失败修正见 [RFC-018](rfcs/018-gpu-environment-probe.md)。nvproxy 会将受支持的 GPU 调用转交宿主 NVIDIA 驱动，驱动本身仍在信任边界内，详见 [gVisor GPU 官方指南](https://gvisor.dev/docs/user_guide/gpu/)。
 
 ## 分批结果
+
+- 2026-11-11 R-09 托管证据复核：2026-11-02 经授权推送的 `2f2c9b0` 已通过应用五项 job 及完整 WASI 工作流，包含发布包导入、真实迁移失败和中断恢复；官方 API 再次确认提交身份与成功终态，见[托管验收记录](acceptance-hosted-ci.md)。本次复核没有重跑测试；旧 F 整站升级、专用部署节点、GPU 和外部运营事项继续保留。
 
 - 2026-11-02 R-09 当前默认 Compose：针对 G68–G70 的十个运行源码增量完整重放；首次与重建后均完成 129 项镜像内真实探针，七题型的九次 HTTP 提交、离线关闭、直接 IP/CSRF、资源权限及历史/会话/目录保留通过，见 [G71](acceptance-g71.md)。临时资源全部清理，原服务未变；没有重跑 AI/浏览器或使用 GPU，不替代托管及目标站点验收。
 
