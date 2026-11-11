@@ -1,5 +1,6 @@
 """Modeled fault boundaries; runtime evidence uses actual CPU acceptance."""
 
+import math
 from types import SimpleNamespace
 
 import pytest
@@ -11,6 +12,24 @@ from judge.sandbox import SandboxUnavailable
 
 DEVICE = "GPU-12345678-1234-5678-9abc-123456789abc"
 REQUEST = fault_request("controller-exit", "a" * 32)
+
+
+def test_fractional_fault_budget_keeps_original_strict_bounds(monkeypatch):
+    now = 934.0000000000003
+    monkeypatch.setattr(lifecycle.time, "monotonic", lambda: now)
+    lower = now + (
+        lifecycle.START_SECONDS
+        + lifecycle.STOP_SECONDS
+        + 5
+        + lifecycle.PROFILE["compile_seconds"]
+        + lifecycle.PROFILE["request_seconds"]
+    )
+    upper = now + lifecycle.FAULT_SECONDS
+    lifecycle.check_budget(upper)
+    lifecycle.check_budget(math.nextafter(lower, math.inf))
+    for deadline in (now, lower, math.nextafter(upper, math.inf), True, math.nan, math.inf):
+        with pytest.raises(SandboxUnavailable, match="bounded"):
+            lifecycle.check_budget(deadline)
 
 
 def cleanup(container="c" * 64, nonce="b" * 32, device=DEVICE):

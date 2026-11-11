@@ -90,7 +90,10 @@ def local(configured, tmp_path, monkeypatch):
                 assert operation["phase"] == "pending"
                 assert str(task.service.job_id) == operation["job"]
                 assert str(task.service.reservation_token) == operation["reservation"]
-                assert 0 < deadline - time.monotonic() <= 180
+                now = time.monotonic()
+                # Subtracting a frozen fractional clock can round a valid
+                # 180-second budget upward; compare the original deadline.
+                assert now < deadline <= now + 180
                 assert journal.load() is None
                 on_tick()
                 on_begin()
@@ -199,12 +202,17 @@ def test_failure_retains_pending_operation_and_requires_explicit_recovery(
         assert state.operation()["phase"] == "recovered"
 
 
+@pytest.mark.parametrize(
+    "clock_start",
+    [None, 934.0000000000003],
+    ids=["current-clock", "fractional-clock-boundary"],
+)
 @pytest.mark.parametrize("change", ["cancel", "environment", "marker", "operation", "deadline"])
 def test_late_startup_change_prevents_sending_learner_source(
-    local, public_problem, change, monkeypatch
+    local, public_problem, change, clock_start, monkeypatch
 ):
     with LocalPracticeState(local.journal, create=True) as state:
-        clock = [time.monotonic()]
+        clock = [time.monotonic() if clock_start is None else clock_start]
         monkeypatch.setattr(module.time, "monotonic", lambda: clock[0])
 
         def progress(name):
@@ -225,6 +233,7 @@ def test_late_startup_change_prevents_sending_learner_source(
 
         with pytest.raises((SandboxUnavailable, InterruptedError)):
             execute(local, state, public_problem, on_progress=progress)
+        assert local.progress == list(CHECKS)
         assert local.public_calls == 0
 
 

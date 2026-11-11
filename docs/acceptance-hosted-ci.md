@@ -33,6 +33,7 @@
 | `fc59265` | [43043838329](https://github.com/laf070810/PraxiMesh/actions/runs/43043838329)：SQLite 测试和 Chromium 安装失败，PostgreSQL 被取消；最后一次可用查询时容器 job 尚在运行 | [43043837878](https://github.com/laf070810/PraxiMesh/actions/runs/43043837878)：Chromium 安装失败 |
 | `10242e5` | [43058131760](https://github.com/laf070810/PraxiMesh/actions/runs/43058131760)：SQLite、PostgreSQL、编辑器、容器通过；浏览器系统依赖安装失败 | [43058132599](https://github.com/laf070810/PraxiMesh/actions/runs/43058132599)：系统依赖安装失败 |
 | `369a881` | [43058725539](https://github.com/laf070810/PraxiMesh/actions/runs/43058725539)：SQLite、PostgreSQL、编辑器、容器通过；浏览器系统依赖安装失败 | [43058725571](https://github.com/laf070810/PraxiMesh/actions/runs/43058725571)：系统依赖安装失败 |
+| `f89a480` | [43063191247](https://github.com/laf070810/PraxiMesh/actions/runs/43063191247)：PostgreSQL、编辑器、浏览器、容器通过；SQLite 的一个测试函数失败，已取得位置注释 | [43063191233](https://github.com/laf070810/PraxiMesh/actions/runs/43063191233)：安装、截图、解释器构建和启动探针通过；17:19 UTC 观察时仍在执行真实回归 |
 
 失败注释只有退出码；日志接口返回 403，后续匿名 API 查询也遇到限流。没有取得完整失败文本，不能确认 SQLite 或安装失败的原因。Node 弃用警告不作为失败原因。
 
@@ -43,6 +44,24 @@
 11 月 12 日进一步核对确认，两个后续提交的两种数据库均已通过；这不能还原此前 SQLite 失败的具体原因。安装失败发生在 `install-deps chromium`，尚未执行浏览器下载、截图或 WASI 验收。锁定 Playwright 的该入口依次调用 `apt-get update` 与安装，公开注释仍只有退出码，尚不能确定具体 APT 错误。
 
 本轮增加内存中的安装错误分类，保留原命令、job 输出和退出状态。原始日志制品方案因可能外发内部地址等元数据被自动审批拒绝，已改为不生成日志文件、只输出固定类别。十一项新检查与原十七项诊断检查共 **28 passed**，包括实际固定子进程的正常/非零/信号退出、无新增文件及诊断容量边界。没有在开发主机运行 APT；这些结果不证明远端安装故障已经解决。分类规则和运行方式见 [CI 指南](deployment/ci.md)。
+
+<a id="fractional-clock"></a>
+
+## SQLite 失败位置与分数时钟复现
+
+`f89a480` 的安装步骤和浏览器完整检查已通过，安装调用及版本没有改变，不能据此确定此前 APT 失败的原因。其 SQLite job 的真实注释定位到 `tests/test_container_practice.py::test_late_startup_change_prevents_sending_learner_source`；参数值和异常正文没有公开。
+
+在原本地环境直接重放该函数，五种状态变化均通过。将冻结时钟固定为 `934.0000000000003` 后，五种变化均在初始恢复的夹具预算断言处失败：构造的期限为 `1114.0000000000005`，相减得到 `180.0000000000001`，误判超过 180 秒。这发生在预期的启动后身份/取消检查之前。
+
+仅修正夹具后，相关三个模块为 99 passed / 5 failed，分数时钟继续在生产适配器的维护预算判断处被拒绝。进一步独立验证同类故障预算和完整启动总预算；完整启动使用 `3872.0000000000027` 构造 4320 秒期限时，相减得到 `4320.000000000001`，也会被误拒绝。
+
+三个生产入口及对应夹具改为比较原绝对期限与 `now + 原预算`，保持原 90/180/4320 秒常量、严格最小预算、类型及有限值检查，不加容差或刷新期限。回归覆盖取消、环境、私有标记、操作记录和期限变化，并断言完整启动确实已走到最后阶段、源码仍未发送；紧邻上界的下一个浮点值继续被拒绝。独立启动夹具也补齐了真实任务构造器已有的清理状态字段，避免模型异常掩盖原失败。
+
+三个文件已在执行源码契约中，故障模块也在运行时源码契约中；本轮会改变环境/镜像摘要，需要匹配制品重新验收。当前没有取得远端异常正文，因此本地确定性复现不能证明所有历史 SQLite 失败都同因。预算决定见 [RFC-021](rfcs/021-gpu-container-supervision.md#监督契约)及 [ADR-055](adr/055-container-controller-faults.md)。
+
+最终六个相关模块 **225 passed / 0 skipped**，包括新增数值边界、全部启动后变化、独立恢复拒绝、真实私有文件/锁和进程中断；结果为 `deadline-components-final.xml`。源码契约已按实际文件摘要核对。匹配镜像、真实无设备故障及 PostgreSQL 复验仍须单独记录完成结果，组件通过不替代这些检查或硬件验收。
+
+原始证据包括 `f89a480-sqlite-annotations.json`、`late-startup-original.xml`、`late-startup-fractional-before.xml`、`late-startup-regression-before.xml`、`late-startup-components-after.xml`、`production-deadline-boundaries-before.xml`、`startup-total-boundary-before.xml` 和 `deadline-source-contracts.json`，均位于下述忽略目录。这些检查使用真实临时文件/锁与明确的设备模型，没有访问 GPU。
 
 ## 原始证据
 

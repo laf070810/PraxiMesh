@@ -191,12 +191,13 @@ class ContainerGPUAdapter:
 
     def check_controller(self, task, name, *, deadline, on_tick):
         request = fault_request(name, uuid4().hex)
+        now = time.monotonic()
         if (
             type(task) is not KernelTask
             or task.service.purpose != "maintenance"
             or type(deadline) not in {int, float}
             or not math.isfinite(deadline)
-            or not 0 < deadline - time.monotonic() <= FAULT_SECONDS + RECOVERY_SECONDS
+            or not now < deadline <= now + (FAULT_SECONDS + RECOVERY_SECONDS)
         ):
             raise ValueError("Controller faults require an original bounded maintenance task")
         fault_deadline = min(deadline - RECOVERY_SECONDS, time.monotonic() + FAULT_SECONDS)

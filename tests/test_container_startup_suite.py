@@ -12,6 +12,7 @@ from types import SimpleNamespace
 import pytest
 
 from judge import container_startup_suite as module
+from judge.container_execution import KernelTask
 from judge.container_isolation_protocol import target_identity
 from judge.container_journal import ContainerJournal
 from judge.container_readiness import SCOPE, task_identity
@@ -28,9 +29,16 @@ from tests.test_container_lifecycle import report as fault_report
 
 
 @pytest.fixture
-def standalone(configured, tmp_path):
+def standalone(configured, tmp_path, monkeypatch):
     adapter, control = configured.adapter, configured.control
     events = []
+    original_create = KernelTask.__init__
+
+    def create(task, *args, **kwargs):
+        original_create(task, *args, **kwargs)
+        task.cleanup = task.status = None
+
+    monkeypatch.setattr(KernelTask, "__init__", create)
     with DeviceLock(tmp_path / "locks", adapter.target["uuid"]) as guard:
         with ContainerJournal(tmp_path / "journal", guard, Engine()) as journal:
             control.guard, control.journal = guard, journal
@@ -51,7 +59,8 @@ def standalone(configured, tmp_path):
                 assert task.service.purpose == "maintenance"
                 assert task.service.job_id == state.job
                 assert task.service.reservation_token == state.reservation
-                assert 0 < deadline - time.monotonic() <= 180
+                now = time.monotonic()
+                assert now < deadline <= now + 180
                 assert journal.load() is None
                 task.cleanup = task.status = None
                 on_tick()
@@ -125,7 +134,12 @@ def standalone(configured, tmp_path):
             yield state
 
 
-def test_full_sequence_uses_real_lock_without_database_or_readiness_publication(standalone):
+@pytest.mark.parametrize("clock_start", [None, 934.0000000000003, 3872.0000000000027])
+def test_full_sequence_uses_real_lock_without_database_or_readiness_publication(
+    standalone, clock_start, monkeypatch
+):
+    if clock_start is not None:
+        monkeypatch.setattr(module.time, "monotonic", lambda: clock_start)
     evidence = standalone.run()
     assert [row["name"] for row in evidence] == list(CHECKS)
     assert standalone.progress == list(CHECKS)
@@ -136,6 +150,17 @@ def test_full_sequence_uses_real_lock_without_database_or_readiness_publication(
     assert evidence[0]["report"] is not standalone.initial
     assert all(row["report"]["task"]["cleanup"]["removed"] for row in evidence[1:])
     assert not (standalone.journal.directory.parent / "receipts").exists()
+
+
+def test_complete_startup_rejects_next_float_after_original_deadline(standalone, monkeypatch):
+    import math
+
+    now = 3872.0000000000027
+    monkeypatch.setattr(module.time, "monotonic", lambda: now)
+    original_tasks = len(standalone.tasks)
+    with pytest.raises(ValueError, match="bounded deadline"):
+        standalone.run(deadline=math.nextafter(now + 4320, math.inf))
+    assert len(standalone.tasks) == original_tasks and standalone.progress == []
 
 
 @pytest.mark.parametrize("stage", CHECKS[1:])

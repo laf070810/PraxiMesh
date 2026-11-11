@@ -29,12 +29,13 @@ def run_startup(
 ):
     if type(adapter) is not ContainerGPUAdapter:
         raise ValueError("The original container GPU adapter is required")
+    now = time.monotonic()
     if (
         type(job_id) is not uuid.UUID
         or type(reservation_token) is not uuid.UUID
         or type(deadline) not in {int, float}
         or not math.isfinite(deadline)
-        or not 0 < deadline - time.monotonic() <= SUITE_SECONDS
+        or not now < deadline <= now + SUITE_SECONDS
     ):
         raise ValueError("Startup requires explicit maintenance identities and a bounded deadline")
     control = adapter.control

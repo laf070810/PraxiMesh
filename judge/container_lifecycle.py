@@ -24,7 +24,7 @@ def check_budget(deadline):
     minimum = (
         START_SECONDS + STOP_SECONDS + 5 + PROFILE["compile_seconds"] + PROFILE["request_seconds"]
     )
-    if not finite(deadline) or not minimum < deadline - now <= FAULT_SECONDS:
+    if not finite(deadline) or not now + minimum < deadline <= now + FAULT_SECONDS:
         raise SandboxUnavailable("Insufficient bounded container fault and cleanup budget")
 
 

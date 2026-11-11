@@ -271,10 +271,15 @@ def test_resource_adapter_uses_fresh_challenge_and_original_maintenance_task(con
     assert requests[0]["canary"] != requests[1]["canary"]
 
 
+@pytest.mark.parametrize("clock_start", [None, 934.0000000000003])
 @pytest.mark.parametrize("defect", [None, "old-cleanup", "new-recovery", "reuse"])
-def test_controller_fault_creates_recovery_only_after_original_cleanup(configured, defect):
+def test_controller_fault_creates_recovery_only_after_original_cleanup(
+    configured, defect, clock_start, monkeypatch
+):
     from tests.test_container_lifecycle import cleanup, report
 
+    if clock_start is not None:
+        monkeypatch.setattr(module.time, "monotonic", lambda: clock_start)
     events = []
     adapter = configured.adapter
     old = adapter.task(configured.control.guard, "job", "reservation", purpose="maintenance")
@@ -335,6 +340,24 @@ def test_controller_fault_keeps_budget_for_independent_recovery(configured, seco
     with pytest.raises((ValueError, SandboxUnavailable)):
         adapter.check_controller(
             task, "service-deadline", deadline=time.monotonic() + seconds, on_tick=lambda: None
+        )
+    assert len(configured.tasks) == 1 and "runtime-recovery-and-cleanup" not in configured.events
+
+
+def test_controller_fault_rejects_next_float_after_original_deadline(configured, monkeypatch):
+    import math
+
+    now = 934.0000000000003
+    monkeypatch.setattr(module.time, "monotonic", lambda: now)
+    task = configured.adapter.task(
+        configured.control.guard, "job", "reservation", purpose="maintenance"
+    )
+    with pytest.raises(ValueError, match="bounded maintenance"):
+        configured.adapter.check_controller(
+            task,
+            "controller-exit",
+            deadline=math.nextafter(now + 180, math.inf),
+            on_tick=lambda: None,
         )
     assert len(configured.tasks) == 1 and "runtime-recovery-and-cleanup" not in configured.events
 
