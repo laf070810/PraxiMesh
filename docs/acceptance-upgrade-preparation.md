@@ -10,9 +10,9 @@ F→当前版本的升级检查已接入，当前 CPU 包也已通过真实 WASI
 
 相关组件为 **94 passed / 2 skipped**；随后在一次性 PostgreSQL 中完成两项被跳过的检查及四项历史 schema 检查，共 **6 passed / 0 skipped**。它们覆盖数据快照、GPU 空表、列权限与旧写入兼容，未运行旧 F 应用。实际 F/当前清单的只读预检从拒绝变为接受。
 
-## 当前包的真实验收
+## 首轮 CPU 包的真实验收
 
-最终通过的包在 `var/releases/2026-11-11-cpu-upgrade-target-2/`：
+第一轮通过的目标包在 `var/releases/2026-11-11-cpu-upgrade-target-2/`：
 
 | 身份 | 值 |
 | --- | --- |
@@ -24,6 +24,23 @@ F→当前版本的升级检查已接入，当前 CPU 包也已通过真实 WASI
 完整镜像与源码归档先校验，再在私有网络、独立 PostgreSQL 和回环 HTTP 站点运行。129 项镜像内真实启动探针、Run/错解/正确提交/进度/删除、三组基础及七组扩展浏览器旅程、准入超时关闭、排空/恢复和错误运行时拒绝均通过。临时容器、网络与数据库卷清理通过，独立 Docker 客户端配置已删除。本轮没有使用 AI、HTTPS 或 GPU；CPU/HTTPS 完整发布恢复矩阵见 [G59](acceptance-g59.md)。
 
 此次使用提交 `10242e5` 的外部浏览器验收脚本；归档仍为原始 `fc59265`，未就地改写。脚本摘要保存在 `polling-harness-sources.json`。
+
+<a id="current-target"></a>
+
+## 当前目标包：包含预算修复的版本
+
+控制器的分数时钟修复及匹配镜像验证见[托管验收记录](acceptance-hosted-ci.md#fractional-clock)。随后从干净提交 `3cdfff2e0fd0dfa8b5a82d1a5ab068cb07d27405` 冻结新 CPU 包，保留此前两个目录：
+
+| 身份 | 值 |
+| --- | --- |
+| 目录 | `var/releases/2026-11-12-cpu-upgrade-target-3/` |
+| manifest SHA-256 | `082fa88c1be53e370b83df4f617ce9642116db2467953fe51745cdda23833c0d` |
+| source_id | `71cfce143a2f36bdaad9308ac8798f3be024d345a1413bd6f4c6c551532b408c` |
+| 源码 | 979 个文件与该提交的原始 Git 对象逐字节匹配 |
+
+完整归档及镜像核验后，该包通过 129 项镜像内真实启动探针、Run/错解/正确提交/进度/删除、三组基础与七组扩展浏览器旅程、准入关闭、排空/恢复及错误运行时拒绝。实际站点仍为独立 PostgreSQL 与回环 HTTP，AI 和 GPU 未参与。临时资源和数据库卷清理通过；原 Web、worker、tutor 的 ID、镜像、启动时间和健康状态保持不变。
+
+旧 F 与此目标包重新按归档字节验证，升级预检返回 `post-f`。这次仅核对元数据与制品，没有加载旧 F 镜像、启动旧应用或执行升级。原始证据在 `test-results/deadline-bounds-2026-11-12/`：`release-build-result.json`、`release-validation-result.json`、`latest-upgrade-preflight.json` 和 `package-final-resource-audit.json`。
 
 ## 保留的失败与调整
 

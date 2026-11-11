@@ -34,7 +34,8 @@
 | `10242e5` | [43058131760](https://github.com/laf070810/PraxiMesh/actions/runs/43058131760)：SQLite、PostgreSQL、编辑器、容器通过；浏览器系统依赖安装失败 | [43058132599](https://github.com/laf070810/PraxiMesh/actions/runs/43058132599)：系统依赖安装失败 |
 | `369a881` | [43058725539](https://github.com/laf070810/PraxiMesh/actions/runs/43058725539)：SQLite、PostgreSQL、编辑器、容器通过；浏览器系统依赖安装失败 | [43058725571](https://github.com/laf070810/PraxiMesh/actions/runs/43058725571)：系统依赖安装失败 |
 | `f89a480` | [43063191247](https://github.com/laf070810/PraxiMesh/actions/runs/43063191247)：PostgreSQL、编辑器、浏览器、容器通过；SQLite 的一个测试函数失败，已取得位置注释 | [43063191233](https://github.com/laf070810/PraxiMesh/actions/runs/43063191233)：成功，包含真实评测、HTTPS、发布包和迁移失败/中断恢复 |
-| `a5d96c7` | [43071071772](https://github.com/laf070810/PraxiMesh/actions/runs/43071071772)：两种数据库、编辑器、浏览器和容器全部通过 | [43071071748](https://github.com/laf070810/PraxiMesh/actions/runs/43071071748)：18:10 UTC 观察时仍在执行真实回归，尚未记录为通过 |
+| `a5d96c7` | [43071071772](https://github.com/laf070810/PraxiMesh/actions/runs/43071071772)：两种数据库、编辑器、浏览器和容器全部通过 | [43071071748](https://github.com/laf070810/PraxiMesh/actions/runs/43071071748)：成功，包含真实评测、HTTPS、发布包和迁移失败/中断恢复 |
+| `3cdfff2` | [43076789097](https://github.com/laf070810/PraxiMesh/actions/runs/43076789097)：全部通过；此提交只更新文档 | [43076788801](https://github.com/laf070810/PraxiMesh/actions/runs/43076788801)：19:01 UTC 观察时仍在部署恢复阶段；本地同源冻结包已通过独立验收 |
 
 失败注释只有退出码；日志接口返回 403，后续匿名 API 查询也遇到限流。没有取得完整失败文本，不能确认 SQLite 或安装失败的原因。Node 弃用警告不作为失败原因。
 
@@ -69,7 +70,9 @@
 - 当前 worker 镜像、Compose 与 PostgreSQL 只读预检：**十项通过，十一个自有容器及相关网络、卷、临时存储清理完成**。没有查询、映射或执行 GPU。
 - 原 Web、CPU worker 和 tutor 的容器 ID、镜像、启动时间均未变，健康状态正常。
 
-这些检查的汇总在 `test-results/deadline-bounds-2026-11-12/`，包括 `postgres-summary.json`、`lifecycle-process.json`、`worker-confirmation.json` 和 `final-resource-audit.json`；原始实际报告分别为 `test-results/px-container-lifecycle-cb2a8e188ab8/result.json` 与 `test-results/px-container-worker-e1b55b4536db/result.json`。测试镜像标签已经清理，不作为现成部署制品交付；正式使用须按新源码构建匹配镜像并完成真实硬件启动。应用 CI 五项 job 已通过，完整 WASI 结果继续绑定上表中的同一提交，不能借用 `f89a480` 的成功。
+这些检查的汇总在 `test-results/deadline-bounds-2026-11-12/`，包括 `postgres-summary.json`、`lifecycle-process.json`、`worker-confirmation.json` 和 `final-resource-audit.json`；原始实际报告分别为 `test-results/px-container-lifecycle-cb2a8e188ab8/result.json` 与 `test-results/px-container-worker-e1b55b4536db/result.json`。测试镜像标签已经清理，不作为现成部署制品交付；正式使用须按新源码构建匹配镜像并完成真实硬件启动。
+
+`a5d96c7` 的应用五项 job 与完整 WASI 工作流均已通过。WASI 于 2026-11-11 18:35 UTC 成功结束，23 个步骤成功，失败位置摘要按条件跳过；工作流内的测试跳过项仍不计作通过。最终步骤复核在 `final-wasi-verification.json`。此前安装失败和旧 SQLite 失败的完整异常仍未取得，本次成功不将历史原因全部归结为同一问题。随后从仅更新文档的 `3cdfff2` 构建并实测了[新的冻结 CPU 目标包](acceptance-upgrade-preparation.md#current-target)，供旧 F 整站升级获许可后使用。
 
 原始证据包括 `f89a480-sqlite-annotations.json`、`late-startup-original.xml`、`late-startup-fractional-before.xml`、`late-startup-regression-before.xml`、`late-startup-components-after.xml`、`production-deadline-boundaries-before.xml`、`startup-total-boundary-before.xml` 和 `deadline-source-contracts.json`，均位于下述忽略目录。这些检查使用真实临时文件/锁与明确的设备模型，没有访问 GPU。
 
