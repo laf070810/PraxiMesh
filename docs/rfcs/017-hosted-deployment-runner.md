@@ -20,6 +20,14 @@
 
 ## 验证
 
+### CI 失败位置与浏览器准备（2026-11-11）
+
+`853b526` 的 SQLite job 失败，公开注释只有退出码，日志下载需要额外 GitHub 权限；同一提交在独立冻结环境的本地 SQLite 套件通过，不能据此确定远端原因。后续 `fc59265` 又出现浏览器安装步骤失败，合并的 `--with-deps` 命令没有区分系统包安装与浏览器下载。
+
+为应用和 WASI 的 pytest 步骤增加失败位置摘要，使用 [GitHub error 注释](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message)。摘要只公布工作流确切提交中已有的测试文件、行号及函数名；从固定 Git 对象读取并解析定义，不执行源码、不采用测试期间改写的工作区。参数值、异常正文、输出、凭据和私有数据都不进入注释。报告缺失或不合法仍报错，原测试失败状态不变。两种数据库独立完成检查，避免一项失败取消另一项的证据。
+
+浏览器准备分为 `install-deps chromium` 与 `install chromium` 两步，沿用锁定 Playwright 及既有实际截图预检。此改动不增加重试、放宽验证或跳过任何安装与运行检查，也不改变专用部署 runner 的权限或触发条件。
+
 核对工作流 YAML 和内嵌命令；验证 `status`、`apply`、`recover` 分派及非法操作/摘要拒绝。在临时私有配置和状态目录运行真实控制器 `status`，核对不修改部署记录、不连接数据库或启动容器。以上只证明本地命令行为；目标 runner 的接单、权限与实际发布/恢复仍需服务端验收。
 
 本次本地验证：9 组工作流分派/拒绝检查通过；真实控制器对临时空状态及已有记录的查询通过，记录未改写、配置凭证未输出、临时目录已清理。85 项协调器/发布包回归通过，406 个本地文档链接及新增指南的两段 shell 命令检查通过。结果见忽略目录 `test-results/runner-gpu-guide-validation.json`；主机和 GitHub 的已取得只读观测汇总在 `test-results/runner-gpu-readonly-audit.json`。未执行 GPU 工作负载、runner 注册或目标站点发布。

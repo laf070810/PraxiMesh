@@ -136,7 +136,12 @@ def main():
                 run_id = page.url.rstrip("/").rsplit("/", 1)[1]
                 web_run = finished(run_id)
                 assert web_run["verdict"] == "accepted" and not web_run["formal_result"]
-                page.reload()
+                # The pending result page reloads itself when its poll finishes.
+                # Wait for that real terminal page within the former navigation
+                # budget instead of starting another navigation from the harness.
+                expect(page.locator(".result-panel:not([data-poll-url])")).to_be_visible(
+                    timeout=30000
+                )
                 expect(page.locator("main")).to_contain_text("不计入正式完成状态")
                 directory = Path(temporary) / slug
                 package = cli(*connection, "download", slug, str(directory))

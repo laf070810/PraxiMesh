@@ -17,7 +17,10 @@ jobs:
           python-version: '3.11'
       - run: python -m pip install uv==0.11.8
       - run: uv sync --frozen --group judge --group browser
-      - run: .venv/bin/playwright install --with-deps chromium
+      - name: Install Chromium system dependencies
+        run: .venv/bin/playwright install-deps chromium
+      - name: Install pinned Chromium
+        run: .venv/bin/playwright install chromium
       - name: Verify browser rendering before building and probing WASI
         run: .venv/bin/python -m tests.browser_runtime
       - name: Build pinned trusted Python and JavaScript interpreters
@@ -31,9 +34,13 @@ jobs:
       - name: Record the real startup receipt for queued worker tests
         run: .venv/bin/python manage.py sandbox_check
       - name: Real isolation, reference, incorrect solution and lifecycle checks
+        id: pytest
         env:
           RUN_SANDBOX_TESTS: '1'
         run: .venv/bin/python scripts/postgres_tests.py -q --junitxml=test-results/wasi.xml
+      - name: Report failed test locations
+        if: ${{ always() && steps.pytest.outcome == 'failure' }}
+        run: .venv/bin/python scripts/ci_diagnostics.py test-results/wasi.xml --revision "${{ github.sha }}"
       - name: Fetch the pinned TLS proxy
         run: .venv/bin/python scripts/fetch_caddy.py --output var/tools/caddy-2.11.7
       - name: Real HTTPS deployment, browser journey, PostgreSQL roles and capacity

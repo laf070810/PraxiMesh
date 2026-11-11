@@ -32,6 +32,7 @@ jobs:
   checks:
     runs-on: ubuntu-24.04
     strategy:
+      fail-fast: false
       matrix:
         database: [sqlite, postgres]
     services:
@@ -55,10 +56,14 @@ jobs:
       - run: uv run python manage.py content_check
       - run: uv run python manage.py makemigrations --check --dry-run
       - name: Tests
+        id: pytest
         env:
           DATABASE_URL: ${{ matrix.database == 'postgres' && 'postgresql://postgres:ci-only-password@localhost:5432/praximesh' || '' }}
           DB_SSLMODE: disable
         run: uv run pytest -q --junitxml=test-results/application.xml
+      - name: Report failed test locations
+        if: ${{ always() && steps.pytest.outcome == 'failure' }}
+        run: .venv/bin/python scripts/ci_diagnostics.py test-results/application.xml --revision "${{ github.sha }}"
       - run: uv run pip-audit --progress-spinner off
       - name: Check exported production lock
         run: |
@@ -80,7 +85,10 @@ jobs:
           python-version: '3.11'
       - run: python -m pip install uv==0.11.8
       - run: uv sync --frozen --group browser
-      - run: uv run --group browser playwright install --with-deps chromium
+      - name: Install Chromium system dependencies
+        run: .venv/bin/playwright install-deps chromium
+      - name: Install pinned Chromium
+        run: .venv/bin/playwright install chromium
       - run: .venv/bin/python -m tests.browser_runtime
       - name: Local browser journey, evaluation disabled
         run: uv run --group browser python scripts/browser_acceptance.py
