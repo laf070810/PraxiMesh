@@ -4,7 +4,6 @@ import hashlib
 import json
 import os
 import re
-import shutil
 import stat
 import struct
 import subprocess
@@ -20,7 +19,7 @@ from judge.driver_artifacts import (
     version_from_kernel,
 )
 from judge.gpu_artifacts import prepare_kernel_artifacts
-from scripts.container_runtime_acceptance import build_context, stage_context
+from scripts.container_runtime_acceptance import build_context, copy_image_source, stage_context
 
 KERNEL_VERSION = Path("/proc/driver/nvidia/version")
 
@@ -160,8 +159,8 @@ def build_image(
     compiler_identity = prepare_kernel_artifacts(compiler, archive, ROOT)
     archive.unlink()
     for name in ("driver_artifacts.py", "container_driver_guest.py"):
-        shutil.copyfile(ROOT / "judge" / name, context / name)
-    shutil.copyfile(
+        copy_image_source(ROOT / "judge" / name, context / name)
+    copy_image_source(
         ROOT / "scripts/container_driver_fixture.py", context / "container_driver_fixture.py"
     )
     package = json.loads((ROOT / "content/candidates/cuda.json").read_text())
@@ -170,6 +169,7 @@ def build_image(
             [{k: item[k] for k in ("id", "operation", "reference")} for item in package["problems"]]
         )
     )
+    (context / "driver-cases.json").chmod(0o644)
     with (context / "Dockerfile").open("ab") as target:
         target.write((ROOT / "deploy/container-driver.fragment").read_bytes())
         if device_tasks:
@@ -190,8 +190,8 @@ def build_image(
             "container_kernel_entry.py",
             "container_kernel_guest.py",
         ):
-            shutil.copyfile(ROOT / "judge" / name, context / name)
-        shutil.copyfile(
+            copy_image_source(ROOT / "judge" / name, context / name)
+        copy_image_source(
             ROOT / "scripts/container_gpu_fixture.py", context / "container_gpu_fixture.py"
         )
     if digest_function() != expected:

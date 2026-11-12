@@ -26,7 +26,7 @@
 - CUDA 内容校验复用 `judge/gpu_contract.py`，不能放宽 CPU schema 或加入 CPU 分派。`content/candidates/` 只存候选新增内容；`content_compose` 生成完整包但不发布、不覆盖 ID。参考解/错解的真实检查使用 [GPU 指南](docs/deployment/gpu.md#cuda-content)中的正常 API 验收入口，只针对独立测试站点和合成账号；观察超时保留请求键、任务和站点，不把协议替身或静态校验当作硬件通过。
 - `content_import` 是发布动作，会撤回官方全量包中缺失的内容。只在新建或明确授权的数据库导入示例包。应用升级默认保留现有目录；不自动覆盖维护者或组织的内容。
 - 数据库结构变化追加迁移，保留已交付迁移文件。新增表/应用时核对 `scripts/deploy_database.py` 的角色权限、`scripts/release.py` 的源码范围和 `Dockerfile` 的复制范围；Web/worker 不获得全表权限来规避授权错误。
-- 发布包不可原地改写。新控制器必须能校验需要升级的旧制品；新增开发文档不得无意变成旧清单的必填项。源码快照须独立于调用者 umask，让非 root 镜像可读管理命令、迁移和静态资源；只归一化白名单源码的内部目录/文件权限，保留外层工作区和配置私有。schema 升级、失败恢复和内容发布分别说明验证范围。
+- 发布包不可原地改写。新控制器必须能校验需要升级的旧制品；新增开发文档不得无意变成旧清单的必填项。源码快照须独立于调用者 umask，让非 root 镜像可读管理命令、迁移和静态资源；runtime/编译/驱动镜像的追加源码也须覆盖，只归一化白名单源码的内部目录/文件权限，保留外层工作区和配置私有。schema 升级、失败恢复和内容发布分别说明验证范围。
 - 协调器恢复时的无状态 Web 重建在 `scripts/deploy_web.py`；保留实际维护路由、原数据库及严格运行契约。先保存原 ID/配置摘要与意图，移除只用已核对的完整 ID，新容器保存 ID 后才启动；不能按同名认领替代，也不能将此流程套用于 worker。按[集中恢复检查](docs/deployment/production.md#web-recovery-check)验证真实端口和中断，再重放完整 CPU 发布矩阵。固定 HTTP 专项可使用已有自有 Compose Web 的不可变镜像 ID，仅从镜像派生测试命令；不改动运行中的容器，清理保留基镜像，结果不替代冻结发布包的完整应用验收。
 - GPU 发布使用同一冻结源码的四镜像 format 2，默认 CPU format 1 保持兼容。构建与核验在 `scripts/release.py`、`scripts/release_gpu.py`；有序源码契约从归档字节计算，导入前核对完整镜像层、角色和入口，不能执行归档代码或借用当前工作树/daemon 缓存。按[发布指南](docs/deployment/releases.md#gpu-release)串行验证导入后的无设备 worker 和 CPU 应用。制品通过不代表 GPU 激活或升级通过；未接入完整 GPU 生命周期的协调器必须拒绝激活。
 - GPU 协调器节点绑定在 `scripts/deploy_gpu.py`，操作集中在[原节点绑定](docs/deployment/container-gpu-worker.md#coordinator-binding)。先保存意图再认领同一私有状态和锁，只允许 `attach-gpu` 为原配置增加 GPU 字段；不得借此改密钥或接管已有 worker/任务。绑定未确认前不得触及数据库或执行发布变更。`--prepare-only --initialize` 仍读取真实 GPU，需要授权；`deploy_gpu_acceptance.py` 才是合成元数据与实际文件锁/SIGKILL 的无设备检查，不生成就绪证据。

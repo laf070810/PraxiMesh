@@ -1,12 +1,11 @@
 """Build a pinned, device-free NVRTC guest on the existing supervised runtime."""
 
 import os
-import shutil
 import stat
 
 from judge.container_compiler import ROOT, compiler_digest
 from judge.gpu_artifacts import prepare_kernel_artifacts
-from scripts.container_runtime_acceptance import build_context, stage_context
+from scripts.container_runtime_acceptance import build_context, copy_image_source, stage_context
 
 
 def build_image(engine, runtime_archive, nvrtc_archive, output, tag):
@@ -35,7 +34,7 @@ def build_image(engine, runtime_archive, nvrtc_archive, output, tag):
         "container_compile_guest.py",
         "container_compile_protocol.py",
     ):
-        shutil.copyfile(ROOT / "judge" / name, context / name)
+        copy_image_source(ROOT / "judge" / name, context / name)
     with (context / "Dockerfile").open("ab") as target:
         target.write((ROOT / "deploy/container-compiler.fragment").read_bytes())
     image = build_context(engine, context, output, tag, compiler_digest, expected_digest=expected)

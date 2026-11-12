@@ -22,6 +22,12 @@ from judge.gpu_device_lock import DeviceLock  # noqa: E402
 from scripts.container_supervision_acceptance import gone, owned_cleanup, tree, wait_exit  # noqa: E402
 
 
+def copy_image_source(source, destination):
+    """Keep fixed image sources readable without opening the private build root."""
+    shutil.copyfile(source, destination)
+    destination.chmod(0o644)
+
+
 def stage_context(archive, out):
     context = out / "context"
     context.mkdir(mode=0o700)
@@ -42,10 +48,10 @@ def stage_context(archive, out):
             raise ValueError("Runtime archive changed during staging")
     runtime_from_archive(snapshot, context / "runtime")
     snapshot.unlink()
-    shutil.copyfile(ROOT / "deploy/container-runtime.Dockerfile", context / "Dockerfile")
-    shutil.copyfile(ROOT / "vendor/gvisor/LICENSE", context / "gvisor-LICENSE")
+    copy_image_source(ROOT / "deploy/container-runtime.Dockerfile", context / "Dockerfile")
+    copy_image_source(ROOT / "vendor/gvisor/LICENSE", context / "gvisor-LICENSE")
     for name in ("container_entry.py", "container_contract.py"):
-        shutil.copyfile(ROOT / "judge" / name, context / name)
+        copy_image_source(ROOT / "judge" / name, context / name)
     for name in (
         "container_runtime_fixture.py",
         "container_transport_fixture.py",
@@ -54,8 +60,9 @@ def stage_context(archive, out):
         "container_kernel_cpu_guest.py",
         "container_kernel_fixture.py",
     ):
-        shutil.copyfile(ROOT / "scripts" / name, context / name)
-    (context / "judge").mkdir()
+        copy_image_source(ROOT / "scripts" / name, context / name)
+    (context / "judge").mkdir(mode=0o755)
+    (context / "judge").chmod(0o755)
     host_only = {
         "judge/container_service.py",
         "judge/container_runtime_service.py",
@@ -66,7 +73,7 @@ def stage_context(archive, out):
     for path in (
         ROOT / name for name in SOURCES if name.startswith("judge/") and name not in host_only
     ):
-        shutil.copyfile(path, context / "judge" / path.name)
+        copy_image_source(path, context / "judge" / path.name)
     return context
 
 
