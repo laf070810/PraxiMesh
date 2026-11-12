@@ -17,7 +17,7 @@
 - `f89a480` 的失败位置注释定位到启动后变化检查；本地固定分数时钟稳定复现合法 180 秒期限被误判超限。
 - 三个生产入口及夹具使用原绝对期限比较，保留原预算与严格拒绝条件；补充分数时钟、启动后五种变化和相邻浮点上界回归。执行摘要随源码更新，原始失败、匹配镜像验证及后续 CI 见[托管记录](docs/acceptance-hosted-ci.md#fractional-clock)。
 - 六个相关模块 225 项组件、128 项实际 PostgreSQL、五组 CPU/gVisor 故障及十项匹配 worker 预检均通过；测试资源已清理，原服务身份和健康未变。`a5d96c7` 应用 CI 五项及完整 WASI 工作流全部通过。
-- 从 `3cdfff2` 冻结的新 CPU 包 `082fa88c…` 通过真实评测与完整浏览器验收，979 个源码文件与提交匹配；旧 F 升级目标已更新，镜像导入许可和整站升级仍待完成，见[当前目标包](docs/acceptance-upgrade-preparation.md#current-target)。
+- 从 `3cdfff2` 冻结的新 CPU 包 `082fa88c…` 通过真实评测与完整浏览器验收，979 个源码文件与提交匹配；旧 F 升级目标已更新，镜像导入许可和整站升级仍待完成，见[预算修复目标包](docs/acceptance-upgrade-preparation.md#budget-target)。
 
 ## 系统依赖安装诊断与 worker 续检确认 — 2026-11-12
 

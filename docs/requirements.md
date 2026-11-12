@@ -43,7 +43,7 @@
 | --- | --- | --- |
 | 旧 F 应用到当前版本的整站升级（R-09） | [G58](acceptance-g58.md) 的六项实际端口恢复专项及 [G59](acceptance-g59.md) 的当前 CPU/HTTPS/WASI 完整发布恢复矩阵均通过，RootlessKit 恢复缺口已补齐。[G60](acceptance-g60.md)使用与冻结 F 字节相同的历史迁移重建数据库，实际复制并升级到当前 schema，旧数据、序列、写入兼容及权限检查通过。已补充[F→当前 CPU 整站入口](deployment/production.md#f-current-upgrade)，94 项组件及六项真实 PostgreSQL 检查通过；[更新后的 CPU 目标包](acceptance-upgrade-preparation.md#current-target)也已完成真实评测与浏览器验收，旧 F 应用仍未运行。 | 继续验证旧 F 应用到当前版本的完整升级及真实评测。此前旧 F 镜像缓存恢复被自动审批拒绝，未获许可前不重试该操作；重建数据库的组件验证和当前版本代际恢复均不能代替跨版本应用升级。 |
 | GPU 题型（§2.2 C、§4.2/4.4、R-16） | [G1](acceptance-g1.md)、[G2](acceptance-g2.md) 有早期单卡正确性与故障实测；当前 worker、持久成绩、健康准入、CUDA 候选内容、编辑和分享已接入。[G42](acceptance-g42.md) 通过统一四镜像制品检查，[G56](acceptance-g56.md) 实现内部完整发布恢复编排，公共 GPU 激活仍关闭。[G57](acceptance-g57.md) 的 77 项真实 PostgreSQL 检查及 [G59](acceptance-g59.md) 的当前 CPU 发布矩阵通过；设备和成绩的模型结果不代表当前 GPU 路径或性能通过。分批实现与原始失败记录保留在下方。 | 当前遵循维护者“先继续不占 GPU 的开发”。待设备授权与独占条件具备，验证完整启动、真实执行/性能、故障恢复、队列和 GPU 部署升级，再发布候选内容及开放产品入口；[本地 GPU 命令](deployment/local-gpu.md)已连接，真实硬件全路径尚待验收。 |
-| 专用部署 runner 与 CD（§8.2、R-09） | 提交 `2f2c9b0` 已于 2026-11-02 通过[托管应用与真实 WASI 工作流](acceptance-hosted-ci.md)，2026-11-11 复核成功终态。专用部署工作流仍需单独接入目标站点，默认操作为 `status`；此前 runner 管理 API 的未认证 401 不能证明注册情况。 | 按 [CI 指南](deployment/ci.md)设置受信运维仓库/有效访问限制、分支/environment、专用部署节点，再验收状态、发布和恢复。部署 runner 不依赖 GPU；代码 CI 成功不代替目标站点验收。 |
+| 专用部署 runner 与 CD（§8.2、R-09） | 实现提交 `fa58c7a` 与当前发布包源提交 `0b9a69c` 均已通过[托管应用与完整 WASI 工作流](acceptance-hosted-ci.md)，含 HTTPS、发布和迁移失败/中断恢复。专用部署工作流仍需单独接入目标站点，默认操作为 `status`；此前 runner 管理 API 的未认证 401 不能证明注册情况。 | 按 [CI 指南](deployment/ci.md)设置受信运维仓库/有效访问限制、分支/environment、专用部署节点，再验收状态、发布和恢复。部署 runner 不依赖 GPU；代码 CI 成功不代替目标站点验收。 |
 | 目标站点运维（§8.2/8.4、AC-07） | 本地固定镜像、回环 HTTPS、备份恢复、升级与容量样本已验证；没有指定长期部署目标。 | 在目标主机验收服务监管、容量、公有证书与续期、日志/备份保留和故障恢复。公开运营仍按维护者决定后续处理。 |
 | 开源与公开发布政策（§1、§8.3、§13） | `LICENSES.md` 仍为待确认状态；`SECURITY.md` 尚无正式私密报告渠道和负责人。维护者明确先交付自部署、公开运营及许可证后定。 | 维护者确认代码/内容/投稿授权，以及需要公开运营时的品牌、资源、治理、隐私和安全响应安排。开发者不能代为批准这些事项。 |
 
@@ -57,7 +57,7 @@
 
 - 2026-11-13 R-09/15 镜像源码权限：真实私有 umask 构建复现非 root 入口不可读，修复基础 runtime、编译/驱动和任务镜像的固定源码权限；239 项组件、22 项 CLI、26 项完整编译/预算、14 项容器控制及 10 项 worker 预检通过。匹配双镜像静态构建通过，81 个自有容器清理，原服务未变；提交 `fa58c7a` 已推送。范围和原始失败见[镜像权限验收](acceptance-image-staging.md)，不代表 GPU 硬件、旧 F 整站升级或目标站点验收通过。
 
-- 2026-11-12 R-09 分数时钟预算修复：确定性复现后修正三个生产入口及夹具，保留原预算和严格边界；225 项组件、128 项实际 PostgreSQL、五组 CPU/gVisor 故障和十项匹配 worker 预检通过。`a5d96c7` 两项完整托管工作流通过，关闭本轮 CI 缺口；`3cdfff2` 的新冻结 CPU 包也已完成真实评测/浏览器验收，见[托管记录](acceptance-hosted-ci.md#fractional-clock)和[当前升级目标](acceptance-upgrade-preparation.md#current-target)。原服务未变，GPU、旧 F 整站升级及外部运营门槛继续保留。
+- 2026-11-12 R-09 分数时钟预算修复：确定性复现后修正三个生产入口及夹具，保留原预算和严格边界；225 项组件、128 项实际 PostgreSQL、五组 CPU/gVisor 故障和十项匹配 worker 预检通过。`a5d96c7` 两项完整托管工作流通过，关闭本轮 CI 缺口；`3cdfff2` 的新冻结 CPU 包也已完成真实评测/浏览器验收，见[托管记录](acceptance-hosted-ci.md#fractional-clock)和[预算修复目标包](acceptance-upgrade-preparation.md#budget-target)。原服务未变，GPU、旧 F 整站升级及外部运营门槛继续保留。
 
 - 2026-11-12 R-09 升级准备与诊断：F→当前入口的 94 项组件和六项真实 PostgreSQL 检查通过；`fc59265` 冻结 CPU 包在更新的外部浏览器脚本下通过 129 项真实启动探针、三组基础及七组扩展旅程，见[升级准备记录](acceptance-upgrade-preparation.md)。原导航错误未独立复现，服务末次审计发现原 worker 启动时间变化并保留记录；没有操作既有服务或使用 GPU。旧 F 整站升级仍待许可和实测，后续提交的托管失败继续定位。
 

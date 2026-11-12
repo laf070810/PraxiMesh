@@ -37,7 +37,8 @@
 | `a5d96c7` | [43071071772](https://github.com/laf070810/PraxiMesh/actions/runs/43071071772)：两种数据库、编辑器、浏览器和容器全部通过 | [43071071748](https://github.com/laf070810/PraxiMesh/actions/runs/43071071748)：成功，包含真实评测、HTTPS、发布包和迁移失败/中断恢复 |
 | `3cdfff2` | [43076789097](https://github.com/laf070810/PraxiMesh/actions/runs/43076789097)：全部通过；此提交只更新文档 | [43076788801](https://github.com/laf070810/PraxiMesh/actions/runs/43076788801)：成功；本地同源冻结包也已通过独立验收 |
 | `95b24e4` | [43084734133](https://github.com/laf070810/PraxiMesh/actions/runs/43084734133)：两种数据库、编辑器、浏览器和容器全部通过 | [43084734130](https://github.com/laf070810/PraxiMesh/actions/runs/43084734130)：成功 |
-| `fa58c7a` | [43261015099](https://github.com/laf070810/PraxiMesh/actions/runs/43261015099)：11 月 12 日 16:53 UTC 观察时仍在运行 | [43261015054](https://github.com/laf070810/PraxiMesh/actions/runs/43261015054)：同次观察时仍在运行；本地无设备镜像检查另行记录 |
+| `fa58c7a` | [43261015099](https://github.com/laf070810/PraxiMesh/actions/runs/43261015099)：两种数据库、编辑器、浏览器和容器全部通过 | [43261015054](https://github.com/laf070810/PraxiMesh/actions/runs/43261015054)：成功，包含真实评测、HTTPS、发布包及迁移失败/中断恢复 |
+| `0b9a69c` | [43264181883](https://github.com/laf070810/PraxiMesh/actions/runs/43264181883)：全部通过；本地两种格式发布包的源提交 | [43264181559](https://github.com/laf070810/PraxiMesh/actions/runs/43264181559)：成功，包含完整 WASI 与发布恢复流程 |
 
 早期失败注释只有退出码；日志接口返回 403，后续匿名 API 查询也遇到限流。没有取得完整失败文本，不能确认早期 SQLite 或安装失败的原因。Node 弃用警告不作为失败原因。
 
@@ -74,7 +75,7 @@
 
 这些检查的汇总在 `test-results/deadline-bounds-2026-11-12/`，包括 `postgres-summary.json`、`lifecycle-process.json`、`worker-confirmation.json` 和 `final-resource-audit.json`；原始实际报告分别为 `test-results/px-container-lifecycle-cb2a8e188ab8/result.json` 与 `test-results/px-container-worker-e1b55b4536db/result.json`。测试镜像标签已经清理，不作为现成部署制品交付；正式使用须按新源码构建匹配镜像并完成真实硬件启动。
 
-`a5d96c7` 的应用五项 job 与完整 WASI 工作流均已通过。WASI 于 2026-11-11 18:35 UTC 成功结束，23 个步骤成功，失败位置摘要按条件跳过；工作流内的测试跳过项仍不计作通过。最终步骤复核在 `final-wasi-verification.json`。此前安装失败和旧 SQLite 失败的完整异常仍未取得，本次成功不将历史原因全部归结为同一问题。随后从仅更新文档的 `3cdfff2` 构建并实测了[新的冻结 CPU 目标包](acceptance-upgrade-preparation.md#current-target)，供旧 F 整站升级获许可后使用。
+`a5d96c7` 的应用五项 job 与完整 WASI 工作流均已通过。WASI 于 2026-11-11 18:35 UTC 成功结束，23 个步骤成功，失败位置摘要按条件跳过；工作流内的测试跳过项仍不计作通过。最终步骤复核在 `final-wasi-verification.json`。此前安装失败和旧 SQLite 失败的完整异常仍未取得，本次成功不将历史原因全部归结为同一问题。随后从仅更新文档的 `3cdfff2` 构建并实测了[包含预算修复的 CPU 目标包](acceptance-upgrade-preparation.md#budget-target)，供旧 F 整站升级获许可后使用。
 
 原始证据包括 `f89a480-sqlite-annotations.json`、`late-startup-original.xml`、`late-startup-fractional-before.xml`、`late-startup-regression-before.xml`、`late-startup-components-after.xml`、`production-deadline-boundaries-before.xml`、`startup-total-boundary-before.xml` 和 `deadline-source-contracts.json`，均位于下述忽略目录。这些检查使用真实临时文件/锁与明确的设备模型，没有访问 GPU。
 
@@ -84,4 +85,8 @@
 
 2026-11-13 复核 `3cdfff2` 与 `95b24e4` 的两项工作流均为成功终态；后者五个应用 job 与一个完整 WASI job 的公开状态保存在 `test-results/current-tool-images-2026-11-13/hosted-ci.json`。随后发现的镜像暂存权限问题及其独立验证见[镜像权限记录](acceptance-image-staging.md)；上述 CI 结果仍只对应各自提交。
 
-`fa58c7a` 的初次 API 记录和随后公开 Actions 页面复核保存在同目录的 `implementation-ci-first.json` 与 `implementation-ci-final-observation.json`。中途匿名 API 返回限流 403，因此改读公开页面并按完整提交链接匹配。尚未取得该提交的成功终态，本地通过不代替托管结果。
+`fa58c7a` 的初次 API 记录和随后公开 Actions 页面复核保存在同目录的 `implementation-ci-first.json` 与 `implementation-ci-final-observation.json`。中途匿名 API 返回限流 403，因此改读公开页面并按完整提交链接匹配；这些早期观察保留原状态。
+
+2026-11-13 继续核对：`fa58c7a` 与发布包源提交 `0b9a69c` 的五项应用 job 均成功，完整 WASI job 分别于 11 月 12 日 17:40、17:46 UTC 成功结束。每个 WASI job 有 23 个成功步骤，失败位置摘要按条件跳过；真实隔离、HTTPS、发布包、迁移失败/中断恢复、依赖审计和制品留存均逐项确认成功，测试中的跳过项仍不计为通过。
+
+确切 job/提交和阶段结果保存在 `test-results/hosted-main-a6d2435-2026-11-13/` 的 `application-success.json`、`implementation-wasi-completed.json`、`release-source-wasi-completed.json` 和 `release-source-summary.json`。本地[同源 CPU/四镜像包](acceptance-current-releases.md)另有独立制品身份与实际应用结果；这些托管成功记录不替代旧 F 跨版本升级、目标站点或 GPU 硬件验收。

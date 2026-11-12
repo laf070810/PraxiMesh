@@ -42,6 +42,8 @@ F→当前版本的升级检查已接入，当前 CPU 包已完成校验与导�
 
 旧 F 与新 CPU 包的完整归档读取通过，升级预检返回 `post-f`，原始结果为 `test-results/current-four-image-release-2026-11-13/latest-upgrade-preflight.json`。这只更新已准备的目标，不表示旧 F 镜像导入或跨版本应用升级已经执行。
 
+<a id="budget-target"></a>
+
 ## 前一目标包：包含预算修复的版本
 
 控制器的分数时钟修复及匹配镜像验证见[托管验收记录](acceptance-hosted-ci.md#fractional-clock)。随后从干净提交 `3cdfff2e0fd0dfa8b5a82d1a5ab068cb07d27405` 冻结新 CPU 包，保留此前两个目录：
