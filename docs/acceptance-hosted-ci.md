@@ -23,9 +23,9 @@
 
 <a id="later-runs"></a>
 
-## 后续提交：失败仍待定位
+## 后续提交与故障定位
 
-2026-11-11 至 12 日核对后续 push；以下结果独立于 `2f2c9b0` 的成功记录。
+2026-11-11 至 13 日核对后续 push；以下结果独立于 `2f2c9b0` 的成功记录。
 
 | 提交 | 应用工作流 | WASI 工作流 |
 | --- | --- | --- |
@@ -35,9 +35,11 @@
 | `369a881` | [43058725539](https://github.com/laf070810/PraxiMesh/actions/runs/43058725539)：SQLite、PostgreSQL、编辑器、容器通过；浏览器系统依赖安装失败 | [43058725571](https://github.com/laf070810/PraxiMesh/actions/runs/43058725571)：系统依赖安装失败 |
 | `f89a480` | [43063191247](https://github.com/laf070810/PraxiMesh/actions/runs/43063191247)：PostgreSQL、编辑器、浏览器、容器通过；SQLite 的一个测试函数失败，已取得位置注释 | [43063191233](https://github.com/laf070810/PraxiMesh/actions/runs/43063191233)：成功，包含真实评测、HTTPS、发布包和迁移失败/中断恢复 |
 | `a5d96c7` | [43071071772](https://github.com/laf070810/PraxiMesh/actions/runs/43071071772)：两种数据库、编辑器、浏览器和容器全部通过 | [43071071748](https://github.com/laf070810/PraxiMesh/actions/runs/43071071748)：成功，包含真实评测、HTTPS、发布包和迁移失败/中断恢复 |
-| `3cdfff2` | [43076789097](https://github.com/laf070810/PraxiMesh/actions/runs/43076789097)：全部通过；此提交只更新文档 | [43076788801](https://github.com/laf070810/PraxiMesh/actions/runs/43076788801)：19:01 UTC 观察时仍在部署恢复阶段；本地同源冻结包已通过独立验收 |
+| `3cdfff2` | [43076789097](https://github.com/laf070810/PraxiMesh/actions/runs/43076789097)：全部通过；此提交只更新文档 | [43076788801](https://github.com/laf070810/PraxiMesh/actions/runs/43076788801)：成功；本地同源冻结包也已通过独立验收 |
+| `95b24e4` | [43084734133](https://github.com/laf070810/PraxiMesh/actions/runs/43084734133)：两种数据库、编辑器、浏览器和容器全部通过 | [43084734130](https://github.com/laf070810/PraxiMesh/actions/runs/43084734130)：成功 |
+| `fa58c7a` | [43261015099](https://github.com/laf070810/PraxiMesh/actions/runs/43261015099)：11 月 12 日 16:53 UTC 观察时仍在运行 | [43261015054](https://github.com/laf070810/PraxiMesh/actions/runs/43261015054)：同次观察时仍在运行；本地无设备镜像检查另行记录 |
 
-失败注释只有退出码；日志接口返回 403，后续匿名 API 查询也遇到限流。没有取得完整失败文本，不能确认 SQLite 或安装失败的原因。Node 弃用警告不作为失败原因。
+早期失败注释只有退出码；日志接口返回 403，后续匿名 API 查询也遇到限流。没有取得完整失败文本，不能确认早期 SQLite 或安装失败的原因。Node 弃用警告不作为失败原因。
 
 从 `git archive 853b526` 创建独立源码和环境，使用冻结依赖、Python 3.11.15 与 uv 0.11.8，本地 SQLite 全套为 **4023 passed / 195 skipped**，未复现远端错误；临时环境已经删除。宿主与 GitHub Ubuntu runner 不同，跳过项也未计作通过。相关记录为 `sqlite-reproduction.json`、`sqlite-reproduction.xml`；主服务虚拟环境没有同步依赖。
 
@@ -79,3 +81,7 @@
 ## 原始证据
 
 首次推送和运行期间的公开 API、运行页面、job 页面及最终步骤记录保存在忽略目录 `test-results/github-main-2f2c9b0/`。后续复核与诊断在 `test-results/hosted-ci-2026-11-11/`，包含工作流、job、制品列表、本地复现和查询摘要。对 `2f2c9b0` 的复核没有重跑其工作流或部署站点。
+
+2026-11-13 复核 `3cdfff2` 与 `95b24e4` 的两项工作流均为成功终态；后者五个应用 job 与一个完整 WASI job 的公开状态保存在 `test-results/current-tool-images-2026-11-13/hosted-ci.json`。随后发现的镜像暂存权限问题及其独立验证见[镜像权限记录](acceptance-image-staging.md)；上述 CI 结果仍只对应各自提交。
+
+`fa58c7a` 的初次 API 记录和随后公开 Actions 页面复核保存在同目录的 `implementation-ci-first.json` 与 `implementation-ci-final-observation.json`。中途匿名 API 返回限流 403，因此改读公开页面并按完整提交链接匹配。尚未取得该提交的成功终态，本地通过不代替托管结果。

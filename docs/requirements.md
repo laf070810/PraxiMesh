@@ -1,6 +1,6 @@
 # 全部 PRD 要求的实施与证据
 
-更新：2026-11-12。目标：按 PRD 实施阶段 A/B/C 与 D/E/F 补充。维护者已明确当前先交付可本地验证的自部署版本；公开运营和许可证选择稍后确定，GPU 正式题型及完整验收仍未完成。**C 的专业评测、组织与辅导，D 的完整筛选、私有成就与挑战，E 的类/API，以及 F 的版本题目反馈均已通过本地验收。外部部署与授权事项仍未完成。** 当前固定制品及 E→F HTTPS 升级见 [F 验收](acceptance-f.md)，类/API见 [E 验收](acceptance-e.md)，筛选与挑战见 [D 验收](acceptance-d.md)，既有阶段 A 验收见 [acceptance.md](acceptance.md)，架构见 [RFC-006](rfcs/006-complete-product.md)和 [ADR-011](adr/011-specialists-organizations-coaching.md)。
+更新：2026-11-13。目标：按 PRD 实施阶段 A/B/C 与 D/E/F 补充。维护者已明确当前先交付可本地验证的自部署版本；公开运营和许可证选择稍后确定，GPU 正式题型及完整验收仍未完成。**C 的专业评测、组织与辅导，D 的完整筛选、私有成就与挑战，E 的类/API，以及 F 的版本题目反馈均已通过本地验收。外部部署与授权事项仍未完成。** 当前固定制品及 E→F HTTPS 升级见 [F 验收](acceptance-f.md)，类/API见 [E 验收](acceptance-e.md)，筛选与挑战见 [D 验收](acceptance-d.md)，既有阶段 A 验收见 [acceptance.md](acceptance.md)，架构见 [RFC-006](rfcs/006-complete-product.md)和 [ADR-011](adr/011-specialists-organizations-coaching.md)。
 
 ## 功能要求
 
@@ -52,6 +52,8 @@
 2026-10-24 开发指南交付后的只读查询记录在 `test-results/post-onboarding-blockers-1.json`；其中无远端的历史条件已被 2026-10-30 的 GitHub 接入解除。CPU 委派缺口随后由维护者修复，实际限额结果见 `test-results/cpu-controller-restored/result.json`。候选 runsc 的精确驱动版本列表检查见 `test-results/gpu-runtime-preflight/result.json`；后续单卡 CUDA 样例与实际节流已通过，范围及失败修正见 [RFC-018](rfcs/018-gpu-environment-probe.md)。nvproxy 会将受支持的 GPU 调用转交宿主 NVIDIA 驱动，驱动本身仍在信任边界内，详见 [gVisor GPU 官方指南](https://gvisor.dev/docs/user_guide/gpu/)。
 
 ## 分批结果
+
+- 2026-11-13 R-09/15 镜像源码权限：真实私有 umask 构建复现非 root 入口不可读，修复基础 runtime、编译/驱动和任务镜像的固定源码权限；239 项组件、22 项 CLI、26 项完整编译/预算、14 项容器控制及 10 项 worker 预检通过。匹配双镜像静态构建通过，81 个自有容器清理，原服务未变；提交 `fa58c7a` 已推送。范围和原始失败见[镜像权限验收](acceptance-image-staging.md)，不代表 GPU 硬件、旧 F 整站升级或目标站点验收通过。
 
 - 2026-11-12 R-09 分数时钟预算修复：确定性复现后修正三个生产入口及夹具，保留原预算和严格边界；225 项组件、128 项实际 PostgreSQL、五组 CPU/gVisor 故障和十项匹配 worker 预检通过。`a5d96c7` 两项完整托管工作流通过，关闭本轮 CI 缺口；`3cdfff2` 的新冻结 CPU 包也已完成真实评测/浏览器验收，见[托管记录](acceptance-hosted-ci.md#fractional-clock)和[当前升级目标](acceptance-upgrade-preparation.md#current-target)。原服务未变，GPU、旧 F 整站升级及外部运营门槛继续保留。
 
