@@ -4,7 +4,12 @@
 
 发布制品把同一源码快照、锁文件、Web 镜像和 WASI worker 镜像绑定起来。制品流程与单主机发布协调器均已实现：`load` 负责导入，`deploy.py apply` 负责维护窗口内的备份恢复、迁移、候选验证和代理激活。设计见 [RFC-004](../rfcs/004-release-artifacts.md)、[ADR-008](../adr/008-deployment-generations.md)及[部署协调指南](production.md)。
 
-默认 format 1 服务于上述 CPU 部署。开发中的 GPU 发布使用[下方 format 2](#gpu-release)统一保存四个镜像；其制品构建/导入与 GPU 服务激活分别验收，当前协调器拒绝尚未接入的 GPU 激活。
+按部署场景选择格式；同源两种格式的确切制品及验证范围见[当前发布包记录](../acceptance-current-releases.md)。
+
+| 场景 | 格式与当前支持 |
+| --- | --- |
+| 使用公共发布协调器部署或升级 CPU/WASI 站点 | 默认 format 1，包含 Web 和 CPU worker |
+| 准备配套 GPU 镜像及后续完整硬件验收 | [format 2](#gpu-release)，统一保存四个镜像；公共 GPU 激活仍关闭 |
 
 ## 构建
 
@@ -117,4 +122,4 @@ export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
 
 第一个入口核对源码匹配、真实数据库最小权限、私有配置、默认关闭及失败拒绝，不映射 GPU、发布 ready 或执行任务。第二个入口沿用上文的浏览器/judge 依赖及匹配的本地 WASI 配置，验证包内 CPU 应用；输出目录必须是新目录。两者都不能作为 GPU 硬件验收。
 
-当前 `deploy.py apply` 会在任何服务/数据库变更前拒绝 format 2，直到 GPU 排空、停止、原状态保留与候选完整启动接入协调器。协调器已有[原节点绑定](container-gpu-worker.md#coordinator-binding)和中断重试入口；首次独立 worker 配置仍按 [GPU 容器指南](container-gpu-worker.md)操作。制品或绑定通过不能替代升级验收。制品设计与实际结果见 [ADR-058](../adr/058-gpu-release-artifacts.md)和 [G42](../acceptance-g42.md)，后续协调方案见 [RFC-022](../rfcs/022-gpu-release-coordination.md)。
+当前 `deploy.py apply` 会在镜像导入、服务或数据库变更前拒绝 format 2。排空、原库恢复、候选验证及曝光已连接[内部整站编排](container-gpu-worker.md#whole-site-release)，但完整 GPU 启动、队列、升级和故障恢复矩阵尚未实测，公共 `apply/recover` 仍关闭。首次独立 worker 配置按 [GPU 容器指南](container-gpu-worker.md)操作；制品、绑定或无设备检查通过不能替代硬件升级验收。制品设计见 [ADR-058](../adr/058-gpu-release-artifacts.md)，原 G42 与[当前同源发布包](../acceptance-current-releases.md)分别保留确切版本的结果。

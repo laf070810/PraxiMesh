@@ -1,8 +1,8 @@
 # F 升级准备与当前 CPU 发布包验收
 
-日期：2026-11-11 至 12 日。对应 PRD R-09、AC-07。操作入口统一在[生产部署指南](deployment/production.md#f-current-upgrade)。
+日期：2026-11-11 至 13 日。对应 PRD R-09、AC-07。操作入口统一在[生产部署指南](deployment/production.md#f-current-upgrade)。
 
-F→当前版本的升级检查已接入，当前 CPU 包也已通过真实 WASI 与浏览器检查。旧 F 镜像尚未导入或启动，完整跨版本应用升级仍未验收。
+F→当前版本的升级检查已接入，当前 CPU 包已完成校验与导入，其确切 Web/worker 镜像通过真实 WASI 与浏览器检查。本次升级验收尚未导入或启动旧 F 镜像，完整跨版本应用升级仍未验收。
 
 ## 组件与数据库
 
@@ -27,7 +27,22 @@ F→当前版本的升级检查已接入，当前 CPU 包也已通过真实 WASI
 
 <a id="current-target"></a>
 
-## 当前目标包：包含预算修复的版本
+## 当前目标包：包含镜像权限修复的版本
+
+当前目标来自干净提交 `0b9a69c6c8d7a700c62a3c9e4e579a129616de14`，旧目录均保留：
+
+| 身份 | 值 |
+| --- | --- |
+| 目录 | `var/releases/2026-11-13-cpu-upgrade-target-4/` |
+| manifest SHA-256 | `767551ab285abe431a5e0ca692d0a34631a122227dd80510ca2a97e24e4e0741` |
+| source_id | `31985d5dc9a0782d529c12a8ebe59ef2e1a7a5983e38a1a4693a032b74de8524` |
+| 源码 | 981 个文件与该提交的原始 Git 对象逐字节匹配 |
+
+该 format 1 包已完成完整校验与标准导入。它与同批四镜像包具有完全相同的 Web/worker 镜像 ID、源码归档和评测配置；应用证据对应同一对不可变镜像的一次实际运行，包括 129 项启动探针、真实提交和浏览器流程。具体身份、覆盖与清理见[当前发布包记录](acceptance-current-releases.md)。
+
+旧 F 与新 CPU 包的完整归档读取通过，升级预检返回 `post-f`，原始结果为 `test-results/current-four-image-release-2026-11-13/latest-upgrade-preflight.json`。这只更新已准备的目标，不表示旧 F 镜像导入或跨版本应用升级已经执行。
+
+## 前一目标包：包含预算修复的版本
 
 控制器的分数时钟修复及匹配镜像验证见[托管验收记录](acceptance-hosted-ci.md#fractional-clock)。随后从干净提交 `3cdfff2e0fd0dfa8b5a82d1a5ab068cb07d27405` 冻结新 CPU 包，保留此前两个目录：
 

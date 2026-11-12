@@ -8,6 +8,7 @@
 - [完整 PRD 需求追踪](requirements.md) — 全目标实施中，当前 F 自部署制品及版本题目反馈已验证
 - [GitHub 托管应用与 WASI 验收](acceptance-hosted-ci.md) — 按确切提交记录工作流结果和故障定位；专用部署节点与 GPU 仍需分别验收
 - [F 升级准备与当前 CPU 发布包验收](acceptance-upgrade-preparation.md) — 当前包真实 WASI/浏览器通过；旧应用整站升级待验收
+- [当前源码的 CPU 与四镜像发布包](acceptance-current-releases.md) — 同源制品核验、导入及无设备应用验收；公共 GPU 激活仍关闭
 - [私有构建目录的镜像源码权限](acceptance-image-staging.md) — 非 root 入口读取修复与无设备镜像检查
 - [G71：当前默认 Compose 的完整重放](acceptance-g71.md) — 当前镜像内真实评测、直接 IP、离线关闭与重建保留通过
 - [G70：父镜像清理、桥接退出同步与无设备工具验证](acceptance-g70.md)
