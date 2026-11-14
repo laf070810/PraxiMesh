@@ -6,6 +6,8 @@
 
 - [阶段计划与安全发布门槛](plan.md)
 - [完整 PRD 需求追踪](requirements.md) — 全目标实施中，当前 F 自部署制品及版本题目反馈已验证
+- [RFC-025：宿主与 guest 的设备编号](rfcs/025-nvproxy-guest-device-identity.md)、[ADR-080](adr/080-nvproxy-guest-device-identity.md) — 实际 GPU 资源检查误拒绝的修复与验证边界
+- [GPU 0 启动检查与修复](acceptance-gpu0-startup.md) — 真实失败、独立诊断及回归范围
 - [GitHub 托管应用与 WASI 验收](acceptance-hosted-ci.md) — 按确切提交记录工作流结果和故障定位；专用部署节点与 GPU 仍需分别验收
 - [旧 F→当前 CPU 整站升级](acceptance-f-current.md) — 真实旧应用、三项迁移、数据保留、HTTPS/WASI 与清理通过
 - [F 升级准备与当前 CPU 发布包验收](acceptance-upgrade-preparation.md) — 保留历次目标包、准备阶段和原始失败

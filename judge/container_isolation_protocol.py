@@ -6,7 +6,7 @@ import math
 import re
 
 from judge.container_contract import WORKLOAD_PROFILE, resource_limits
-from judge.container_devices import nodes, validate_selection
+from judge.container_devices import guest_nodes, validate_selection
 from judge.gpu_task_protocol import validate_target
 from judge.sandbox import SandboxUnavailable
 
@@ -72,7 +72,7 @@ def target_identity(target, selection):
         {key: target[key] for key in ("uuid", "model", "architecture")} | {"count": 1},
         [
             {"path": path, "character": True, "major": major, "minor": minor}
-            for path, (major, minor) in sorted(nodes(selection).items())
+            for path, (major, minor) in sorted(guest_nodes(selection).items())
         ],
     )
 

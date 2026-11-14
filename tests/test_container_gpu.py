@@ -10,6 +10,7 @@ from judge.container_contract import WORKLOAD_PROFILE, docker_resources, resourc
 from judge.container_devices import (
     PROFILE,
     docker_devices,
+    guest_nodes,
     kernel_uvm_major,
     nodes,
     validate_selection,
@@ -106,7 +107,7 @@ def test_missing_or_ambiguous_uvm_registry_is_not_guessed(registry):
         kernel_uvm_major(registry)
 
 
-def test_outer_and_inner_mapping_select_the_same_three_nodes(selected):
+def test_outer_mapping_and_oci_input_retain_the_same_host_nodes(selected):
     assert nodes(selected) == {
         "/dev/nvidia2": (195, 2),
         "/dev/nvidiactl": (195, 255),
@@ -123,6 +124,27 @@ def test_outer_and_inner_mapping_select_the_same_three_nodes(selected):
     assert "NVIDIA_VISIBLE_DEVICES=void" in spec["process"]["env"]
     assert "devices" not in object.__new__(ContainerRuntime).specification(["/fixed.py"])["linux"]
     assert spec["root"]["readonly"] and spec["process"]["noNewPrivileges"]
+
+
+def test_guest_mapping_keeps_physical_card_and_does_not_rewrite_host_selection(selected):
+    original = copy.deepcopy(selected)
+    assert guest_nodes(selected) == {
+        "/dev/nvidia2": (195, 2),
+        "/dev/nvidiactl": (195, 255),
+        "/dev/nvidia-uvm": (254, 0),
+    }
+    assert selected == original
+    assert nodes(selected)["/dev/nvidia-uvm"] == (509, 0)
+
+
+def test_unknown_runsc_cannot_reuse_guest_device_mapping(selected, monkeypatch):
+    from judge import gpu_artifacts
+
+    monkeypatch.setattr(gpu_artifacts, "RUNSC_SHA256", "0" * 64)
+    with pytest.raises(SandboxUnavailable, match="needs review"):
+        guest_nodes(selected)
+    # Historical host records retain their device mapping independently.
+    assert nodes(selected)["/dev/nvidia-uvm"] == (509, 0)
 
 
 def test_service_requires_matching_lock_driver_budget(journal, bundle, selected):  # noqa: F811

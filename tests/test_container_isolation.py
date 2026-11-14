@@ -22,6 +22,28 @@ SELECTION = {
 }
 
 
+@pytest.mark.parametrize("host_uvm_major", [254, 507, 509])
+def test_guest_uvm_major_is_independent_of_host_registration(host_uvm_major):
+    selection = {**SELECTION, "uvm_major": host_uvm_major}
+    observed = resource_report(gpu=True)["checks"][0]["details"]["guest"]
+    # Actual pinned runsc observation, with a nonzero physical card minor to
+    # distinguish its identity from the guest's CUDA logical ordinal zero.
+    observed["gpu_nodes"] = [
+        {"path": "/dev/nvidia-uvm", "character": True, "major": 254, "minor": 0},
+        {"path": "/dev/nvidia2", "character": True, "major": 195, "minor": 2},
+        {"path": "/dev/nvidiactl", "character": True, "major": 195, "minor": 255},
+    ]
+    protocol.verify_identity(observed, REQUEST, TARGET, selection)
+
+
+@pytest.mark.parametrize("guest_uvm_major", [0, 195, 507, 509])
+def test_host_or_other_uvm_major_cannot_substitute_for_guest_identity(guest_uvm_major):
+    observed = resource_report(gpu=True)["checks"][0]["details"]["guest"]
+    observed["gpu_nodes"][0]["major"] = guest_uvm_major
+    with pytest.raises(SandboxUnavailable, match="identity or isolation"):
+        protocol.verify_identity(observed, REQUEST, TARGET, SELECTION)
+
+
 def resource_report(request=REQUEST, *, gpu=False):
     target, selection = (TARGET, SELECTION) if gpu else (None, None)
     cuda, nodes = protocol.target_identity(target, selection)

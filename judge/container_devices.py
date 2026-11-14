@@ -5,6 +5,7 @@ import os
 import stat
 from pathlib import Path
 
+from judge import gpu_artifacts
 from judge.driver_artifacts import VERSION
 from judge.gpu_device_lock import GPU_UUID
 from judge.sandbox import SandboxUnavailable
@@ -53,6 +54,22 @@ def nodes(value):
         "/dev/nvidiactl": (195, 255),
         "/dev/nvidia-uvm": (value["uvm_major"], 0),
     }
+
+
+def guest_nodes(value):
+    """Expected sentry device identities for the pinned single-card runtime."""
+    selected = nodes(value)
+    # release-20261026.0 registers nvproxy UVM with the first dynamic char
+    # major (254), then boot/vfs.go rewrites its OCI host major on mknod.
+    # This is specific to our reviewed runtime/configuration, not a host
+    # device mapping. Re-review and replay when changing the runsc binary.
+    if (
+        gpu_artifacts.RUNSC_SHA256
+        != "7d658f2c3a5602d28c391285eb4ee0740e7dd21d40731324049a29620e51cf5e"
+    ):
+        raise SandboxUnavailable("Guest device mapping needs review for this runsc binary")
+    selected["/dev/nvidia-uvm"] = (254, 0)
+    return selected
 
 
 def docker_devices(value):

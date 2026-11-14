@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from judge.container_contract import PYTHON, STATE  # noqa: E402
-from judge.container_devices import nodes, validate_selection  # noqa: E402
+from judge.container_devices import guest_nodes, validate_selection  # noqa: E402
 from judge.container_gpu_runtime import GPUContainerRuntime  # noqa: E402
 from judge.container_transport import readiness  # noqa: E402
 
@@ -40,7 +40,7 @@ def main():
             value, _ = session.exchange(
                 {"protocol": 1, "operation": "inspect-device-nodes"}, seconds=10
             )
-            expected = {key: list(numbers) for key, numbers in nodes(selection).items()}
+            expected = {key: list(numbers) for key, numbers in guest_nodes(selection).items()}
             assert value["event"] == "device-nodes" and value["nodes"] == expected, value
             assert value["cuda_initialized"] is False and value["uid"] == 0, value
             assert value["root_readonly"] is True and value["supervisor_visible"] is False, value

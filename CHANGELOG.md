@@ -1,5 +1,10 @@
 # 变更记录
 
+## GPU guest 的 UVM 设备编号 — 2026-11-15
+
+- 实际 GPU 启动复现宿主 `507:0` 与 gVisor guest `254:0` 混用导致资源检查拒绝。按固定 runsc 摘要生成 guest 预期，保留实际宿主映射、历史 journal、原资源和隔离条件。
+- 281 项相关组件通过，原失败及诊断保留；真实完整启动回归仍在进行，见[GPU 0 记录](docs/acceptance-gpu0-startup.md)。不据组件结果开放 GPU 提交。
+
 ## 旧 F→当前 CPU 整站升级 — 2026-11-15
 
 - 获明确授权后恢复原 F 镜像缓存，在独立 PostgreSQL、回环 HTTPS 和真实 WASI worker 上完成两代应用的升级验收。
