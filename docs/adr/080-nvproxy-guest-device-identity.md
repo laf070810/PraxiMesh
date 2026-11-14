@@ -1,6 +1,6 @@
 # ADR-080：guest UVM 编号绑定固定 runsc
 
-日期：2026-11-15。状态：已决定，真实回归进行中。问题与验证方案见 [RFC-025](../rfcs/025-nvproxy-guest-device-identity.md)。
+日期：2026-11-15。状态：已实施，真实节点检查与两轮完整启动通过，见[验收记录](../acceptance-gpu0-startup.md)。问题与验证方案见 [RFC-025](../rfcs/025-nvproxy-guest-device-identity.md)。
 
 保留 `container_devices.nodes()` 的宿主物理语义，以及使用它的 Docker、OCI 输入和历史 journal。新增独立 guest 节点投影：当前单卡配置的 UVM 为 `254:0`，同时核对已审阅的 runsc SHA-256；其他节点仍按原物理卡选择生成。未知运行时不沿用该映射。
 

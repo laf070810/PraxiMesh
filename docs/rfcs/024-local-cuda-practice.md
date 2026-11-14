@@ -1,6 +1,6 @@
 # RFC-024：本地 CUDA 练习工具
 
-日期：2026-11-02。状态：编译与本地 GPU 命令已连接，真实 GPU 全路径尚待验收。决策见 [ADR-073](../adr/073-local-device-free-cuda-compilation.md)和 [ADR-079](../adr/079-local-gpu-public-client.md)。对应 PRD R-15、R-16、§8.5；沿用 [RFC-007](007-b2-practice-and-sharing.md) 的公开包/正式成绩边界，以及 [RFC-021](021-gpu-container-supervision.md) 的容器监督、隔离编译与持久恢复。
+日期：2026-11-02。状态：已实施；2026-11-15 两轮真实完整启动与公开样例通过，见[验收记录](../acceptance-gpu0-startup.md)。决策见 [ADR-073](../adr/073-local-device-free-cuda-compilation.md)和 [ADR-079](../adr/079-local-gpu-public-client.md)。对应 PRD R-15、R-16、§8.5；沿用 [RFC-007](007-b2-practice-and-sharing.md) 的公开包/正式成绩边界，以及 [RFC-021](021-gpu-container-supervision.md) 的容器监督、隔离编译与持久恢复。
 
 ## 问题与完整目标
 

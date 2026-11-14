@@ -2,7 +2,7 @@
 
 日期：2026-11-15。维护者已重新授权 GPU 0。对应 PRD R-09、R-16；集中入口见 [GPU 指南](deployment/gpu.md)、[本地 GPU 工具](deployment/local-gpu.md)。
 
-当前已验证完整管理查询、单卡节点传递/原任务恢复及第一次 CUDA 正确性恢复；原完整启动在资源身份检查失败。宿主与 guest UVM 编号混用的原因已复现并修复，**修复后的完整启动回归仍在进行，不能开放正式 GPU 评测**。设计见 [RFC-025](rfcs/025-nvproxy-guest-device-identity.md)、[ADR-080](adr/080-nvproxy-guest-device-identity.md)。
+**修复后，两轮真实 GPU 完整启动及向量加法、矩阵乘法的公开样例均已通过。** 完整管理查询、单卡节点和原任务恢复也已实测。正式 worker、API Submit/性能、队列及发布升级仍分别验收，网站 GPU 准入尚未开放。设计见 [RFC-025](rfcs/025-nvproxy-guest-device-identity.md)、[ADR-080](adr/080-nvproxy-guest-device-identity.md)。
 
 ## 输入与通过范围
 
@@ -39,10 +39,27 @@
 
 私有 `uvm-images/local-gpu.json` 由同一标准构建函数的制品生成，经当前源码和镜像配置重新核验；`provenance.json` 记录来源。它只选择镜像，`ready` 与正式成绩仍为 false。
 
+## 两轮完整启动与公开样例
+
+使用上表不含诊断修改的镜像，在同一原物理状态依次运行两个正常 `test-gpu` 命令。每次均重新执行全部 24 阶段，未导入旧报告或跳过检查：
+
+| 公开任务 | 完整启动 | 公开用例 | 命令退出码 | 命令耗时 |
+| --- | --- | --- | --- | --- |
+| 向量加法，临时版本 27 | 24/24 | 2/2 通过 | 0 | 1399.632 秒 |
+| 矩阵乘法，临时版本 28 | 24/24 | 2/2 通过 | 0 | 1395.678 秒 |
+
+每轮包括初始正确性恢复、九项资源/身份检查、十九项内核检查和三项控制器故障检查；资源检查作为一个启动阶段。参考实现、针对性错解、编译/入口错误、边界、输出伪造、设备堆、非法地址、模块内存不足、内核超时、取消及附着退出均通过。控制器退出、断连和独立期限后均完成原任务清理及新正确调用恢复；独立期限检查实际等待原期限到期。
+
+两份最终结果均为 `formal_result: false`、`ready: false`，公开结果为 `accepted`。它们证明本地公开任务完成，不产生服务器正式成绩、性能分数或就绪事务；表中耗时包含完整启动，不能作为内核性能。
+
+末次正常 `recover-gpu` 返回成功。独立审计核对原状态中的 79 个已登记容器均不存在，包括前述失败、诊断和最终两轮的任务/控制容器；操作和控制记录均为 `completed`，没有活动 task journal，GPU 0 完整 SMI 列表为空。原 Web、CPU worker 和 tutor 的容器、镜像、启动时间、重启次数和健康状态均保持本轮基线。
+
+原始结果在 `local-gpu-fixed-1/` 的命令记录、各自 stdout/stderr 和 `result.json`；阶段序列逐项与 `CHECKS` 比较，末次独立审计为 `gpu-local-final-audit.json`。两份完整启动证据摘要分别为 `af3561e96c29790d61ee0ff99902b2f9f7c1df594caa765264a513c56e80d250` 和 `16004a502f863f0664d0d1be4627d0eeb41b7944fe2ee001312c9726b47259bf`。
+
 ## 证据与后续
 
 私有原始记录保留在 `test-results/f-current-authorized-2026-11-15/`：管理检查及清理摘要、`local-gpu-public-2/`、`local-gpu-1/`、`local-gpu-2/`、`diagnostic-1/`、`diagnostic-2/`，以及 `uvm-regression-before.xml`、`uvm-components.xml`。管理完整报告在 `test-results/px-container-controller-8e3566b0dd07/result.json`。首次公开包准备因调用参数错误失败，`local-gpu-public/` 保留原记录，站点和数据库亦已清理。
 
 原物理练习状态保留在 `/tmp/praximesh-gpu0-local-20261115/`，包括锁、原操作与恢复历史，后续继续使用此状态，不创建替代目录绕过记录。原 Web、CPU worker 和 tutor 的容器、镜像、启动时间及健康检查与本轮起始一致。
 
-仍须用不含诊断修改的匹配镜像完成二十四阶段和两个公开样例；正式队列、参考解/错解、GPU 发布升级和候选内容发布分别验收。本页不产生正式成绩或就绪凭证。
+正式 worker/队列、参考解与错解的 API Submit、真实性能、GPU 发布升级和候选内容发布仍分别验收；独立整站范围见 [RFC-026](rfcs/026-gpu-site-hardware-rehearsal.md)。本页不产生正式成绩或就绪凭证。

@@ -10,7 +10,7 @@
 | **发布协调器单机部署** | 需要域名/HTTPS、PostgreSQL、分离数据库权限、受控升级和失败恢复的长期站点 | Caddy + 固定 Web/worker 镜像 + PostgreSQL；私有配置、部署状态与备份 | worker 通过真实检查后开放评测；AI 使用预先配置的 HTTPS 服务 | [生产部署完整操作](production.md) |
 | **源码开发环境** | 修改应用、调试页面、编写内容或开发评测器 | Python/uv + Django 开发服务器；默认仓库内 SQLite；回环访问 | 默认不启动评测或 AI；按需单独配置 WASI worker 和模型 | [下方源码开发](#development) |
 | **本地 CUDA 编译工具** | 用自己的编辑器写 CUDA，需要编译检查且不占 GPU | 私有 rootless Docker + 固定 gVisor/NVRTC 镜像；独立状态目录 | 只编译，不运行样例；不需要网站或数据库 | [构建、使用与恢复](local-compiler.md) |
-| **本地 GPU 公开样例（待硬件验收）** | 已获独占单卡，准备在自己的编辑器中调试公开 CUDA 样例 | 私有 rootless Docker + 固定控制/任务镜像；原物理状态；无需网站或数据库 | 每次完整启动检查，仅返回非正式公开结果；当前未完成真实 GPU 验收 | [构建、首次绑定、运行与恢复](local-gpu.md) |
+| **本地 GPU 公开样例** | 已获独占单卡，在自己的编辑器中调试公开 CUDA 样例 | 私有 rootless Docker + 固定控制/任务镜像；原物理状态；无需网站或数据库 | 两轮完整启动与公开样例已实测；每次重新检查，仅返回非正式公开结果 | [构建、首次绑定、运行与恢复](local-gpu.md) |
 | **GPU 宿主 worker（开发验收）** | 已获得独占单卡、准备验证完整 CUDA 控制流程 | 普通用户 systemd + RootlessKit/Podman/runsc；持久私有目录与同一应用数据库 | 每次启动完整检查；新 CUDA 路径尚未验收，网站 GPU 提交关闭 | [配置与生命周期](gpu.md#gpu-worker) |
 | **GPU 容器 worker（开发验收）** | 已有 PostgreSQL，准备使用固定镜像和 Compose 验证专用 GPU 节点 | 原私有 rootless Docker、锁/journal、数据库网络；可制作统一四镜像发布包 | 无设备预检与完整启动分开；真实 GPU、队列及升级仍待验收 | [构建、配置和 Compose](container-gpu-worker.md)、[统一发布包](releases.md#gpu-release) |
 
@@ -20,7 +20,7 @@
 
 需要保存或分发匹配的 Web、CPU worker、GPU worker 和任务镜像时，使用[四镜像发布包](releases.md#gpu-release)。它提供统一构建、校验与导入；协调器可先完成[原 GPU 节点绑定](container-gpu-worker.md#coordinator-binding)。[内部整站发布与恢复](container-gpu-worker.md#whole-site-release)已串接，真实环境验收仍待完成；公共协调器当前只激活两镜像 CPU 包。
 
-GPU 0 的独立环境已通过真实 CUDA 样例、内核参考解/错解和 CPU 限额检查。准备执行节点或排障时使用 [GPU 单卡环境检查](gpu.md#重放单卡环境检查)及[内核组件检查](gpu.md#重放内核正确性检查)。显卡被占用时，可按 [GPU 指南的检查入口表](gpu.md#validation-options)选择控制链、离线 runsc、异常恢复、可信容器监督、容器内 runsc 或[控制端 UID/锁映射检查](gpu.md#container-controller)；它们只运行固定 CPU 程序，尚不能作为接收学员提交的 GPU 部署方案。
+GPU 0 已通过[两轮完整启动与本地公开样例](../acceptance-gpu0-startup.md)，网站正式 Submit、队列和发布仍需单独验收。准备执行节点或排障时使用 [GPU 单卡环境检查](gpu.md#重放单卡环境检查)及[内核组件检查](gpu.md#重放内核正确性检查)。显卡被占用时，可按 [GPU 指南的检查入口表](gpu.md#validation-options)选择控制链、离线 runsc、异常恢复、可信容器监督、容器内 runsc 或[控制端 UID/锁映射检查](gpu.md#container-controller)；它们只运行固定 CPU 程序，尚不能作为接收学员提交的 GPU 部署方案。
 
 [单卡设备节点检查](gpu.md#container-device-nodes)属于需要明确授权的真实设备接入，即使固定程序只读取节点信息也不能当作无设备 CPU 检查。该开发入口仍待修复后实测，不是 GPU Compose 启动方式。
 

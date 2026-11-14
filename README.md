@@ -2,7 +2,7 @@
 
 通过真实编程练习学习计算知识：用结构化知识导航找到学习方向，也可以直接筛题、写代码、运行和提交。
 
-当前交付为**已完成本地验收的自部署版本**。默认 Docker Compose 包含真实 CPU/WASI 评测；可选覆盖文件提供本地 CPU AI 辅导。GPU 正式评测仍在开发：宿主与[容器 worker/Compose 入口](docs/deployment/container-gpu-worker.md)、持久成绩及健康准入已接通，默认关闭；可制作包含配套 GPU 镜像的[统一发布包](docs/deployment/releases.md#gpu-release)，完整硬件验收、部署升级及正式题型发布尚未完成。公开运营和项目许可证仍待维护者决定。产品需求见 [PRD.md](PRD.md)，完整范围与未完成项见[需求追踪](docs/requirements.md)。
+当前交付为**已完成本地验收的自部署版本**。默认 Docker Compose 包含真实 CPU/WASI 评测；可选覆盖文件提供本地 CPU AI 辅导。GPU 的[完整启动与本地公开样例](docs/acceptance-gpu0-startup.md)已通过真实硬件验收；[容器 worker/Compose 入口](docs/deployment/container-gpu-worker.md)、持久成绩及健康准入已接通，正式队列、Submit 性能、部署升级及正式题型发布尚未完成，网站 GPU 提交默认关闭。可制作配套的[统一发布包](docs/deployment/releases.md#gpu-release)。公开运营和项目许可证仍待维护者决定。产品需求见 [PRD.md](PRD.md)，完整范围与未完成项见[需求追踪](docs/requirements.md)。
 
 ## 可以做什么
 
@@ -38,7 +38,7 @@ docker compose -f compose.yaml -f compose.ai.yaml up --build -d
 | --- | --- |
 | 用 Python 修改代码或内容 | [源码开发环境](docs/deployment/README.md#development) |
 | 接入 GitHub CI 或准备 GPU 节点 | [CI 与部署 runner](docs/deployment/ci.md)、[GPU 方案与检查入口](docs/deployment/gpu.md#validation-options)、[容器 worker 及协调器开发状态](docs/deployment/container-gpu-worker.md) |
-| 在自己的编辑器中做题 | [本地练习与提交工具](docs/local-practice.md)；[CUDA 隔离编译](docs/deployment/local-compiler.md)无需显卡；[本地 GPU 运行](docs/deployment/local-gpu.md)的真实硬件全路径尚未验收 |
+| 在自己的编辑器中做题 | [本地练习与提交工具](docs/local-practice.md)；[CUDA 隔离编译](docs/deployment/local-compiler.md)无需显卡；[本地 GPU 公开样例](docs/deployment/local-gpu.md)已通过独占单卡实测 |
 | 新增题目、课程或学习路径 | [内容规范](docs/content.md)、[工程项目](projects/README.md)、[组织题库](docs/rfcs/009-organizations-and-packages.md) |
 | 贡献代码或查看设计 | [贡献指南](CONTRIBUTING.md)、[AGENTS.md](AGENTS.md)、[设计索引](docs/README.md) |
 

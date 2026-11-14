@@ -1,6 +1,6 @@
 # RFC-025：区分宿主与 nvproxy guest 的设备编号
 
-日期：2026-11-15。状态：实施中。背景见 [RFC-021](021-gpu-container-supervision.md)；决策见 [ADR-080](../adr/080-nvproxy-guest-device-identity.md)。
+日期：2026-11-15。状态：已实施并通过真实节点和两轮完整启动，见[验收记录](../acceptance-gpu0-startup.md)。背景见 [RFC-021](021-gpu-container-supervision.md)；决策见 [ADR-080](../adr/080-nvproxy-guest-device-identity.md)。
 
 ## 实际失败
 

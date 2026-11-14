@@ -8,6 +8,7 @@
 - [完整 PRD 需求追踪](requirements.md) — 全目标实施中，当前 F 自部署制品及版本题目反馈已验证
 - [RFC-025：宿主与 guest 的设备编号](rfcs/025-nvproxy-guest-device-identity.md)、[ADR-080](adr/080-nvproxy-guest-device-identity.md) — 实际 GPU 资源检查误拒绝的修复与验证边界
 - [GPU 0 启动检查与修复](acceptance-gpu0-startup.md) — 真实失败、独立诊断及回归范围
+- [RFC-026：真实 GPU 整站验收](rfcs/026-gpu-site-hardware-rehearsal.md) — 新建临时站点、正式队列、切换和恢复的验收边界
 - [GitHub 托管应用与 WASI 验收](acceptance-hosted-ci.md) — 按确切提交记录工作流结果和故障定位；专用部署节点与 GPU 仍需分别验收
 - [旧 F→当前 CPU 整站升级](acceptance-f-current.md) — 真实旧应用、三项迁移、数据保留、HTTPS/WASI 与清理通过
 - [F 升级准备与当前 CPU 发布包验收](acceptance-upgrade-preparation.md) — 保留历次目标包、准备阶段和原始失败
@@ -15,7 +16,7 @@
 - [私有构建目录的镜像源码权限](acceptance-image-staging.md) — 非 root 入口读取修复与无设备镜像检查
 - [G71：当前默认 Compose 的完整重放](acceptance-g71.md) — 当前镜像内真实评测、直接 IP、离线关闭与重建保留通过
 - [G70：父镜像清理、桥接退出同步与无设备工具验证](acceptance-g70.md)
-- [RFC-024：本地 CUDA 练习工具](rfcs/024-local-cuda-practice.md) — 编译与本地 GPU 命令已连接；真实 GPU 全路径尚待验收
+- [RFC-024：本地 CUDA 练习工具](rfcs/024-local-cuda-practice.md) — 编译、完整启动与本地 GPU 公开样例已实测
 - [本地 GPU 操作指南](deployment/local-gpu.md) — 构建、首次绑定、公开样例和恢复集中入口
 - [ADR-079：本地公开 GPU 命令的联合完成条件](adr/079-local-gpu-public-client.md)
 - [G69：本地 GPU 公开命令与实际 CPU 管道验证](acceptance-g69.md)

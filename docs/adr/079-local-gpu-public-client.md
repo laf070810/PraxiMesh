@@ -1,6 +1,6 @@
 # ADR-079：本地公开 GPU 命令的联合完成条件
 
-日期：2026-11-02。状态：已采用，CLI 已连接，真实 GPU 验收待授权。对应 [RFC-024](../rfcs/024-local-cuda-practice.md)。
+日期：2026-11-02。状态：已采用；2026-11-15 真实完整启动、公开样例及原状态恢复通过，见[验收记录](../acceptance-gpu0-startup.md)。对应 [RFC-024](../rfcs/024-local-cuda-practice.md)。
 
 公开命令使用 `scripts/practice.py`，下载包先通过既有公开契约校验，不能选择镜像、socket、设备或状态。独立构建入口输出匹配当前源码和本机驱动的私有双镜像清单。首次物理准备复用 `judge/container_preparation.py`，不复制另一套 worker 初始化规则；本地练习继续拒绝使用 worker 或协调器状态。
 
