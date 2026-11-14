@@ -2,7 +2,7 @@
 
 日期：2026-11-11 至 13 日。对应 PRD R-09、AC-07。操作入口统一在[生产部署指南](deployment/production.md#f-current-upgrade)。
 
-F→当前版本的升级检查已接入，当前 CPU 包已完成校验与导入，其确切 Web/worker 镜像通过真实 WASI 与浏览器检查。本次升级验收尚未导入或启动旧 F 镜像，完整跨版本应用升级仍未验收。
+F→当前版本的升级检查已接入，当前 CPU 包已完成校验与导入，其确切 Web/worker 镜像通过真实 WASI 与浏览器检查。11 月 11 至 13 日的准备阶段未导入或启动旧 F 镜像；11 月 15 日获明确授权后，已通过[旧 F→当前 CPU 整站升级](acceptance-f-current.md)。本页保留此前准备、失败和各目标包的范围。
 
 ## 组件与数据库
 
@@ -71,6 +71,6 @@ F→当前版本的升级检查已接入，当前 CPU 包已完成校验与导�
 
 ## 剩余门槛与证据
 
-旧 F 归档 `896e1c1b605025376ed30786ea4e79d3fde008c97e7d114bf91febd86cc62482` 的完整内容已重新只读核验。其 Web 镜像缓存缺失；此前导入被自动审批拒绝，见 [G44](acceptance-g44.md)。恢复缓存及执行隔离整站升级的许可仍待维护者回复。当前包通过、历史 schema 升级或预检接受均不替代旧应用整站升级。
+旧 F 归档 `896e1c1b605025376ed30786ea4e79d3fde008c97e7d114bf91febd86cc62482` 的完整内容已重新只读核验。此前 Web 镜像缓存缺失及导入被自动审批拒绝的历史见 [G44](acceptance-g44.md)。2026-11-15 维护者明确允许旧 F 导入和临时站点升级，随后缓存恢复及真实整站升级均通过，结果见[独立验收记录](acceptance-f-current.md)。当前包通过、历史 schema 升级或预检接受本身仍不能替代旧应用整站升级。
 
 原始结果在忽略目录 `test-results/upgrade-preparation-2026-11-11/`：`components-2.xml`、`postgres.xml`、两个构建结果、`current-release-result-*.json`、`navigation-reproduction.json`、`final-resource-audit.json` 与 `services-final-observation.json`。托管检查的后续失败及本地复现另见[托管记录](acceptance-hosted-ci.md#later-runs)。真实 GPU 全路径与其余产品门槛继续按[需求追踪](requirements.md)处理。

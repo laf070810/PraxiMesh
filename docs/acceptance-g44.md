@@ -32,3 +32,5 @@
 2026-11-02 的 [G58](acceptance-g58.md) 改用本账号已有的 Compose Web 不可变镜像 ID，通过六项实际 Docker/HTTP 检查，包括四处真实 SIGKILL；原服务及基镜像均保留。没有导入旧 F 镜像，先前的缓存恢复审批限制仍保留。端口专项缺口已补齐，完整 PostgreSQL/HTTPS/WASI 发布矩阵仍待完成；本页原始失败记录不变。
 
 同日 [G59](acceptance-g59.md) 新建当前 CPU 制品，在真实 PostgreSQL/HTTPS/WASI 上通过五次代际尝试、迁移失败、曝光前后中断和 worker 自动重启恢复。当前版本的完整矩阵缺口已补齐，旧 F→当前 schema 升级仍独立待验收。
+
+2026-11-15 维护者明确允许旧 F 导入及临时站点升级。原两份镜像缓存已恢复，并通过[旧 F→当前 CPU 整站升级](acceptance-f-current.md)，临时资源清理及原服务身份核对通过。上述审批阻塞已解除，原始失败记录继续保留。
