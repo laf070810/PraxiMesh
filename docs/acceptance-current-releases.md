@@ -1,8 +1,33 @@
 # 当前源码的 CPU 与四镜像发布包
 
-日期：2026-11-13。对应 PRD R-09/15/16。两份新包均从干净、已推送的 `0b9a69c6c8d7a700c62a3c9e4e579a129616de14` 构建，包含[镜像源码权限修复](acceptance-image-staging.md)。原 G42 四镜像包保留原身份；它缺少后续代际配置声明，旧契约不能用于当前 worker。
+更新：2026-11-15。对应 PRD R-09/15/16。下方按冻结版本记录同源 CPU/四镜像包，旧归档均保留，不原地覆盖。原 G42 包缺少后续代际配置声明，旧契约不能用于当前 worker。
 
-## 制品与用途
+<a id="uvm-release"></a>
+## 11 月 15 日：宿主/guest UVM 身份修复后的配套包
+
+源提交 `75e2762841dec735eecd6e313df0c9a8a1ec39c3`，source ID `7da8914894a244fc1d1e012e5d1eac87be5b5b813bb0d3f32391e72190314fde`。988 个归档文件与原始 Git 对象逐字节匹配；两包共用源码归档、Web/CPU worker 镜像和评测配置。
+
+| 格式 | 不可变目录 | release.json SHA-256 |
+| --- | --- | --- |
+| CPU format 1 | `var/releases/2026-11-15-cpu-upgrade-target-5/` | `b29d6cbd8f5f5a3a6e32954ff31106ed43a9f997c59004cc82c1abc4ecd82f61` |
+| GPU format 2 | `var/releases/2026-11-15-uvm-four-image-1/` | `0c34dbf9f008227160138c4cd23c126d35c802d5562dca72008df6c805d8abd5` |
+
+| 角色 | 不可变镜像 ID |
+| --- | --- |
+| Web | `sha256:3c4581547555a8181a830b45f9cfcd06df40beb9f893618a1680800a92313ce6` |
+| CPU worker | `sha256:608a53088757c803dcd4170f40d25188889e490a1d724c6cca9f7860a0653576` |
+| GPU worker | `sha256:caec6c69aacf80b3ba05b6236ba8374cc352493ab3a87987adf53b7c2e74ef70` |
+| GPU task | `sha256:bc3f386e347bf94131b3c1daeb116d49979f0568222007a7068f43e9ec159eae` |
+
+GPU task 镜像与[两轮真实本地完整启动](acceptance-gpu0-startup.md)所用镜像完全相同，controller 契约也相同；新增 worker 应用和正式队列仍需独立验收。完整归档核验和标准导入后，**10 项无设备 worker/Compose/PostgreSQL 检查**通过；同包 Web/CPU 应用的 **129 项启动探针、真实 Run/错解/正确 Submit、三组基础与七组扩展浏览器旅程、准入/排空及清理**通过。CPU 配套包随后通过[第二轮真实旧 F 整站升级](acceptance-f-current.md)。
+
+这些包不含随后发现的协调器 OOM 配置修复。首次自有 CPU→GPU 整站尝试的预检退出码为 0，但被创建摘要核对拒绝，原站点和操作保留；原因及有限恢复设计见 [RFC-027](rfcs/027-rootless-worker-oom-contract.md)。制品和 CPU 通过不等于 GPU 站点激活通过。
+
+原始证据在 `test-results/uvm-releases-2026-11-15/`：`build-continuation.json`、`source-and-pair-audit.json`、`acceptance-process.json`、`cpu-application/release-acceptance.json` 和升级报告；worker 报告为 `test-results/px-container-worker-33d9caef0f09/result.json`。首次构建包装器在成功构建后误读 `manifest.json` 而失败；原失败保留，后续使用实际 `release.json` 继续核验，没有重建或改写该包。
+
+## 11 月 13 日：镜像源码权限修复后的配套包
+
+以下两份包从干净、已推送的 `0b9a69c6c8d7a700c62a3c9e4e579a129616de14` 构建，包含[镜像源码权限修复](acceptance-image-staging.md)。
 
 | 格式 | 用途 | 不可变目录 | manifest SHA-256 |
 | --- | --- | --- | --- |

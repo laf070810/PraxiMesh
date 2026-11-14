@@ -18,6 +18,12 @@
 
 使用 `scripts/deploy_acceptance.py --upgrade-only`，分别传入上述原包与新包、各自摘要及新证据目录。浏览器预检实际生成截图；整站命令退出码为 0，耗时 475.595 秒，报告为 `passed: true`、`phase: complete`，共两代应用。
 
+## 同日第二轮：当前 GPU 修复源码对应的 CPU 包
+
+从干净提交 `75e2762841dec735eecd6e313df0c9a8a1ec39c3` 制作的 CPU 目标包为 `var/releases/2026-11-15-cpu-upgrade-target-5/`，manifest SHA-256 `b29d6cbd8f5f5a3a6e32954ff31106ed43a9f997c59004cc82c1abc4ecd82f61`。988 个源码文件逐字节匹配 Git；它与同批四镜像包的源码、Web/CPU 镜像和评测配置相同，详见[当前包记录](acceptance-current-releases.md#uvm-release)。
+
+再次使用原 F 包、同一固定 Caddy 和全新临时站点执行完整 `--upgrade-only`，退出码 0，耗时 **477.745 秒**，报告 `passed: true`、`phase: complete`。下述三项实际迁移、原数据/角色/会话/分享范围、HTTPS/WASI、浏览器及清理检查重新通过；仍不访问 GPU。证据在 `test-results/uvm-releases-2026-11-15/upgrade-process.json` 和 `f-current-upgrade-1/deployment-acceptance.json`，不覆盖第一轮报告。
+
 ## 实际验证范围
 
 - 运行旧 F 应用后建立真实 CPU 提交历史及预约、账号、会话、草稿和私有学习数据，经数据库复制和新应用迁移比较保留结果；升级不会自动发布或覆盖目录。

@@ -9,6 +9,7 @@
 - [RFC-025：宿主与 guest 的设备编号](rfcs/025-nvproxy-guest-device-identity.md)、[ADR-080](adr/080-nvproxy-guest-device-identity.md) — 实际 GPU 资源检查误拒绝的修复与验证边界
 - [GPU 0 启动检查与修复](acceptance-gpu0-startup.md) — 真实失败、独立诊断及回归范围
 - [RFC-026：真实 GPU 整站验收](rfcs/026-gpu-site-hardware-rehearsal.md) — 新建临时站点、正式队列、切换和恢复的验收边界
+- [RFC-027：rootless worker 的 OOM 启动配置](rfcs/027-rootless-worker-oom-contract.md)、[ADR-081](adr/081-rootless-worker-oom-contract.md) — 固定有效设置及原无设备预检的有限恢复
 - [GitHub 托管应用与 WASI 验收](acceptance-hosted-ci.md) — 按确切提交记录工作流结果和故障定位；专用部署节点与 GPU 仍需分别验收
 - [旧 F→当前 CPU 整站升级](acceptance-f-current.md) — 真实旧应用、三项迁移、数据保留、HTTPS/WASI 与清理通过
 - [F 升级准备与当前 CPU 发布包验收](acceptance-upgrade-preparation.md) — 保留历次目标包、准备阶段和原始失败

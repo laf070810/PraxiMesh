@@ -782,6 +782,7 @@ class Deployment:
             or any(value and "gpu" in value.get("manifest", {}) for value in generations)
             or state.get("gpu_configuration")
             or state.get("gpu_runtime")
+            or state.get("gpu_legacy_oom")
             or state.get("gpu_recoveries")
             or state.get("gpu_candidate_checks")
             or state.get("gpu_preparations")

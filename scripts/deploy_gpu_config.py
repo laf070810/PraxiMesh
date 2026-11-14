@@ -16,6 +16,7 @@ from judge.container_journal import MAX_RECORD, private, validate_record
 from judge.container_service import IMAGE_ID
 from judge.gpu_session import decode_frame
 from scripts.deploy_gpu import read_private
+from scripts.deploy_gpu_oom import runtime_fingerprint
 from scripts.deploy_web import fingerprint
 from scripts.release_gpu import WORKER_CONFIGURATION
 
@@ -94,6 +95,9 @@ def require_stopped_workers(host, node, binding):
     transitions = host.state.get("gpu_runtime", {})
     if type(transitions) is not dict:
         raise ValueError("Invalid GPU worker lifecycle journal")
+    proofs = host.state.get("gpu_legacy_oom", {})
+    if type(proofs) is not dict or not set(proofs) <= set(transitions):
+        raise ValueError("Invalid stopped preflight OOM journal")
     if transitions:
         from scripts.deploy_gpu_worker import WorkerRuntime
 
@@ -207,10 +211,16 @@ def require_stopped_workers(host, node, binding):
                 )
             generation_id, expected, role = known[info["Id"]]
             state = info["State"]
+            lifecycle = transitions.get(expected["name"])
+            actual = (
+                runtime_fingerprint(info, lifecycle, proofs.get(expected["name"]))
+                if lifecycle is not None
+                else fingerprint(info)
+            )
             if (
                 info["Name"] != "/" + expected["name"]
                 or info["Image"] != expected["image"]
-                or fingerprint(info) != expected["runtime_sha256"]
+                or actual != expected["runtime_sha256"]
                 or labels.get("org.praximesh.site") != host.state["site_id"]
                 or labels.get("org.praximesh.generation") != generation_id
                 or labels.get("org.praximesh.role") != role

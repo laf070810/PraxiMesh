@@ -160,10 +160,12 @@ DOCKER_HOST="unix://$PRAXIMESH_DOCKER_SOCKET" \
 
 创建前保存意图，核验完整运行契约后登记 ID，再允许启动。每次新启动要求本次操作的预检，且预检开始不早于上一 worker 的实际退出时间；记录启动意图后释放设备锁，由 worker 取得原锁。同一启动实例被暂停或重启时不算成功。停止只操作原 ID、契约与启动时间，不抢 worker 的设备锁、不持队列行锁等待、不清空任务或预约。原对象丢失、未知同名对象和未确认的生命周期都须保留现场，不能以删除日志或手工运行 Docker 来绕过。
 
+新生命周期 schema 2 在创建时固定原 daemon 的实际 OOM 分数，并在每次新启动前核对原 socket/peer/出生时间与默认值。摘要只归一 OOM killer 仍启用的 `false/null` 表示，不忽略分数或其他设置。旧 schema 1 的创建摘要不改写；原操作中正常退出、且配对 worker 从未启动的旧预检可由正常恢复追加退役证明，不能据此重新启动。不要修改 daemon、原日志或容器设置来消除摘要报错，规则见 [ADR-081](../adr/081-rootless-worker-oom-contract.md)。
+
 不访问 Docker 或设备的组件检查：
 
 ```sh
-.venv/bin/pytest -q tests/test_deploy_gpu_worker.py \
+.venv/bin/pytest -q tests/test_deploy_gpu_worker.py tests/test_deploy_gpu_oom.py \
   tests/test_deploy_gpu_config.py tests/test_deploy_gpu_config_database.py
 ```
 

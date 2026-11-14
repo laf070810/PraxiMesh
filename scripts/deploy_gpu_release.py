@@ -374,6 +374,9 @@ class GPURelease:
         if info["State"]["StartedAt"] in ZERO and key not in self.host.state.get(
             "gpu_recoveries", {}
         ):
+            check = self.host.state.get("gpu_runtime", {}).get(generation["gpu_worker"] + "-check")
+            if check is not None and check.get("schema") == 1:
+                WorkerRuntime(self.host, generation, mode="check").reconcile_legacy_preflight()
             self.host.gpu_worker_runtime(generation, "create", mode="check")
             self.host.gpu_worker_runtime(generation, "stop", mode="check")
             for record in self.host.state.get("gpu_candidate_checks", {}).values():

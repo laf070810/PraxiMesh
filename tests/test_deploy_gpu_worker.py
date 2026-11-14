@@ -164,6 +164,17 @@ class DockerModel:
             "MemorySwap": 536870912,
             "NanoCpus": 1000000000,
             "PidsLimit": 128,
+            "OomScoreAdj": int(
+                next(
+                    (
+                        arg.split("=", 1)[1]
+                        for arg in arguments
+                        if arg.startswith("--oom-score-adj=")
+                    ),
+                    "0",
+                )
+            ),
+            "OomKillDisable": False,
             "RestartPolicy": {"Name": "no", "MaximumRetryCount": 0},
             "Tmpfs": {"/tmp": "rw,noexec,nosuid,nodev,size=16777216,mode=1777"},
             "Devices": devices,
@@ -235,6 +246,10 @@ class DockerModel:
         if args[:2] == ("container", "start"):
             info = next(info for info in value["containers"].values() if info["Id"] == args[2])
             assert not info["State"]["Running"]
+            info["HostConfig"]["OomScoreAdj"] = max(
+                info["HostConfig"]["OomScoreAdj"], self.daemon_oom["oom_score_adj"]
+            )
+            info["HostConfig"]["OomKillDisable"] = None
             # The real original lock must be available at the actual start call.
             with DeviceLock(self.item.root / "locks", self.item.bound.prepared.device):
                 pass
@@ -280,6 +295,17 @@ def lifecycle(publication, monkeypatch, tmp_path):
     remember(item, item.generation)
     item.publish(enabled=True)
     model = DockerModel(item, tmp_path)
+    model.daemon_oom = {
+        "engine": item.bound.prepared.engine_id,
+        "socket": [1, 2],
+        "peer": [1234, os.getuid(), os.getgid()],
+        "start_ticks": 123456,
+        "oom_score_adj": 200,
+        "version": "29.9.2",
+    }
+    monkeypatch.setattr(
+        deploy_gpu_worker, "observe_daemon", lambda engine: copy.deepcopy(model.daemon_oom)
+    )
     monkeypatch.setattr(
         WorkerRuntime,
         "command",

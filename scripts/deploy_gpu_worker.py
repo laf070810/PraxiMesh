@@ -20,6 +20,12 @@ from judge.container_processes import HOST_PROC
 from judge.container_worker_config import read_config
 from scripts.deploy_gpu import GPUDeploymentNode, read_private
 from scripts.deploy_gpu_config import context, frozen
+from scripts.deploy_gpu_oom import (
+    legacy_identity,
+    observe_daemon,
+    runtime_fingerprint,
+    validate_daemon,
+)
 from scripts.deploy_web import environment_values, fingerprint
 from scripts.release_gpu import check_image
 
@@ -198,9 +204,9 @@ class WorkerRuntime:
         try:
             valid = (
                 type(record) is dict
-                and set(record) == FIELDS
+                and set(record) == FIELDS | ({"oom"} if record.get("schema") == 2 else set())
                 and type(record["schema"]) is int
-                and record["schema"] == 1
+                and record["schema"] in {1, 2}
                 and re.fullmatch(r"[a-f0-9]{32}", record["token"])
                 and record["mode"] == self.mode
                 and record["generation"] == self.generation
@@ -220,6 +226,12 @@ class WorkerRuntime:
                 )
                 and str(uuid.UUID(record["operation"])) == record["operation"]
             )
+            if record["schema"] == 2:
+                validate_daemon(record["oom"])
+                valid = (
+                    valid
+                    and record["oom"]["engine"] == self.binding["node"]["installation"]["engine"]
+                )
             for name in ("started_at", "launch_before"):
                 if record[name] is not None:
                     started(record[name])
@@ -305,6 +317,8 @@ class WorkerRuntime:
             "--log-opt=compress=false",
             "--tmpfs=/tmp:" + TMPFS,
         ]
+        if record["schema"] == 2:
+            result += ["--oom-score-adj=" + str(max(0, record["oom"]["oom_score_adj"]))]
         for key, value in self.labels(record).items():
             result += ["--label", key + "=" + value]
         result += [
@@ -445,14 +459,18 @@ class WorkerRuntime:
                 and not options.get("NonRecursive")
                 and not options.get("ReadOnlyNonRecursive")
             )
+        try:
+            actual = runtime_fingerprint(info, record, self.legacy_proof())
+        except ValueError:
+            actual, valid = None, False
         if not valid or (
-            record["runtime_sha256"] is not None and fingerprint(info) != record["runtime_sha256"]
+            record["runtime_sha256"] is not None and actual != record["runtime_sha256"]
         ):
             raise WorkerLifecycleError("Worker container differs from its fixed creation contract")
         started(info["State"]["StartedAt"])
         return info
 
-    def inspect(self, *, absent=False):
+    def observation(self, *, absent=False):
         # A successful full listing distinguishes absence from an inspect failure.
         ids = (
             self.command(
@@ -479,17 +497,96 @@ class WorkerRuntime:
             raise WorkerLifecycleError("Original worker inspection is inconsistent")
         if self.network() != record["network"]:
             raise WorkerLifecycleError("Original database network changed")
-        return self.validate(values[0], self.image())
+        return values[0]
+
+    def inspect(self, *, absent=False):
+        info = self.observation(absent=absent)
+        return None if info is None else self.validate(info, self.image())
+
+    def legacy_proof(self):
+        proofs = self.host.state.get("gpu_legacy_oom", {})
+        if type(proofs) is not dict:
+            raise WorkerLifecycleError("Invalid stopped preflight OOM journal")
+        return proofs.get(self.name)
+
+    def daemon_oom(self):
+        try:
+            value = observe_daemon(self.node.engine)
+            if value["engine"] != self.binding["node"]["installation"]["engine"]:
+                raise ValueError
+            return value
+        except (OSError, KeyError, ValueError):
+            raise WorkerLifecycleError("Cannot verify the original daemon OOM settings") from None
+
+    def reconcile_legacy_preflight(self):
+        """Only retire an already exited old check whose paired worker never ran."""
+        _, metadata, token = self.common()
+        record = self.load()
+        if record is None or record["schema"] != 1:
+            return
+        with self.node.locked() as node:
+            node.require_owner(self.binding)
+            self.common()
+            info = self.observation()
+            if self.legacy_proof() is not None or fingerprint(info) == record["runtime_sha256"]:
+                self.validate(info, self.image())
+                return
+            if (
+                self.mode != "check"
+                or record["phase"] != "start_requested"
+                or record["operation"] != token
+                or record["metadata"] != metadata
+                or record["launch_before"] not in ZERO
+                or record["started_at"] not in ZERO | {None}
+                or not self.success(info)
+            ):
+                raise WorkerLifecycleError(
+                    "Only the original stopped legacy preflight may be reconciled"
+                )
+            worker = WorkerRuntime(self.host, self.generation)
+            original = worker.load()
+            if original is None or original["phase"] != "created":
+                raise WorkerLifecycleError("Legacy preflight recovery requires an unstarted worker")
+            prior = worker.inspect()
+            if prior["State"]["Status"] != "created" or prior["State"]["StartedAt"] not in ZERO:
+                raise WorkerLifecycleError("Legacy preflight recovery requires an unstarted worker")
+            daemon = self.daemon_oom()
+            runtime = info["HostConfig"]
+            if (
+                daemon["version"] != "29.9.2"
+                or runtime.get("OomKillDisable", False) is not None
+                or type(runtime.get("OomScoreAdj")) is not int
+                or runtime["OomScoreAdj"] != max(0, daemon["oom_score_adj"])
+            ):
+                raise WorkerLifecycleError(
+                    "Legacy preflight lacks the reviewed native OOM transition"
+                )
+            # Verify the old cryptographic preimage; never mutate the actual observation.
+            creation = info | {"HostConfig": runtime | {"OomKillDisable": False, "OomScoreAdj": 0}}
+            self.validate(creation, self.image())
+            proof = {
+                "schema": 1,
+                "identity_sha256": legacy_identity(record),
+                "operation": token,
+                "started_at": info["State"]["StartedAt"],
+                "observed_sha256": fingerprint(info),
+                "state_sha256": digest(info["State"]),
+                "daemon": daemon,
+            }
+            runtime_fingerprint(info, record, proof)
+            self.host.state.setdefault("gpu_legacy_oom", {})[self.name] = proof
+            self.host.save()
 
     def register(self, info):
-        self.record["id"], self.record["runtime_sha256"] = info["Id"], fingerprint(info)
+        actual = runtime_fingerprint(info, self.record)
+        self.record["id"], self.record["runtime_sha256"] = info["Id"], actual
         key = "gpu_workers" if self.mode == "worker" else "gpu_checks"
         self.host.state.setdefault(key, {})[self.generation["id"]] = {
             "id": info["Id"],
             "name": self.name,
             "image": info["Image"],
             "binding_sha256": digest(self.binding),
-            "runtime_sha256": fingerprint(info),
+            "runtime_sha256": actual,
         }
         self.save("created")
 
@@ -517,7 +614,8 @@ class WorkerRuntime:
                         "Worker creation requires a recorded deployment generation"
                     )
                 self.record = {
-                    "schema": 1,
+                    "schema": 2,
+                    "oom": self.daemon_oom(),
                     "token": uuid.uuid4().hex,
                     "mode": self.mode,
                     "generation": frozen(self.generation),
@@ -580,6 +678,7 @@ class WorkerRuntime:
         record = check.load()
         if (
             record is None
+            or check.legacy_proof() is not None
             or record["phase"] != "completed"
             or record["metadata"] != self.record["metadata"]
             or record["operation"] != self.host.state["operation"]["id"]
@@ -634,6 +733,8 @@ class WorkerRuntime:
             raise WorkerLifecycleError(
                 "Create the original worker for the published configuration first"
             )
+        if self.legacy_proof() is not None:
+            raise WorkerLifecycleError("A legacy OOM recovery proof only permits retirement")
         info = self.inspect()
         if record["phase"] in {"running", "completed"}:
             if info["State"]["StartedAt"] != record["started_at"]:
@@ -686,6 +787,8 @@ class WorkerRuntime:
             return self.confirm_start(info)
         if not stopped(info):
             raise WorkerLifecycleError("Worker changed before its recorded start")
+        if record["schema"] == 2 and self.daemon_oom() != record["oom"]:
+            raise WorkerLifecycleError("Original daemon OOM defaults changed before startup")
         self.command("container", "start", record["id"], timeout=30)
         return self.confirm_start(self.inspect())
 

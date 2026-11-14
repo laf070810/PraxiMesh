@@ -1,6 +1,6 @@
 # F 升级准备与当前 CPU 发布包验收
 
-日期：2026-11-11 至 13 日。对应 PRD R-09、AC-07。操作入口统一在[生产部署指南](deployment/production.md#f-current-upgrade)。
+更新：2026-11-15，保留 11 至 13 日的准备记录。对应 PRD R-09、AC-07。操作入口统一在[生产部署指南](deployment/production.md#f-current-upgrade)。
 
 F→当前版本的升级检查已接入，当前 CPU 包已完成校验与导入，其确切 Web/worker 镜像通过真实 WASI 与浏览器检查。11 月 11 至 13 日的准备阶段未导入或启动旧 F 镜像；11 月 15 日获明确授权后，已通过[旧 F→当前 CPU 整站升级](acceptance-f-current.md)。本页保留此前准备、失败和各目标包的范围。
 
@@ -27,9 +27,13 @@ F→当前版本的升级检查已接入，当前 CPU 包已完成校验与导�
 
 <a id="current-target"></a>
 
-## 当前目标包：包含镜像权限修复的版本
+## 当前目标包：包含 GPU UVM 修复的配套 CPU 版本
 
-当前目标来自干净提交 `0b9a69c6c8d7a700c62a3c9e4e579a129616de14`，旧目录均保留：
+`var/releases/2026-11-15-cpu-upgrade-target-5/` 来自干净提交 `75e2762`，manifest SHA-256 `b29d6cbd8f5f5a3a6e32954ff31106ed43a9f997c59004cc82c1abc4ecd82f61`，988 个冻结文件与 Git 逐字节匹配。完整制品核验、同源 Web/CPU 应用与无设备 worker 检查通过，见[制品记录](acceptance-current-releases.md#uvm-release)。该包已经过实际旧 F 应用到当前版本的第二轮整站升级，477.745 秒、退出码 0、数据/权限/HTTPS/WASI 及清理通过，见[升级结果](acceptance-f-current.md)。
+
+## 前一目标包：包含镜像权限修复的版本
+
+此前目标来自干净提交 `0b9a69c6c8d7a700c62a3c9e4e579a129616de14`，旧目录均保留：
 
 | 身份 | 值 |
 | --- | --- |
