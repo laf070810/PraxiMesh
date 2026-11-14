@@ -41,6 +41,8 @@
 
 2026-11-15 获明确授权后，已实际运行旧 F 应用并完成到当前 CPU 包的整站升级，三项迁移、原数据与成绩保留、权限、HTTPS 浏览器及清理均通过，见[整站升级记录](acceptance-f-current.md)。旧 F 导入和成功升级缺口已关闭；以下项目继续保留。
 
+同日的[独立 GPU 站点验收](acceptance-gpu-site.md)已定位并修复原预检容器的 OOM 配置核对问题，从同一发布操作真实回退到原 CPU 库与版本。它关闭了这次曝光前恢复故障，正式 GPU 队列、API、性能及完整发布矩阵仍在验收中。
+
 | 未完成项 | 当前证据与限制 | 后续完成所需条件 |
 | --- | --- | --- |
 | GPU 题型（§2.2 C、§4.2/4.4、R-16） | [G1](acceptance-g1.md)、[G2](acceptance-g2.md) 有早期单卡正确性与故障实测；当前 worker、持久成绩、健康准入、CUDA 候选内容、编辑和分享已接入。[G42](acceptance-g42.md) 通过统一四镜像制品检查，[G56](acceptance-g56.md) 实现内部完整发布恢复编排，公共 GPU 激活仍关闭。[G57](acceptance-g57.md) 的 77 项真实 PostgreSQL 检查及 [G59](acceptance-g59.md) 的当前 CPU 发布矩阵通过；设备和成绩的模型结果不代表当前 GPU 路径或性能通过。分批实现与原始失败记录保留在下方。 | 2026-11-15 已获维护者重新授权使用 GPU 0，[本地 GPU 命令](deployment/local-gpu.md)两轮完整启动及公开样例已通过。继续验证正式 worker、API Submit/性能、队列与 GPU 部署升级，再发布候选内容及开放网站入口；范围见[GPU 0 记录](acceptance-gpu0-startup.md)。 |

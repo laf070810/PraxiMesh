@@ -1,6 +1,6 @@
 # RFC-026：独立临时站点的真实 GPU 整站验收
 
-日期：2026-11-15。状态：准备实施，完整矩阵尚未执行。依赖 [RFC-022](022-gpu-release-coordination.md) 的内部编排和[当前 GPU 硬件检查](../acceptance-gpu0-startup.md)。
+日期：2026-11-15。状态：实施与真实验收中，完整矩阵尚未完成；原预检失败与同一操作回退见[实际站点记录](../acceptance-gpu-site.md)。依赖 [RFC-022](022-gpu-release-coordination.md) 的内部编排和[当前 GPU 硬件检查](../acceptance-gpu0-startup.md)。
 
 ## 目标与边界
 

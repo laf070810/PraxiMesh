@@ -163,6 +163,7 @@ def build_images(context, work, options, docker, log_directory):
     engine = check_engine(options, docker)
     output = work / "gpu-build"
     tag = "px-gpu-release-" + uuid.uuid4().hex[:12]
+    built = None
     try:
         with (log_directory / "entry.log").open("w") as log:
             subprocess.run(
@@ -189,15 +190,87 @@ def build_images(context, work, options, docker, log_directory):
         raw = (output / "release-images.json").read_bytes()
         if len(raw) > 256 * 1024:
             raise ValueError("GPU build metadata is oversized")
-        yield json.loads(raw)
+        built = json.loads(raw)
+        yield built
     finally:
         for relative, name in (("build.log", "worker.log"), ("task/build.log", "task.log")):
             path = output / relative
             if path.is_file():
                 shutil.copyfile(path, log_directory / name)
-        for name in (tag + "-task", tag):
-            if engine.run("image", "inspect", name, check=False).returncode == 0:
-                engine.run("image", "rm", "--no-prune", name)
+        cleanup = []
+        try:
+            images = built.get("images") if type(built) is dict else None
+            for role, name in (("gpu_task", tag + "-task"), ("gpu_worker", tag)):
+                expected = images.get(role) if type(images) is dict else None
+                if type(expected) is str and re.fullmatch(r"sha256:[a-f0-9]{64}", expected):
+                    cleanup.append(cleanup_build_tag(engine, name, expected))
+                else:
+                    # An interrupted builder has not confirmed an image identity.
+                    cleanup.append({"tag": name, "state": "retained-unconfirmed"})
+        finally:
+            (log_directory / "cleanup.json").write_text(json.dumps(cleanup, indent=2) + "\n")
+
+
+def cleanup_build_tag(engine, tag, expected):
+    """Keep a reused image's last tag while containers still reference it."""
+    reference = tag + ":latest"
+    record = {"tag": tag, "image": expected}
+
+    def observe():
+        identifiers = (
+            engine.run("image", "ls", "--quiet", "--no-trunc", "--filter", "reference=" + reference)
+            .stdout.decode()
+            .split()
+        )
+        if not identifiers:
+            return None
+        if identifiers != [expected]:
+            raise ValueError("Temporary GPU build tag no longer refers to its original image")
+        values = json.loads(engine.run("image", "inspect", reference).stdout)
+        if (
+            type(values) is not list
+            or len(values) != 1
+            or values[0].get("Id") != expected
+            or type(values[0].get("RepoTags")) is not list
+            or reference not in values[0]["RepoTags"]
+        ):
+            raise ValueError("Temporary GPU build image observation changed")
+        references = (
+            engine.run(
+                "container",
+                "ls",
+                "--all",
+                "--quiet",
+                "--no-trunc",
+                "--filter",
+                "ancestor=" + expected,
+            )
+            .stdout.decode()
+            .split()
+        )
+        if (
+            len(references) > 1024
+            or len(set(references)) != len(references)
+            or any(not HEX.fullmatch(value) for value in references)
+        ):
+            raise ValueError("Cannot establish bounded GPU build image references")
+        return values[0]["RepoTags"] == [reference] and bool(references)
+
+    used = observe()
+    if used is None:
+        return record | {"state": "absent"}
+    if used:
+        return record | {"state": "retained-in-use"}
+    removed = engine.run("image", "rm", "--no-prune", tag, check=False)
+    if removed.returncode:
+        # A container may start after observation. Recheck the original tag;
+        # never convert an arbitrary daemon error into successful cleanup.
+        if observe() is True:
+            return record | {"state": "retained-in-use"}
+        raise ValueError("Original GPU build tag could not be safely removed")
+    if observe() is not None:
+        raise ValueError("Original GPU build tag removal was not confirmed")
+    return record | {"state": "removed"}
 
 
 def main():
