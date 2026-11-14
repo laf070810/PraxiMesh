@@ -139,7 +139,7 @@ CPU 专项给故障任务 45 秒预算，其中监督器硬期限为 40 秒；�
 
 ## 不运行 CUDA 的单卡设备节点检查
 
-适用于开发容器 GPU worker 的设备映射与持久恢复，当前仍在验收中，首次实际运行的只读挂载失败及修复范围见 [G34](../acceptance-g34.md)。此入口会把真实设备映射给任务，必须取得维护者对此操作的明确授权；只有“不占 GPU 的开发”授权时，不执行下面命令。先按[只读管理检查](#container-device-observer)核对完整 UUID，并设定 `PRAXIMESH_OBSERVE_GPU_UUID`。要求对应卡没有外部进程、UVM 已由主机正常注册、私有 rootless Docker 和当前驱动/管理库可用；工具不会加载主机模块、重置设备或停止其他账号进程。
+适用于开发容器 GPU worker 的设备映射与持久恢复，四项真实节点与恢复检查已通过，见 [GPU 0 记录](../acceptance-gpu0-startup.md)；首次只读挂载失败保留在 [G34](../acceptance-g34.md)。此入口会把真实设备映射给任务，必须取得维护者对此操作的明确授权；只有“不占 GPU 的开发”授权时，不执行下面命令。先按[只读管理检查](#container-device-observer)核对完整 UUID，并设定 `PRAXIMESH_OBSERVE_GPU_UUID`。要求对应卡没有外部进程、UVM 已由主机正常注册、私有 rootless Docker 和当前驱动/管理库可用；工具不会加载主机模块、重置设备或停止其他账号进程。
 
 ```sh
 .venv/bin/python scripts/container_gpu_acceptance.py \

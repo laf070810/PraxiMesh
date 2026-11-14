@@ -139,12 +139,12 @@ def main():
             if name != "wrong-uvm":
                 active = wait_report(control, path, "active")
                 same_identity(active, config)
-                task_processes = task_tree(engine, active)
-                row.update(active=active, original_processes=task_processes)
                 assert (
                     active["record"]["version"] == 3
                     and active["record"]["device_spec"] == active["selection"]
                 )
+                task_processes = task_tree(engine, active, device_spec=active["selection"])
+                row.update(active=active, original_processes=task_processes)
                 assert active["guest"]["identity"]["cuda_initialized"] is False
                 if name == "orphan":
                     control.wait(17)

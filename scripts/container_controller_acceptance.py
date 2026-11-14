@@ -26,6 +26,7 @@ from judge.container_controller import (  # noqa: E402
     controller_digest,
     manifest,
 )
+from judge.container_devices import docker_devices  # noqa: E402
 from judge.container_journal import ContainerJournal, PersistentRuntimeService  # noqa: E402
 from judge.container_processes import HOST_PROC  # noqa: E402
 from judge.container_runtime_service import contract_digest  # noqa: E402
@@ -287,10 +288,12 @@ def same_identity(value, config):
         assert value[key] == config[key]
 
 
-def task_tree(engine, active):
+def task_tree(engine, active, *, device_spec=None):
     info = json.loads(engine.run("container", "inspect", active["container"]).stdout)[0]
     assert info["Mounts"] == [] and info["HostConfig"]["DeviceRequests"] is None
-    assert info["HostConfig"]["Devices"] == [] and info["HostConfig"]["NetworkMode"] == "none"
+    expected = [] if device_spec is None else docker_devices(device_spec)
+    assert info["HostConfig"]["Devices"] == expected
+    assert info["HostConfig"]["NetworkMode"] == "none"
     assert info["Config"]["User"] == "65532:65532"
     return tree(engine, SimpleNamespace(container_id=active["container"]))
 
