@@ -1,6 +1,6 @@
 # RFC-031：GPU 源码发送前的通道检查点
 
-日期：2026-11-15。状态：已实施，268 项组件与本地管道、41 项真实 CPU 容器检查通过；GPU 回归待执行，决策见 [ADR-085](../adr/085-gpu-preparation-checkpoints.md)。
+日期：2026-11-15。状态：已实施，268 项组件与本地管道、41 项真实 CPU 容器检查通过；新冻结版本的完整 GPU 启动、两题普通 API 与浏览器验收通过，决策见 [ADR-085](../adr/085-gpu-preparation-checkpoints.md)。
 
 ## 问题
 
