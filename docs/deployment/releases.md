@@ -9,7 +9,7 @@
 | 场景 | 格式与当前支持 |
 | --- | --- |
 | 使用公共发布协调器部署或升级 CPU/WASI 站点 | 默认 format 1，包含 Web 和 CPU worker |
-| 准备配套 GPU 镜像及后续完整硬件验收 | [format 2](#gpu-release)，统一保存四个镜像；公共 GPU 激活仍关闭 |
+| 为原站点接入或升级 GPU | [format 2](#gpu-release)，同源四镜像；完成原节点绑定后使用同一公共发布命令 |
 
 ## 构建
 
@@ -124,4 +124,4 @@ export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
 
 第一个入口核对源码匹配、真实数据库最小权限、私有配置、默认关闭及失败拒绝，不映射 GPU、发布 ready 或执行任务。第二个入口沿用上文的浏览器/judge 依赖及匹配的本地 WASI 配置，验证包内 CPU 应用；输出目录必须是新目录。两者都不能作为 GPU 硬件验收。
 
-当前 `deploy.py apply` 会在镜像导入、服务或数据库变更前拒绝 format 2。排空、原库恢复、候选验证及曝光已连接[内部整站编排](container-gpu-worker.md#whole-site-release)，但完整 GPU 启动、队列、升级和故障恢复矩阵尚未实测，公共 `apply/recover` 仍关闭。首次独立 worker 配置按 [GPU 容器指南](container-gpu-worker.md)操作；制品、绑定或无设备检查通过不能替代硬件升级验收。制品设计见 [ADR-058](../adr/058-gpu-release-artifacts.md)，原 G42 与[当前同源发布包](../acceptance-current-releases.md)分别保留确切版本的结果。
+公共 `deploy.py apply/recover` 已支持匹配的 format 2 与原 GPU 生命周期。先完成[原节点绑定](container-gpu-worker.md#coordinator-binding)，再按[生产 GPU 入口](production.md#gpu-release)激活；缺少原配置或绑定会在数据库操作前拒绝。构建、导入和无设备检查仍不表示设备就绪，每次 GPU 启动都执行完整检查。临时站点的两题 API、升级及公共命令范围见[真实记录](../acceptance-gpu-site.md#public-command-success)。制品设计见 [ADR-058](../adr/058-gpu-release-artifacts.md)，旧 G42 与[同源发布包记录](../acceptance-current-releases.md)保留原版本证据。

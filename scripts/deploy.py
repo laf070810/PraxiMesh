@@ -696,7 +696,7 @@ class Deployment:
             raise DeploymentError("Complete the durable attach-gpu operation first")
 
     def publish_gpu_configuration(self, generation, *, enabled=False):
-        """Internal preparation only; apply still refuses GPU activation."""
+        """Internal preparation within the complete coordinated lifecycle."""
         from scripts.deploy_gpu_config import publish
 
         self.require_locked()
@@ -718,7 +718,7 @@ class Deployment:
         return getattr(runtime, action)()
 
     def retire_gpu_configuration(self, generation):
-        """Internal pre-exposure retirement; full GPU-to-CPU release is still gated."""
+        """Internal pre-exposure retirement under the original GPU lifecycle."""
         from scripts.deploy_gpu_retirement import GPURetirement
 
         self.require_locked()
@@ -731,7 +731,7 @@ class Deployment:
             return GPURetirement(self, node, binding, generation).run()
 
     def gpu_worker_ready(self, generation, release, *, wait=False):
-        """Internal observation only; full GPU apply/exposure remains closed."""
+        """Observe the original candidate before coordinated exposure."""
         from scripts.deploy_gpu_readiness import GPUReadiness
 
         check = GPUReadiness(self, generation, release)
@@ -744,7 +744,7 @@ class Deployment:
         return GPUWorkerRecovery(self, generation, release).run()
 
     def check_gpu_candidate(self, generation, release, *, cleanup=False, round_id=None):
-        """Internal fixed real queue check; public activation remains closed."""
+        """Run the fixed real queue check within coordinated preparation."""
         from scripts.deploy_gpu_check import GPUCandidateCheck
 
         return GPUCandidateCheck(self, generation, release).run(cleanup=cleanup, round_id=round_id)
@@ -772,12 +772,12 @@ class Deployment:
         self.service(generation, "worker")
         self.check(generation, self.state["operation"]["id"])
 
-    def require_cpu_lifecycle(self, manifest=None):
-        """Until full GPU coordination is connected, CPU paths cannot retire its state."""
+    def needs_gpu_lifecycle(self, manifest=None):
+        """GPU generations and retained history always use their original lifecycle."""
         state = self.state or {}
         operation = state.get("operation") or {}
         generations = (state.get("current"), operation.get("previous"), operation.get("candidate"))
-        if (
+        return bool(
             (manifest is not None and "gpu" in manifest)
             or any(value and "gpu" in value.get("manifest", {}) for value in generations)
             or state.get("gpu_configuration")
@@ -792,20 +792,32 @@ class Deployment:
             or state.get("gpu_releases")
             or state.get("gpu_workers")
             or state.get("gpu_checks")
-        ):
+        )
+
+    def require_coordinated_binding(self):
+        """Reject missing or pending original attachment before database access."""
+        self.require_locked()
+        self.check_gpu_attachment()
+        attachment = (self.state or {}).get("gpu_attachment")
+        if "gpu" not in self.config or not attachment or attachment.get("phase") != "attached":
+            raise DeploymentError("GPU deployment requires the attached original GPU node")
+
+    def require_cpu_lifecycle(self, manifest=None):
+        """The CPU implementation cannot replace any original GPU state."""
+        if self.needs_gpu_lifecycle(manifest):
             raise DeploymentError(
                 "GPU release activation or recovery requires the coordinated GPU lifecycle; "
                 "the CPU path cannot replace its original database or worker"
             )
 
     def expose_gpu(self, generation, release, phase="active"):
-        """Internal durable exposure; public GPU apply/recover still refuse."""
+        """Durable exposure after complete coordinated preparation."""
         from scripts.deploy_gpu_exposure import GPUExposure
 
         return GPUExposure(self, generation, release, phase=phase).run()
 
     def apply_coordinated(self, release, digest, *, initial_content=False):
-        """Internal whole-site flow; public GPU apply remains gated for acceptance."""
+        """Whole-site lifecycle selected by public commands for GPU state."""
         from scripts.deploy_gpu_release import GPURelease
 
         return GPURelease(self).apply(release, digest, initial_content=initial_content)
@@ -1037,13 +1049,30 @@ def main():
             if options.action in {"apply", "recover", "maintain"}:
                 deployment.check_gpu_attachment()
             if options.action == "apply":
+                release = options.release.resolve()
+                manifest = verify(release, options.sha256)
+                coordinated = deployment.needs_gpu_lifecycle(manifest)
+                if coordinated:
+                    deployment.require_coordinated_binding()
                 with deployment.database.operation_lock():
-                    deployment.apply(
-                        options.release.resolve(), options.sha256, options.initial_content
-                    )
-            elif options.action in {"recover", "maintain"}:
+                    if coordinated:
+                        deployment.apply_coordinated(
+                            release, options.sha256, initial_content=options.initial_content
+                        )
+                    else:
+                        deployment.apply(release, options.sha256, options.initial_content)
+            elif options.action == "recover":
+                coordinated = deployment.needs_gpu_lifecycle()
+                if coordinated:
+                    deployment.require_coordinated_binding()
                 with deployment.database.operation_lock():
-                    getattr(deployment, options.action)()
+                    if coordinated:
+                        deployment.recover_coordinated()
+                    else:
+                        deployment.recover()
+            elif options.action == "maintain":
+                with deployment.database.operation_lock():
+                    deployment.maintain()
             elif options.action == "attach-gpu":
                 deployment.attach_gpu()
             elif options.action != "status":

@@ -2,7 +2,7 @@
 
 通过真实编程练习学习计算知识：用结构化知识导航找到学习方向，也可以直接筛题、写代码、运行和提交。
 
-当前交付为**已完成本地验收的自部署版本**。默认 Docker Compose 包含真实 CPU/WASI 评测；可选覆盖文件提供本地 CPU AI 辅导。GPU 的冻结版本已通过[本地公开样例](docs/acceptance-gpu0-startup.md)，以及临时站点的两题正式提交与计时、中英文榜单、撤回和 CPU→GPU→GPU→CPU 正常切换。新的进程观察与资源恢复实现也已通过站点完整启动、两题 API、worker 中断以及不同发布包升级和曝光恢复；[公共部署入口与完整 GPU Compose 仍在推进](docs/acceptance-gpu-site.md)。[容器 worker/Compose 入口](docs/deployment/container-gpu-worker.md)和[统一发布包](docs/deployment/releases.md#gpu-release)已接通，正式题型尚未发布，网站 GPU 提交默认关闭。公开运营和项目许可证仍待维护者决定。产品需求见 [PRD.md](PRD.md)，完整范围与未完成项见[需求追踪](docs/requirements.md)。
+当前交付为**已完成本地验收的自部署版本**。默认 Docker Compose 包含真实 CPU/WASI 评测；可选覆盖文件提供本地 CPU AI 辅导。GPU 的冻结版本已通过[本地公开样例](docs/acceptance-gpu0-startup.md)，以及临时站点的两题正式提交与计时、中英文榜单、撤回和 CPU→GPU→GPU→CPU 正常切换。新的进程观察与资源恢复实现也已通过站点完整启动、两题 API、worker 中断以及不同发布包升级和曝光恢复；[公共 GPU apply/recover 也已实测通过，完整 GPU Compose 继续验收](docs/acceptance-gpu-site.md#public-command-success)。[容器 worker/Compose 入口](docs/deployment/container-gpu-worker.md)和[统一发布包](docs/deployment/releases.md#gpu-release)已接通，正式题型尚未发布，网站 GPU 提交默认关闭。公开运营和项目许可证仍待维护者决定。产品需求见 [PRD.md](PRD.md)，完整范围与未完成项见[需求追踪](docs/requirements.md)。
 
 ## 可以做什么
 
@@ -78,7 +78,7 @@ uv sync --frozen --group browser
 | 目录 | 职责 |
 | --- | --- |
 | `core/` | 知识与题目版本、账户、Web 页面、队列与资源预约 |
-| `judge/` | 可信结果比较、WASI 执行器、gVisor 适配器及开发中的 GPU 组件 |
+| `judge/` | 可信结果比较、WASI 执行器、gVisor 适配器及 GPU 执行与控制组件 |
 | `learning/`, `challenges/` | 私有学习记录、实践证据、成就与固定版本挑战 |
 | `community/` | 题解、讨论、博客、版本题目反馈、评论与审核申诉 |
 | `organizations/` | 组织角色、版本课程、第三方题库归属和发布 |

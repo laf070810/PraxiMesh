@@ -81,6 +81,18 @@ docker exec praximesh-postgres pg_isready --username postgres
 
 候选 Web/worker 来自同一固定发布包。worker 每次启动均重新执行真实隔离探针；协调器要求本候选 worker 在本次容器启动之后发布匹配指纹的心跳。候选验证实际运行一份正确和一份错误程序，核对执行主机、制品、策略和结果，清理自己的测试数据，再恢复入口与切换代理。
 
+<a id="gpu-release"></a>
+
+### 为原站点接入 GPU
+
+公共 `apply/recover` 已接通 GPU 生命周期。已实测的安装顺序是先按本页部署 CPU/WASI 站点，再接入明确授权、持续独占的单卡。GPU 需要私有 rootless Docker、固定驱动/管理制品和[同源四镜像包](releases.md#gpu-release)；先按[原节点绑定](container-gpu-worker.md#coordinator-binding)准备并执行 `attach-gpu`，保留原配置、数据库、设备锁和私有状态。
+
+绑定完成后，使用上面的同一条 `apply` 命令指定四镜像发布目录，升级时不加 `--initial-content`。工具按目标包和原 GPU 历史选择完整流程；Web、CPU/GPU worker、原库排空与冻结、候选队列和曝光统一受控。每次 GPU 启动都重新完成全部检查，最长启动预算为 72 分钟，不能用旧就绪记录跳过。准备目标库和完整环境失败时不会开放 GPU 提交。
+
+恢复始终使用原配置、原状态的 `recover`；曝光后的用户写入保留在已开放库。需要切回 CPU 时，对同一站点 `apply` 已核验的 format 1 包，协调器先停止原 GPU worker 并安全退出配置，仍保留节点与历史。不能删除 GPU 记录或改走旧 CPU 内部函数绕过恢复。
+
+GPU worker 就绪与题库发布是两件事。默认目录仍不包含 CUDA 候选；按[CUDA 内容检查](gpu.md#cuda-content)完成相应版本的参考解/错解验收和维护者发布，不用示例全量包覆盖现有目录。临时站点的两题 API、升级、中断及公共命令范围见[真实验收记录](../acceptance-gpu-site.md#public-command-success)。
+
 这是维护窗口部署：完整备份、验证、迁移和新探针期间站点返回 503。需预留候选库、备份及镜像的磁盘空间。发布进程不允许后台维护命令绕过它；定时维护必须使用同一配置/状态的 `deploy.py maintain`，它与发布共享文件锁和 PostgreSQL 会话锁。忙时维护可失败并在下个周期重试。
 
 ## 中断、失败与恢复

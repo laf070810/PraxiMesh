@@ -7,22 +7,22 @@
 | 方式 | 适用场景 | 组成与数据 | 真实评测与 AI | 操作入口 |
 | --- | --- | --- | --- | --- |
 | **Docker Compose 单机自部署** | 自己使用、内网体验或小规模使用，希望少配置、通过服务器 IP 做题 | Web + worker；SQLite 命名卷；默认 HTTP `0.0.0.0:8000` | 默认七种 CPU/WASI 评测；可选本地 CPU 模型或已有 HTTPS 模型服务 | [Compose 完整操作](compose.md) |
-| **发布协调器单机部署** | 需要域名/HTTPS、PostgreSQL、分离数据库权限、受控升级和失败恢复的长期站点 | Caddy + 固定 Web/worker 镜像 + PostgreSQL；私有配置、部署状态与备份 | worker 通过真实检查后开放评测；AI 使用预先配置的 HTTPS 服务 | [生产部署完整操作](production.md) |
+| **发布协调器单机部署** | 需要域名/HTTPS、PostgreSQL、分离数据库权限、受控升级和失败恢复的长期站点 | Caddy + 固定 Web/worker 镜像 + PostgreSQL；私有配置、部署状态与备份 | CPU/GPU worker 各自通过完整检查后开放；GPU 需原节点绑定和四镜像包；AI 使用已配置的 HTTPS 服务 | [生产部署完整操作](production.md) |
 | **源码开发环境** | 修改应用、调试页面、编写内容或开发评测器 | Python/uv + Django 开发服务器；默认仓库内 SQLite；回环访问 | 默认不启动评测或 AI；按需单独配置 WASI worker 和模型 | [下方源码开发](#development) |
 | **本地 CUDA 编译工具** | 用自己的编辑器写 CUDA，需要编译检查且不占 GPU | 私有 rootless Docker + 固定 gVisor/NVRTC 镜像；独立状态目录 | 只编译，不运行样例；不需要网站或数据库 | [构建、使用与恢复](local-compiler.md) |
 | **本地 GPU 公开样例** | 已获独占单卡，在自己的编辑器中调试公开 CUDA 样例 | 私有 rootless Docker + 固定控制/任务镜像；原物理状态；无需网站或数据库 | 两轮完整启动与公开样例已实测；每次重新检查，仅返回非正式公开结果 | [构建、首次绑定、运行与恢复](local-gpu.md) |
 | **GPU 宿主 worker（开发验收）** | 已获得独占单卡、准备验证完整 CUDA 控制流程 | 普通用户 systemd + RootlessKit/Podman/runsc；持久私有目录与同一应用数据库 | 每次启动完整检查；新 CUDA 路径尚未验收，网站 GPU 提交关闭 | [配置与生命周期](gpu.md#gpu-worker) |
-| **GPU 容器 worker（开发验收）** | 已有 PostgreSQL，准备使用固定镜像和 Compose 验证专用 GPU 节点 | 原私有 rootless Docker、锁/journal、数据库网络；可制作统一四镜像发布包 | 无设备预检与完整启动分开；真实 GPU、队列及升级仍待验收 | [构建、配置和 Compose](container-gpu-worker.md)、[统一发布包](releases.md#gpu-release) |
+| **GPU 容器 worker（开发验收）** | 已有 PostgreSQL，准备使用固定镜像和 Compose 验证专用 GPU 节点 | 原私有 rootless Docker、锁/journal、数据库网络；可制作统一四镜像发布包 | 协调器路径已有真实 GPU/队列/升级结果；独立 Compose 硬件仍待验证 | [构建、配置和 Compose](container-gpu-worker.md)、[统一发布包](releases.md#gpu-release) |
 
 **想直接用起来，选 Compose。** 想同时体验本地 AI，给同一方案加上 `compose.ai.yaml`。有正式数据库、HTTPS 和受控升级要求时，选择发布协调器；它目前同样是单主机方案，没有交付多机高可用部署。
 
-前三种方式沿用同一套账号、内容版本、学习、社区、组织、项目和挑战功能，主要差别在服务启动、数据存储、网络配置与升级保障。已验收的七种评测均为 CPU/WASI；GPU 宿主和容器入口用于后续独占硬件验收，**目前网站没有开放 GPU 题型**。独立 GPU Compose worker 使用 PostgreSQL，不能直接挂入默认 SQLite 单机方案的数据卷。
+前三种方式沿用同一套账号、内容版本、学习、社区、组织、项目和挑战功能，主要差别在服务启动、数据存储、网络配置与升级保障。默认七种评测使用 CPU/WASI；容器 GPU 的正式提交及协调器发布已有实测，操作见[生产 GPU 入口](production.md#gpu-release)。默认目录尚未发布 CUDA 候选，GPU 允许列表为空时仍关闭 GPU 提交。独立 GPU Compose worker 使用 PostgreSQL，不能直接挂入默认 SQLite 单机方案的数据卷。
 
-需要保存或分发匹配的 Web、CPU worker、GPU worker 和任务镜像时，使用[四镜像发布包](releases.md#gpu-release)。它提供统一构建、校验与导入；协调器可先完成[原 GPU 节点绑定](container-gpu-worker.md#coordinator-binding)。[内部整站发布与恢复](container-gpu-worker.md#whole-site-release)已串接，真实环境验收仍待完成；公共协调器当前只激活两镜像 CPU 包。
+需要保存或分发匹配的 Web、CPU worker、GPU worker 和任务镜像时，使用[四镜像发布包](releases.md#gpu-release)。它提供统一构建、校验与导入；协调器可先完成[原 GPU 节点绑定](container-gpu-worker.md#coordinator-binding)。[整站发布与恢复](container-gpu-worker.md#whole-site-release)已接入同一公共 `apply/recover`；两镜像包用于 CPU，四镜像包用于已绑定的 GPU 节点。
 
-GPU 0 已通过[两轮完整启动与本地公开样例](../acceptance-gpu0-startup.md)，网站正式 Submit、队列和发布仍需单独验收。准备执行节点或排障时使用 [GPU 单卡环境检查](gpu.md#重放单卡环境检查)及[内核组件检查](gpu.md#重放内核正确性检查)。显卡被占用时，可按 [GPU 指南的检查入口表](gpu.md#validation-options)选择控制链、离线 runsc、异常恢复、可信容器监督、容器内 runsc 或[控制端 UID/锁映射检查](gpu.md#container-controller)；它们只运行固定 CPU 程序，尚不能作为接收学员提交的 GPU 部署方案。
+GPU 0 已通过[两轮完整启动与本地公开样例](../acceptance-gpu0-startup.md)，网站两题正式 Submit、队列、升级和公共命令也已通过[独立站点验收](../acceptance-gpu-site.md#public-command-success)。准备执行节点或排障时使用 [GPU 单卡环境检查](gpu.md#重放单卡环境检查)及[内核组件检查](gpu.md#重放内核正确性检查)。显卡被占用时，可按 [GPU 指南的检查入口表](gpu.md#validation-options)选择控制链、离线 runsc、异常恢复、可信容器监督、容器内 runsc 或[控制端 UID/锁映射检查](gpu.md#container-controller)；它们只运行固定 CPU 程序，尚不能作为接收学员提交的 GPU 部署方案。
 
-[单卡设备节点检查](gpu.md#container-device-nodes)属于需要明确授权的真实设备接入，即使固定程序只读取节点信息也不能当作无设备 CPU 检查。该开发入口仍待修复后实测，不是 GPU Compose 启动方式。
+[单卡设备节点检查](gpu.md#container-device-nodes)属于需要明确授权的真实设备接入，即使固定程序只读取节点信息也不能当作无设备 CPU 检查。该组件已在限定版本上实测；它不是 GPU Compose 的启动命令。
 
 ## Compose：直接做题和使用可选 AI
 
@@ -101,8 +101,8 @@ uv sync --frozen
 | 只运行 `docker build` 或 `release.py load` | 分别完成镜像构建或导入；不会自动启动完整服务、迁移数据库或激活站点 |
 | 运行 `*acceptance.py` | 在可销毁环境做验证，脚本会清理自有服务和数据；日常站点应使用对应安装入口 |
 | 配好 Git 远端后是否还要部署 runner | 应用/WASI CI 使用托管 runner；只有自动操作发布协调器时才需专用部署 runner，见 [CI 接入](ci.md) |
-| 添加 GPU 或 Actions runner 后能否评测 CUDA | 还需 GPU 评测器、隔离、设备预约及真实验收；已定位的 rootless CPU 配额问题和实施顺序见 [GPU 准备](gpu.md) |
-| WASI、gVisor 是其他部署套餐吗 | 它们是代码执行后端。当前两种自部署入口使用已验证的 WASI；当前 gVisor GPU 全路径仍待硬件验收，安装运行时本身不能开放 GPU 提交 |
+| 添加 GPU 或 Actions runner 后能否评测 CUDA | 还需持续独占单卡、匹配制品、原节点绑定和每次完整启动；操作见[生产 GPU 入口](production.md#gpu-release)，环境准备见 [GPU 指南](gpu.md) |
+| WASI、gVisor 是其他部署套餐吗 | 它们是代码执行后端。默认 CPU 入口使用 WASI，GPU 容器路径使用已实测的 gVisor；仅安装运行时不会开放 GPU 提交 |
 | 页面能打开但不能评测 | 先看 `/health/` 的 `evaluation` 和 worker 日志，再按[排障手册](operations.md)检查探针、心跳、暂停和额度 |
 
 ## 按任务查阅
@@ -114,7 +114,7 @@ uv sync --frozen
 | 监控、排障、数据库备份与恢复演练 | [operations.md](operations.md) |
 | 制作、校验和导入不可变发布包 | [releases.md](releases.md) |
 | 接入 GitHub CI、部署 runner 和检查作业等待原因 | [ci.md](ci.md) |
-| 准备 GPU 评测节点、修复 rootless CPU 委派与安排实现 | [gpu.md](gpu.md)，GPU 尚未交付 |
+| 准备 GPU 评测节点、修复 rootless CPU 委派与安排实现 | [gpu.md](gpu.md)、[生产 GPU 入口](production.md#gpu-release) |
 | 单独构建 WASI 或开发执行后端 | [wasi.md](wasi.md) |
 | 研究尚未验收的 gVisor 后端 | [gvisor.md](gvisor.md)，不作为已交付部署方案 |
 | 已有模型接入、协议限制及模型验证 | [ai.md](ai.md) |

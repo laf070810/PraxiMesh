@@ -1,8 +1,20 @@
 # 独立临时站点的 GPU 发布验收
 
-更新：2026-11-16。**GPU 网站部署尚未验收通过，公共激活入口仍关闭。** 本页记录 [RFC-026](rfcs/026-gpu-site-hardware-rehearsal.md) 的真实临时站点检查；[本地完整 GPU 启动与公开样例](acceptance-gpu0-startup.md)已有独立通过结果。
+更新：2026-11-16。**公共 GPU 发布/恢复命令已通过本页所列临时站点验收。** 独立 GPU Compose、正式题库发布及目标站点仍须分别完成。本文记录 [RFC-026](rfcs/026-gpu-site-hardware-rehearsal.md) 的实际检查；[本地 GPU 公开样例](acceptance-gpu0-startup.md)另有独立结果。
 
-当前进展：内部完整启动、两题正式 API、计时分享、worker 丢失恢复和不同发布包升级的两处协调器中断已通过。公共命令候选 `3193c35` 的冻结制品与 CPU 应用通过，但 GPU 验收期间出现外部 Slurm 占用；已自动回到原 CPU 代并核对数据保留，成功流程尚未执行完。完整 PostgreSQL/GPU Compose 仍在独立分支实施。
+当前进展：内部完整启动、两题正式 API、计时分享、worker 丢失恢复和不同发布包升级的两处协调器中断已通过。`3193c35` 的公共命令首次因外部 Slurm 占用退出并恢复原 CPU 代；之后在重新确认空闲的 GPU 0 上完成成功流程。原失败保留，完整 PostgreSQL/GPU Compose 继续独立验收。
+
+<a id="public-command-success"></a>
+
+## 公共 apply/recover 成功与独立审计
+
+同一原站点从 CPU 代 `47a13f1dd22b` 经正式 `apply` 进入 GPU 代 `f3f88c21af6d`。worker `50b290f2d0bb44147ae14b452b31fade793b02eabec691082c646c87dd4e2ab9` 于 2026-11-15 18:11:24 UTC 启动，完整 24 阶段、候选正确/错误队列检查及清理均通过。
+
+在曝光决定已经持久保存、实际路由已经开放但调用尚未返回时，暂停原调用者，经正常 HTTPS 增加一项 CPU Submit，再对这个原调用者执行 SIGKILL。正式 `recover` 返回成功，原 GPU worker 的完整容器 ID 和启动时间不变，新写入保留。随后普通 API 的正确 GPU Submit `739ee232-ef6b-473d-aa4a-76b161ea6f07` 为 accepted，完整环境指纹为 `83fcd46123ec0ca73b8e36700e59a2217dfbe0b4bbd88cdb90982b04a7d3b8cc`。
+
+再经正式 `apply` 切换到 CPU 代 `77e8512f6f46`，原 GPU worker 正常退出，配置退出，新的 CPU Submit `fb5c329c-28c0-4376-afeb-22e4f767c5d9` 正确。18:45 UTC 的独立审计逐一比较三组切换快照：55 张业务表和 33 个序列保留；最后库中共有 695 条业务记录，15 个登记 GPU worker 均不再运行，自有活动任务与物理预约为零，GPU 0 清单为空。原真实 Web、CPU worker 和 tutor 的身份、启动时间及健康与此前审计一致。
+
+源提交 `3193c35aa5c393c8f9c2f5814023fa5c5eadddd1` 的[应用 CI](https://github.com/laf070810/PraxiMesh/actions/runs/43742625236)与[完整 WASI CI](https://github.com/laf070810/PraxiMesh/actions/runs/43742625255)均成功。实际命令、原响应及 `final-audit.json` 在 `test-results/uvm-releases-2026-11-15/owned-public-cli-17/`；原数据库、归档和历史继续保留。命令操作统一见[生产部署的 GPU 入口](deployment/production.md#gpu-release)。本次验证的是已有 CPU 站点的 GPU 接入及恢复，不外推为独立 Compose 或其他主机已通过。
 
 <a id="public-command-attempt"></a>
 

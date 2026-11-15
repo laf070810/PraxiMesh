@@ -19,7 +19,7 @@ GPU 当前进度：`6e40ba7` 已通过本地与站点完整启动、两题十四
 | R-13 社区、榜单与活动 | 版本题解、讨论/评论、题目反馈/错误报告/修订建议、举报审核申诉、撤回、自愿可比榜单、成就及挑战 | 既有社区、挑战和版本反馈已验收；G20 接入逐条确认的 GPU 计时分享、同版本同环境分榜及撤回，数据/权限/中英界面通过非 GPU 验证；冻结版本的两题真实 GPU 计时、双账号分榜、中英四种宽度和撤回已验收；完整部署仍待完成 |
 | R-14 中英体验 | 界面切换、内容翻译、缺失回退、稳定 ID 与权限一致 | 中英界面、20 节点/10 题英文和明确回退已验证；F 反馈中英界面及英文移动页通过镜像/HTTPS 浏览器 |
 | R-15 多阶段/本地工具 | 项目阶段与总进度、本地公开测试、认证提交工具，官方评分仍由可信 worker 产生 | 四阶段项目、WASI 本地工具、令牌 API 和幂等提交已通过真实全链路；G18 接入 CUDA 公开包下载与远程提交，[G63](acceptance-g63.md) 接入真实无设备隔离编译及中断恢复，[G64](acceptance-g64.md) 补齐独立公开任务协议，[G65](acceptance-g65.md) 整理共用启动流程，[G66](acceptance-g66.md) 接通内部本地执行与原操作恢复，[G67](acceptance-g67.md) 接入固定控制入口和有界管道；[G68](acceptance-g68.md) 补齐宿主原状态和外层容器登记/恢复组件，[G69](acceptance-g69.md) 接通完整管道调用、成功退出与内部终态联合确认、公开 CLI 和双镜像构建；[GPU 0 实测](acceptance-gpu0-startup.md)已通过两轮完整启动及两题公开样例 |
-| R-16 专业评测 | GPU、ML、科学计算、Agent 的实际运行、明确指标和限制、可比环境 | 三类 CPU/WASI 契约、指标、租约、资源预约和本人进度已集成；GPU 宿主 worker、持久成绩、学习证据、健康准入与独立路由已接通并做非 GPU 验证，部分早期 CUDA 正确性/故障已有实测；G19 已注册 CUDA 内容契约并提供候选、组合及 API 验收工具；本地完整启动与公开样例已实测；冻结版本的正式 worker、两题十四项 API/性能、实际浏览器分享及旧版 CPU→GPU→CPU 已通过；新版本完整 GPU 发布矩阵仍待完成 |
+| R-16 专业评测 | GPU、ML、科学计算、Agent 的实际运行、明确指标和限制、可比环境 | 三类 CPU/WASI 契约、指标、租约、资源预约和本人进度已集成；GPU 宿主 worker、持久成绩、学习证据、健康准入与独立路由已接通并做非 GPU 验证，部分早期 CUDA 正确性/故障已有实测；G19 已注册 CUDA 内容契约并提供候选、组合及 API 验收工具；本地完整启动与公开样例已实测；冻结版本的正式 worker、两题十四项 API/性能、实际浏览器分享及旧版 CPU→GPU→CPU 已通过；公共发布命令及实际中断恢复已通过，独立 GPU Compose、正式题库发布与目标站点仍待完成 |
 | R-17 生态 | 自愿公开主页/作品、博客、组织课程和角色、第三方题库来源/命名空间/审核/版本/撤回 | 博客、课程、组织角色及独立审核发布/撤回已集成；C4 镜像浏览器、B2→C 升级与 C5 HTTPS 已验证 |
 | R-18 智能学习 | 分层提示、诊断、个性化路径/复习、综合证据、可选真实 AI 辅导 | 私有目标与版本计划、多维证据、诊断、预览后发送已集成；真实 CPU 模型及关闭状态的浏览器已验证；默认不启动模型，选择 Compose AI 覆盖文件可直接启用 |
 
@@ -47,7 +47,7 @@ GPU 当前进度：`6e40ba7` 已通过本地与站点完整启动、两题十四
 
 | 未完成项 | 当前证据与限制 | 后续完成所需条件 |
 | --- | --- | --- |
-| GPU 题型（§2.2 C、§4.2/4.4、R-16） | [G1](acceptance-g1.md)、[G2](acceptance-g2.md) 有早期单卡正确性与故障实测；当前 worker、持久成绩、健康准入、CUDA 候选内容、编辑和分享已接入。[G42](acceptance-g42.md) 通过统一四镜像制品检查，[G56](acceptance-g56.md) 实现内部完整发布恢复编排，公共 GPU 激活仍关闭。[G57](acceptance-g57.md) 的 77 项真实 PostgreSQL 检查及 [G59](acceptance-g59.md) 的当前 CPU 发布矩阵通过；设备和成绩的模型结果不代表当前 GPU 路径或性能通过。分批实现与原始失败记录保留在下方。 | 2026-11-15 已获维护者重新授权使用 GPU 0，[本地 GPU 命令](deployment/local-gpu.md)两轮完整启动及公开样例已通过。两题正式 API、计时分享及正常 CPU→GPU→GPU→CPU 已通过；继续验证实际发布中断、原库恢复与新写入保留，再开放完整网站 GPU 入口；范围见[GPU 0 记录](acceptance-gpu0-startup.md)。 |
+| GPU 题型（§2.2 C、§4.2/4.4、R-16） | [G1](acceptance-g1.md)、[G2](acceptance-g2.md) 有早期单卡正确性与故障实测；当前 worker、持久成绩、健康准入、CUDA 候选内容、编辑和分享已接入。[G42](acceptance-g42.md) 通过统一四镜像制品检查，[G56](acceptance-g56.md) 实现内部完整发布恢复编排，后续真实公共命令已通过。[G57](acceptance-g57.md) 的 77 项真实 PostgreSQL 检查及 [G59](acceptance-g59.md) 的当前 CPU 发布矩阵通过；设备和成绩的模型结果不代表当前 GPU 路径或性能通过。分批实现与原始失败记录保留在下方。 | 2026-11-15 已获维护者重新授权使用 GPU 0，[本地 GPU 命令](deployment/local-gpu.md)两轮完整启动及公开样例已通过。两题正式 API、计时分享、CPU→GPU→GPU→CPU、实际进程中断、原库恢复与新写入保留已通过，公共 `apply/recover` 已接通；继续验证独立 GPU Compose、发布候选题与目标主机，范围见[站点记录](acceptance-gpu-site.md#public-command-success)。 |
 | 专用部署 runner 与 CD（§8.2、R-09） | 实现提交 `fa58c7a` 与当前发布包源提交 `0b9a69c` 均已通过[托管应用与完整 WASI 工作流](acceptance-hosted-ci.md)，含 HTTPS、发布和迁移失败/中断恢复。专用部署工作流仍需单独接入目标站点，默认操作为 `status`；此前 runner 管理 API 的未认证 401 不能证明注册情况。 | 按 [CI 指南](deployment/ci.md)设置受信运维仓库/有效访问限制、分支/environment、专用部署节点，再验收状态、发布和恢复。部署 runner 不依赖 GPU；代码 CI 成功不代替目标站点验收。 |
 | 目标站点运维（§8.2/8.4、AC-07） | 本地固定镜像、回环 HTTPS、备份恢复、升级与容量样本已验证；没有指定长期部署目标。 | 在目标主机验收服务监管、容量、公有证书与续期、日志/备份保留和故障恢复。公开运营仍按维护者决定后续处理。 |
 | 开源与公开发布政策（§1、§8.3、§13） | `LICENSES.md` 仍为待确认状态；`SECURITY.md` 尚无正式私密报告渠道和负责人。维护者明确先交付自部署、公开运营及许可证后定。 | 维护者确认代码/内容/投稿授权，以及需要公开运营时的品牌、资源、治理、隐私和安全响应安排。开发者不能代为批准这些事项。 |
@@ -57,6 +57,8 @@ GPU 当前进度：`6e40ba7` 已通过本地与站点完整启动、两题十四
 2026-10-24 开发指南交付后的只读查询记录在 `test-results/post-onboarding-blockers-1.json`；其中无远端的历史条件已被 2026-10-30 的 GitHub 接入解除。CPU 委派缺口随后由维护者修复，实际限额结果见 `test-results/cpu-controller-restored/result.json`。候选 runsc 的精确驱动版本列表检查见 `test-results/gpu-runtime-preflight/result.json`；后续单卡 CUDA 样例与实际节流已通过，范围及失败修正见 [RFC-018](rfcs/018-gpu-environment-probe.md)。nvproxy 会将受支持的 GPU 调用转交宿主 NVIDIA 驱动，驱动本身仍在信任边界内，详见 [gVisor GPU 官方指南](https://gvisor.dev/docs/user_guide/gpu/)。
 
 ## 分批结果
+
+- 2026-11-16 R-09/16 公共 GPU 命令通过：`3193c35` 的原 worker 完成 24 阶段和候选队列；曝光调用真实 SIGKILL 后，正式 `recover` 保留同一 worker 启动和新增写入，普通 GPU Submit 正确，再经正式 `apply` 切回 CPU 并完成新提交。独立审计比较三组 55 表/33 序列快照，15 个 GPU worker 均停止、任务/预约为零；该源提交的应用及完整 WASI CI 均成功。实际范围见[公共命令记录](acceptance-gpu-site.md#public-command-success)，完整 GPU Compose 和内容发布继续保留。
 
 - 2026-11-16 R-09/16 公共 GPU 命令候选：`3193c35` 分支的 263 项组件、十项无设备 worker 与完整 CPU 应用验收通过。正式 `apply` 的 GPU 启动期间出现外部 Slurm 占用，检查拒绝继续并自动恢复原 CPU 代；55 张业务表、33 个序列、684 条记录及原真实服务保留，自有任务/设备预约为零。该结果证明失败关闭和回退，公共成功流程及完整 GPU Compose 仍待完成，见[公共命令尝试](acceptance-gpu-site.md#public-command-attempt)。
 

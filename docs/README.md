@@ -24,10 +24,11 @@
 - [RFC-038：嵌套 sandbox 的 OOM 优先级](rfcs/038-nested-sandbox-oom-priority.md)、[ADR-092](adr/092-nested-sandbox-oom-priority.md) — 固定提高原 sandbox 淘汰优先级，整任务限额和恢复门槛不变
 - [RFC-039：退出期间的当前查询身份](rfcs/039-terminating-task-sampled-identities.md)、[ADR-093](adr/093-terminating-task-sampled-identities.md) — 维护故障的原实例确认、查询内句柄和退出后完整空清单
 - [RFC-040：首次 GPU 曝光确认丢失](rfcs/040-initial-gpu-exposure-acknowledgement.md)、[ADR-094](adr/094-initial-gpu-exposure-acknowledgement.md) — 首次发布中断沿原实例续跑，已退出对象仍执行原库完整恢复
+- [RFC-041：统一 CPU/GPU 发布命令](rfcs/041-public-gpu-deployment-entry.md)、[ADR-095](adr/095-public-gpu-deployment-dispatch.md) — 公共 CPU/GPU 分派、数据库前原绑定检查与真实命令验收
 - [GitHub 托管应用与 WASI 验收](acceptance-hosted-ci.md) — 按确切提交记录工作流结果和故障定位；专用部署节点与 GPU 仍需分别验收
 - [旧 F→当前 CPU 整站升级](acceptance-f-current.md) — 真实旧应用、三项迁移、数据保留、HTTPS/WASI 与清理通过
 - [F 升级准备与当前 CPU 发布包验收](acceptance-upgrade-preparation.md) — 保留历次目标包、准备阶段和原始失败
-- [当前源码的 CPU 与四镜像发布包](acceptance-current-releases.md) — 同源制品核验、导入及无设备应用验收；公共 GPU 激活仍关闭
+- [当前源码的 CPU 与四镜像发布包](acceptance-current-releases.md) — 同源制品核验、导入及无设备应用验收；实际 GPU 激活另见站点记录
 - [私有构建目录的镜像源码权限](acceptance-image-staging.md) — 非 root 入口读取修复与无设备镜像检查
 - [G71：当前默认 Compose 的完整重放](acceptance-g71.md) — 当前镜像内真实评测、直接 IP、离线关闭与重建保留通过
 - [G70：父镜像清理、桥接退出同步与无设备工具验证](acceptance-g70.md)

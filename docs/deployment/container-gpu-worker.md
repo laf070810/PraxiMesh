@@ -1,6 +1,6 @@
 # 容器 GPU worker：构建、配置与启动
 
-适用于已经使用 PostgreSQL、准备在 Linux x86_64 节点验收独占单卡 CUDA 评测的维护者。专用 worker 命令、固定镜像和独立 Compose 文件已提供；完整启动、两题普通 API 和 CPU→GPU→GPU→CPU 正常切换已有[真实证据](../acceptance-gpu-site.md)，**进程观察修复已通过专项检查，完整恢复验收未完成，公共激活仍关闭**。当前普通单机 Compose 的 SQLite 数据不能直接接入这个 worker。方案比较见[部署首页](README.md)，检查目录见 [GPU 指南](gpu.md#validation-options)。
+适用于已经使用 PostgreSQL、准备在 Linux x86_64 节点运行独占单卡 CUDA 评测的维护者。固定镜像及专用 worker 已提供；协调器路径的完整启动、两题普通 API、升级、进程中断与公共 `apply/recover` 已通过[真实验收](../acceptance-gpu-site.md#public-command-success)。独立 Compose 的硬件与完整生命周期仍须另行验收，默认 SQLite 卷不能直接接入。用户操作统一见[生产 GPU 入口](production.md#gpu-release)，方案比较见[部署首页](README.md)。
 
 它复用原有账号、题目版本、GPU 预约和队列。可信控制容器使用数据库网络和私有 Docker socket；学员任务继续在单独的无网络 gVisor guest 中运行，拿不到这些挂载或数据库凭据。初始化、完整二十四阶段、当前私有凭证、领取、取消和隔离停用均由同一生命周期完成。
 
@@ -80,7 +80,7 @@ export PRAXIMESH_GPU_TASK_IMAGE="$(.venv/bin/python -c 'import json,sys; print(j
 
 ## 将原节点绑定到发布协调器
 
-此入口面向准备使用 PostgreSQL/HTTPS [发布协调器](production.md)管理 GPU 的新安装，与上文独立 Compose worker 配置二选一。当前已支持节点认领及中断重试；代际数据库切换、GPU worker 生命周期和真实升级仍在接入，`apply` 继续拒绝四镜像 GPU 包。绑定成功不会开放 GPU 提交。
+此入口把原 GPU 节点绑定到 PostgreSQL/HTTPS [发布协调器](production.md#gpu-release)，与独立 Compose worker 配置二选一。节点认领后由公共 `apply/recover` 执行代际切换、完整启动、候选验证及恢复；绑定本身不开放 GPU 提交。
 
 已有 worker、任务或预约的状态不能使用首次绑定。保留其原目录、锁和数据库，由原后端恢复；不能删除 `worker.json`、活动记录或另建锁目录来通过检查。
 
@@ -136,7 +136,7 @@ DOCKER_HOST="unix://$PRAXIMESH_DOCKER_SOCKET" \
 
 已实现身份校验、配置生成和协调器内部的双文件持久发布。发布必须持原协调器/设备锁，确认实际维护路由、原 worker 已停止且禁止自动重启、任务 journal 已清理，以及旧库与目标库都在本次暂停下排空并无物理预约。部署日志保存原目标；节点上的 `deployment-config-transition.json` 在整个切换中阻止 worker 读取，包括标记写到一半的情况。中断只可继续原意图，未知内容保留并失败。
 
-这仍是开发中的内部流程，尚无完成 GPU 生命周期的发布命令；内部容器控制组件见[下节](#worker-lifecycle)。不要手工创建代际记录、移除发布中标记、修改摘要或对已绑定节点套用独立 Compose 的启用步骤。`apply` 继续拒绝 GPU 发布。旧独立 worker 配置保持原行为；旧四镜像包仍可核验，内部发布只接受显式声明 `worker_configuration: generation-pair-v1` 的新制品。
+这是公共发布命令内部使用的配置流程；容器控制组件见[下节](#worker-lifecycle)。不要手工创建代际记录、移除发布中标记、修改摘要或对已绑定节点套用独立 Compose 的启用步骤。旧独立 worker 配置保持原行为；旧四镜像包仍可核验，配置发布只接受显式声明 `worker_configuration: generation-pair-v1` 的兼容制品。
 
 文件/配置与启动边界的无设备组件检查可运行：
 
@@ -158,7 +158,7 @@ DOCKER_HOST="unix://$PRAXIMESH_DOCKER_SOCKET" \
 <a id="worker-lifecycle"></a>
 ### 协调器内部的容器生命周期
 
-`scripts/deploy_gpu_worker.py` 提供固定预检和 worker 的创建、启动、停止与原意图重试，尚未接入完整 GPU 发布命令。预检只读挂载私有配置并连接内部数据库网络；正式 worker 使用原状态、socket、递归只读 procfs 和所选单卡管理映射。凭证不进入参数或容器环境，Docker 客户端使用临时空配置。
+`scripts/deploy_gpu_worker.py` 为公共发布命令提供固定预检和 worker 的创建、启动、停止与原意图重试。预检只读挂载私有配置并连接内部数据库网络；正式 worker 使用原状态、socket、递归只读 procfs 和所选单卡管理映射。凭证不进入参数或容器环境，Docker 客户端使用临时空配置。
 
 创建前保存意图，核验完整运行契约后登记 ID，再允许启动。每次新启动要求本次操作的预检，且预检开始不早于上一 worker 的实际退出时间；记录启动意图后释放设备锁，由 worker 取得原锁。同一启动实例被暂停或重启时不算成功。停止只操作原 ID、契约与启动时间，不抢 worker 的设备锁、不持队列行锁等待、不清空任务或预约。原对象丢失、未知同名对象和未确认的生命周期都须保留现场，不能以删除日志或手工运行 Docker 来绕过。
 
@@ -203,7 +203,7 @@ DOCKER_HOST="unix://$PRAXIMESH_DOCKER_SOCKET" \
   tests/test_deploy_gpu_worker.py tests/test_deploy_gpu_config.py
 ```
 
-文件、锁和被终止的协调器进程是真实的，Docker、数据库及设备就绪是显式模型，范围见 [G49](../acceptance-g49.md)。这仍是开发中的内部入口，没有可用的完整 GPU 发布/回滚命令。公共 CPU 发布与恢复会拒绝已有 GPU 配置、容器或恢复状态，包括 GPU→CPU；不能删除这些记录来走 CPU 恢复路径。完整 Docker/PostgreSQL、GPU 启动、队列及整站恢复尚待实测。
+本专项的文件、锁和被终止进程是真实的，Docker、数据库及设备就绪是显式模型，范围见 [G49](../acceptance-g49.md)。公共 `recover` 现已按原状态选择 GPU 恢复；内部 CPU 方法仍拒绝已有 GPU 状态，不能删除记录来绕过。真实镜像、数据库、GPU 启动与整站恢复另见[站点记录](../acceptance-gpu-site.md#public-command-success)。
 
 <a id="database-freeze"></a>
 ### 协调器内部的原代停机与冻结
@@ -225,12 +225,12 @@ GPU 数据库冻结持有排空锁，直到 runtime 连接权限撤销和现有�
   tests/test_deploy_gpu_config_postgres.py
 ```
 
-当前验证范围见 [G51](../acceptance-g51.md)。停止/冻结已接入[内部整站编排](#whole-site-release)，公共 GPU 激活继续关闭；不能从内部组件检查推断真实部署成功。
+本专项的模型范围见 [G51](../acceptance-g51.md)。停止/冻结已接入[整站编排](#whole-site-release)，实际公共命令结果另见[站点验收](../acceptance-gpu-site.md#public-command-success)；组件检查不替代目标主机验证。
 
 <a id="whole-site-release"></a>
 ### 协调器内部的整站发布与恢复
 
-`scripts/deploy_gpu_release.py` 已将原有组件串接为内部安装、升级和失败恢复流程，记录完整前代、候选代、冻结包路径与恢复尝试。**这不是新增的可用部署方案：公共 GPU `apply/recover` 仍关闭，当前用户启动仍按部署首页选择已验收的 CPU/WASI 方案。** 不应直接调用内部方法或修改私有日志来绕过门槛。
+`scripts/deploy_gpu_release.py` 为公共 `deploy.py apply/recover` 执行安装、升级和失败恢复，记录完整前代、候选代、冻结包路径与恢复尝试。维护者按[生产 GPU 入口](production.md#gpu-release)操作；不直接调用内部方法或修改私有日志绕过门槛。
 
 | 场景 | 内部流程和数据保留 |
 | --- | --- |
@@ -251,7 +251,7 @@ GPU 数据库冻结持有排空锁，直到 runtime 连接权限撤销和现有�
   tests/test_deploy_database.py tests/test_deploy_gpu_recovery.py
 ```
 
-具体范围、失败复现和 CPU 进程中断见 [G56](../acceptance-g56.md)，设计见 [ADR-072](../adr/072-coordinated-gpu-release-recovery.md)。[真实数据库检查](production.md#database-validation)已补验证完整迁移 schema、角色/锁、冻结与复制，结果见 [G57](../acceptance-g57.md)。仍需实际应用/worker 与数据库的完整组合验收，以及获授权独占 GPU 上的完整启动、队列、升级、候选失败回退和曝光后恢复。未完成这些检查前不开放公共入口；数据库辅助代码改变 worker 源码契约，须制作新的匹配制品，不能改写旧包。
+早期模型、失败复现和 CPU 进程中断见 [G56](../acceptance-g56.md)，设计见 [ADR-072](../adr/072-coordinated-gpu-release-recovery.md)。完整迁移、角色/锁、冻结与复制的[数据库检查](production.md#database-validation)见 [G57](../acceptance-g57.md)；后续实际 GPU 启动、队列、升级、曝光前后恢复及公共命令见[站点验收](../acceptance-gpu-site.md#public-command-success)。数据库辅助代码改变 worker 源码契约时须制作匹配新制品，不能改写旧包。
 
 <a id="failed-startup-cpu-rollback"></a>
 ### 未开放的 GPU 候选启动失败
@@ -269,7 +269,7 @@ GPU 数据库冻结持有排空锁，直到 runtime 连接权限撤销和现有�
 
 完整发布流程在回到 CPU 版本前，须先在原 GPU 库完成恢复、排空、停止与冻结，再调用内部配置退出。`scripts/deploy_gpu_retirement.py` 在原设备锁和数据库排空锁下保存退出意图，通过原过渡标记有序移除匹配的两份配置；完成后不再有有效 GPU 配置，节点锁、容器登记、数据库和任务/验证历史仍保留。
 
-曝光决定存在、原库未冻结、worker 未停止、存在任务/预约或未知文件时拒绝退出。中断只能继续同一原配置；不能手工删文件或日志来模拟完成。后续新操作发布新代时不接管退休库的旧暂停 token。此步骤不自行切换 CPU 站点，GPU→CPU 与候选失败回退由上文整站编排协调，仍待实际验收。
+曝光决定存在、原库未冻结、worker 未停止、存在任务/预约或未知文件时拒绝退出。中断只能继续同一原配置；不能手工删文件或日志来模拟完成。后续新操作发布新代时不接管退休库的旧暂停 token。此步骤不自行切换 CPU 站点，GPU→CPU 与候选失败回退由上文整站编排协调，实际结果见[站点验收](../acceptance-gpu-site.md#public-command-success)。
 
 不访问实际服务或 GPU 的检查：
 
@@ -294,7 +294,7 @@ GPU 数据库冻结持有排空锁，直到 runtime 连接权限撤销和现有�
   tests/test_deploy_gpu_check.py tests/test_deploy.py
 ```
 
-验证范围见 [G53](../acceptance-g53.md)。准备已连接内部曝光和上文整站编排，但目前没有可用的公共 GPU apply/回退/恢复命令；实际 Docker、PostgreSQL 和 GPU 需要另行验收。
+本专项范围见 [G53](../acceptance-g53.md)。候选准备现由公共发布命令通过曝光与整站编排调用，真实 Docker、PostgreSQL 和 GPU 结果另见[站点验收](../acceptance-gpu-site.md#public-command-success)。
 
 <a id="durable-exposure"></a>
 ### 协调器内部的持久曝光
@@ -310,7 +310,7 @@ GPU 数据库冻结持有排空锁，直到 runtime 连接权限撤销和现有�
   tests/test_deploy_gpu_exposure_database.py tests/test_deploy_gpu_candidate.py
 ```
 
-实际 PostgreSQL 开放准入与预约快照检查复用上文 `tests/test_deploy_gpu_config_postgres.py` 入口，不能用 SQLite 的跳过结果代替。验证范围见 [G54](../acceptance-g54.md)。这是内部流程；公共 `apply/recover` 仍拒绝 GPU 状态，完整失败回退、GPU→CPU 及真实升级验收还需完成，不应手工修改私有日志来开放。
+实际 PostgreSQL 开放准入与预约快照检查复用上文 `tests/test_deploy_gpu_config_postgres.py` 入口，不能用 SQLite 的跳过结果代替。本专项范围见 [G54](../acceptance-g54.md)，公共 `apply/recover` 的失败回退、GPU→CPU 及真实升级结果另见[站点验收](../acceptance-gpu-site.md#public-command-success)。不手工修改私有日志开放站点。
 
 <a id="candidate-verification"></a>
 ### 协调器内部的候选队列检查
@@ -336,7 +336,7 @@ GPU 数据库冻结持有排空锁，直到 runtime 连接权限撤销和现有�
 .venv/bin/python scripts/postgres_tests.py -q tests/test_deployment_gpu_check_postgres.py
 ```
 
-本轮数据库中的设备和成绩为显式合成记录，实际协调器中断使用自有 CPU 子进程；具体结果和跳过项见 [G50](../acceptance-g50.md)。这不能证明 CUDA 程序、计时或物理恢复通过。新命令进入 worker 源码契约，需要匹配的新冻结制品；旧包核验兼容，但不能执行新协议。完整升级/回滚、真实 GPU 队列和曝光验收仍未完成，公共 `apply` 保持关闭。
+本专项数据库设备和成绩为合成记录，协调器中断使用自有 CPU 子进程；具体范围和跳过项见 [G50](../acceptance-g50.md)。CUDA、计时及物理恢复以[后续真实站点验收](../acceptance-gpu-site.md#public-command-success)为准。新命令进入 worker 源码契约时需要匹配的新冻结制品；旧包可核验不表示支持新协议。
 
 ## Compose 预检与运行
 
