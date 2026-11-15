@@ -73,6 +73,10 @@ def flow(monkeypatch, bundle):
         def observe(self, service=None):
             events.append("task-observed" if service is not None else "idle-observed")
 
+        def observe_termination(self, service):
+            assert service is task.service
+            events.append("termination-observed")
+
     class Service:
         def __init__(
             self, journal, _job, _reservation, *, image, driver_manifest, device_spec, purpose
@@ -179,7 +183,10 @@ def test_controller_fault_uses_original_task_and_cleans_before_return(flow, monk
             service is flow.task.service and request == REQUEST and armed == armed_message(REQUEST)
         )
         assert "outer-recovered" not in flow.events
+        assert flow.task.fault_observation is False
+        kwargs["on_trigger"]()
         kwargs["on_tick"]()
+        assert flow.events[-1] == "termination-observed"
         flow.events.append("fault-observed")
         if defect == "observation":
             raise SandboxUnavailable("fixed fault observation failure")

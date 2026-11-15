@@ -108,11 +108,14 @@ class KernelTask:
             on_tick()
             self.original_record()
             if not self.finishing:
-                state = self.service.inspect() if self.fault_observation else None
-                if self.fault_observation and state is None:
-                    raise SandboxUnavailable("Controller fault lost its original task")
-                if not self.fault_observation or state["running"]:
+                if self.fault_observation:
+                    self.monitor.observe_termination(self.service)
+                else:
                     self.monitor.observe(self.service)
+
+        def fault_triggered():
+            self.original_record()
+            self.fault_observation = True
 
         try:
             starting_tick()
@@ -146,7 +149,6 @@ class KernelTask:
             channel.send(request)
             message = channel.receive()
             if fault:
-                self.fault_observation = True
                 completed = {
                     "report": observe_fault(
                         connection,
@@ -156,6 +158,7 @@ class KernelTask:
                         started=started,
                         deadline=deadline,
                         on_tick=tick,
+                        on_trigger=fault_triggered,
                     )
                 }
             else:

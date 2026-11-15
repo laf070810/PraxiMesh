@@ -86,6 +86,7 @@ def invoke(engine, image, journal, job, reservation, row, *, request, mode="norm
                 started=started,
                 deadline=deadline,
                 on_tick=journal.guard.assert_held,
+                on_trigger=journal.guard.assert_held,
             )
             if row["observation"]["independent_stop"]:
                 # Observe disappearance before journal.recover() can issue any

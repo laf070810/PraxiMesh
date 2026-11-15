@@ -158,7 +158,7 @@ def validate_report(report, request, *, device_uuid, recovered=False):
         )
 
 
-def observe_fault(connection, service, request, armed, *, started, deadline, on_tick):
+def observe_fault(connection, service, request, armed, *, started, deadline, on_tick, on_trigger):
     """Observe only an armed original task; caller performs journal cleanup later."""
     validate_request(request)
     require(exact(armed, armed_message(request)), "Controller fault was not correctly armed")
@@ -194,6 +194,7 @@ def observe_fault(connection, service, request, armed, *, started, deadline, on_
         "Controller stopped before its fault trigger",
     )
     channel.send(phase(request, "fault-trigger"))
+    on_trigger()
     # This callback retains ownership/lease checks while allowing the expected
     # stopped state. It cannot start work or change the actual PID-1 deadline.
     channel.on_tick = state

@@ -1,6 +1,7 @@
 """Ownership refusal boundaries; real namespace evidence uses container acceptance."""
 
 import copy
+import errno
 import os
 from types import SimpleNamespace
 
@@ -10,6 +11,7 @@ from judge import container_processes as module
 from judge.container_processes import (
     HostProcessView,
     OwnedProcesses,
+    ProcessDisappeared,
     process_identity,
     readonly_mounts,
 )
@@ -140,9 +142,36 @@ def test_missing_process_and_symlink_are_not_treated_as_empty(view, tmp_path):
         view.read(5678)
 
 
+def test_missing_process_is_distinct_from_a_permission_failure(view, monkeypatch):
+    with pytest.raises(ProcessDisappeared):
+        view.read(5678)
+    original = module.read_file
+
+    def denied(directory, name, maximum):
+        if name == "stat":
+            raise PermissionError(errno.EACCES, "Fixed permission failure")
+        return original(directory, name, maximum)
+
+    monkeypatch.setattr(module, "read_file", denied)
+    with pytest.raises(SandboxUnavailable) as error:
+        view.read(1234)
+    assert type(error.value) is SandboxUnavailable
+
+
+def test_exited_process_retains_birth_and_cgroup_for_original_identity_check():
+    with pytest.raises(ProcessDisappeared) as error:
+        process_identity(1234, stat_line(state="Z"), "NSpid:\t1234\t1\n", "0::/original\n")
+    assert error.value.identity == {
+        "pid": 1234,
+        "birth": 100,
+        "nspids": [1234, 1],
+        "cgroup": "0::/original",
+    }
+
+
 @pytest.fixture
-def observed_task(journal):  # noqa: F811
-    service, state = intent(journal)
+def observed_task(journal, request):  # noqa: F811
+    service, state = intent(journal, purpose=getattr(request, "param", "task"))
     service.inspect()
     journal.update(service, "created")
     journal.update(service, "running")

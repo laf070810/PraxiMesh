@@ -1,5 +1,6 @@
 """Read-only host PID ownership for trusted containerized control code."""
 
+import errno
 import os
 import re
 import stat
@@ -15,6 +16,14 @@ from judge.sandbox import SandboxUnavailable
 
 HOST_PROC = Path("/run/praximesh-host-proc")
 MAX_PIDS = 4096
+
+
+class ProcessDisappeared(SandboxUnavailable):
+    """A missing/exited process, never evidence that its container or GPU is idle."""
+
+    def __init__(self, message, *, identity=None):
+        super().__init__(message)
+        self.identity = deepcopy(identity)
 
 
 def host_manifest():
@@ -85,7 +94,6 @@ def process_identity(pid, process_stat, status, cgroup):
         if (
             int(number) != pid
             or len(fields) < 20
-            or fields[0] in {"Z", "X", "x"}
             or not fields[19].isascii()
             or not fields[19].isdecimal()
             or int(fields[19]) <= 0
@@ -96,12 +104,15 @@ def process_identity(pid, process_stat, status, cgroup):
             or not re.fullmatch(r"0::/[a-zA-Z0-9/._\\:-]*\n?", cgroup)
         ):
             raise ValueError
-        return {
+        identity = {
             "pid": pid,
             "birth": int(fields[19]),
             "nspids": [int(n) for n in nspids[0]],
             "cgroup": cgroup.strip(),
         }
+        if fields[0] in {"Z", "X", "x"}:
+            raise ProcessDisappeared("Observed process has exited", identity=identity)
+        return identity
     except (ValueError, IndexError, TypeError):
         raise SandboxUnavailable("Unusable process identity") from None
 
@@ -160,8 +171,12 @@ class HostProcessView:
                     raise SandboxUnavailable("Process identity changed during observation")
             finally:
                 os.close(directory)
-        except (OSError, ValueError, UnicodeError):
-            raise SandboxUnavailable("Host process disappeared or cannot be read") from None
+        except OSError as error:
+            if error.errno in {errno.ENOENT, errno.ESRCH}:
+                raise ProcessDisappeared("Host process disappeared") from None
+            raise SandboxUnavailable("Host process cannot be read") from None
+        except (ValueError, UnicodeError):
+            raise SandboxUnavailable("Host process cannot be read") from None
         self.check()
         return second
 
@@ -190,19 +205,60 @@ class OwnedProcesses:
             raise SandboxUnavailable("Original running task record is required")
         self.anchor = self.check()
 
-    def check(self):
+    def original_state(self):
+        """Inspect the pinned startup without claiming live process ownership."""
         self.control.check()
         if self.control.journal.load() != self.record:
             raise SandboxUnavailable("Original process observation record changed")
         before = self.service.inspect()
         if (
             before is None
-            or not before["running"]
             or before["id"] != self.record["container_id"]
             or self.service.owner != self.record["owner"]
         ):
+            raise SandboxUnavailable("Original task identity changed")
+        if self.control.journal.load() != self.record:
+            raise SandboxUnavailable("Original process observation record changed")
+        self.control.check()
+        return before
+
+    def check(self):
+        return self._check(allow_exit=False)
+
+    def check_empty_termination(self):
+        """Only after a full empty inventory during a triggered maintenance fault."""
+        if self.record["purpose"] != "maintenance":
+            raise SandboxUnavailable("Termination observation requires original maintenance")
+        return self._check(allow_exit=True)
+
+    def _check(self, *, allow_exit):
+        def exited(state):
+            return (
+                allow_exit
+                and state["running"] is False
+                and state["status"] == "exited"
+                and state["pid"] == 0
+            )
+
+        before = self.original_state()
+        if not before["running"]:
+            if exited(before):
+                return None
             raise SandboxUnavailable("Original task is no longer running")
-        main = self.control.host_processes.read(before["pid"])
+        try:
+            main = self.control.host_processes.read(before["pid"])
+        except ProcessDisappeared as error:
+            # A procfs disappearance alone proves nothing. Only the unchanged
+            # original runtime can confirm this task's completed exit.
+            if (
+                error.identity is not None
+                and self.anchor is not None
+                and error.identity != self.anchor
+            ):
+                raise SandboxUnavailable("Exited process identity changed") from None
+            if exited(self.original_state()):
+                return None
+            raise
         if (
             len(main["nspids"]) < 2
             or main["nspids"][-1] != 1
@@ -211,7 +267,10 @@ class OwnedProcesses:
             and main != self.anchor
         ):
             raise SandboxUnavailable("Task PID 1 or cgroup identity changed")
-        if self.service.inspect() != before or self.control.journal.load() != self.record:
+        after = self.original_state()
+        if after != before:
+            if exited(after):
+                return None
             raise SandboxUnavailable("Task changed during process observation")
         self.control.check()
         return main

@@ -146,6 +146,7 @@ def observer(monkeypatch):
             started=100.0,
             deadline=155.0,
             on_tick=lambda: events.append("lease"),
+            on_trigger=lambda: events.append("triggered"),
         )
 
     return values, events, channel, run
@@ -158,10 +159,23 @@ def test_matching_fault_requires_live_arm_and_expected_independent_state(observe
     result = run()
     request = fault_request(name, "a" * 32)
     lifecycle.validate_observation(result, request)
+    assert events.index(lifecycle.phase(request, "fault-trigger")) < events.index("triggered")
     assert result["termination"]["running"] is (name == "transport-loss")
     assert result["independent_stop"] is (name != "transport-loss")
     assert channel.deadline == 155.0 and events.count(phase(request, "fault-trigger")) == 1
     assert "lease" in events and "lock" in events
+
+
+def test_failed_trigger_send_never_switches_to_termination_observation(observer):
+    _values, events, channel, run = observer
+
+    def failed(_message):
+        raise SandboxUnavailable("Trigger send failed")
+
+    channel.send = failed
+    with pytest.raises(SandboxUnavailable, match="Trigger send failed"):
+        run()
+    assert "triggered" not in events
 
 
 @pytest.mark.parametrize(

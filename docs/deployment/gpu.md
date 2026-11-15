@@ -105,6 +105,8 @@ CPU 配额缺口已解决。2026-10-30 在用户 Docker context `/run/user/2031/
 
 CPU 专项给故障任务 45 秒预算，其中监督器硬期限为 40 秒；生产适配器为故障与新恢复各预留最多 90 秒，不因此宣称真实 CUDA 已在该预算内通过。报告在 `test-results/px-container-lifecycle-*/result.json`；核对原 ID、nonce、独立退出状态、进程、归档、临时目录和镜像标签清理。规则见 [ADR-055](../adr/055-container-controller-faults.md)。此入口不连接应用数据库、签发凭证或部署常驻 GPU worker。
 
+GPU 观察在故障触发消息完整发送后才进入原任务退出分支，正常执行继续要求原 PID 1 活跃。非空清单不能按“正在退出”忽略；空清单也必须由原启动实例确认退出并再次查询完整 NVIDIA 来源，见 [ADR-083](../adr/083-controller-termination-observation.md)。修改该边界还须重放[宿主进程归属](#container-process-observer)及真实 GPU 完整启动；CPU 故障通过不证明 NVIDIA 退出时序已通过。
+
 五组实际故障、正常调用回归和对应验证范围见 [G39 验收](../acceptance-g39.md)。
 
 <a id="container-kernel-flow"></a>
