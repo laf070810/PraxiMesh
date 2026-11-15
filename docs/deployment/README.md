@@ -7,16 +7,17 @@
 | 方式 | 适用场景 | 组成与数据 | 真实评测与 AI | 操作入口 |
 | --- | --- | --- | --- | --- |
 | **Docker Compose 单机自部署** | 自己使用、内网体验或小规模使用，希望少配置、通过服务器 IP 做题 | Web + worker；SQLite 命名卷；默认 HTTP `0.0.0.0:8000` | 默认七种 CPU/WASI 评测；可选本地 CPU 模型或已有 HTTPS 模型服务 | [Compose 完整操作](compose.md) |
+| **PostgreSQL Compose 固定版本** | 需要独立 PostgreSQL，或准备在独占单卡上验收 GPU 与本地 AI 组合 | PostgreSQL + 初始化服务 + Web + CPU worker；可选 GPU worker、CPU tutor；默认 HTTP `0.0.0.0:8000` | CPU/AI 启动与重建通过；GPU 首次启动和两题 API 通过，重建仍待复验；跨版本维护未交付 | [准备、启动与数据边界](compose-postgres.md) |
 | **发布协调器单机部署** | 需要域名/HTTPS、PostgreSQL、分离数据库权限、受控升级和失败恢复的长期站点 | Caddy + 固定 Web/worker 镜像 + PostgreSQL；私有配置、部署状态与备份 | CPU/GPU worker 各自通过完整检查后开放；GPU 需原节点绑定和四镜像包；AI 使用已配置的 HTTPS 服务 | [生产部署完整操作](production.md) |
 | **源码开发环境** | 修改应用、调试页面、编写内容或开发评测器 | Python/uv + Django 开发服务器；默认仓库内 SQLite；回环访问 | 默认不启动评测或 AI；按需单独配置 WASI worker 和模型 | [下方源码开发](#development) |
 | **本地 CUDA 编译工具** | 用自己的编辑器写 CUDA，需要编译检查且不占 GPU | 私有 rootless Docker + 固定 gVisor/NVRTC 镜像；独立状态目录 | 只编译，不运行样例；不需要网站或数据库 | [构建、使用与恢复](local-compiler.md) |
 | **本地 GPU 公开样例** | 已获独占单卡，在自己的编辑器中调试公开 CUDA 样例 | 私有 rootless Docker + 固定控制/任务镜像；原物理状态；无需网站或数据库 | 两轮完整启动与公开样例已实测；每次重新检查，仅返回非正式公开结果 | [构建、首次绑定、运行与恢复](local-gpu.md) |
 | **GPU 宿主 worker（开发验收）** | 已获得独占单卡、准备验证完整 CUDA 控制流程 | 普通用户 systemd + RootlessKit/Podman/runsc；持久私有目录与同一应用数据库 | 每次启动完整检查；新 CUDA 路径尚未验收，网站 GPU 提交关闭 | [配置与生命周期](gpu.md#gpu-worker) |
-| **GPU 容器 worker（开发验收）** | 已有 PostgreSQL，准备使用固定镜像和 Compose 验证专用 GPU 节点 | 原私有 rootless Docker、锁/journal、数据库网络；可制作统一四镜像发布包 | 协调器路径已有真实 GPU/队列/升级结果；独立 Compose 硬件仍待验证 | [构建、配置和 Compose](container-gpu-worker.md)、[统一发布包](releases.md#gpu-release) |
+| **GPU 容器 worker（单独接入）** | 已有 PostgreSQL，需单独管理 GPU 节点 | 原私有 rootless Docker、锁/journal、数据库网络；固定四镜像发布包 | 协调器及新 Compose 的首次硬件启动已有实测；仍须为自己的原配置完成全部检查 | [构建、配置和 Compose](container-gpu-worker.md)、[统一发布包](releases.md#gpu-release) |
 
-**想直接用起来，选 Compose。** 想同时体验本地 AI，给同一方案加上 `compose.ai.yaml`。有正式数据库、HTTPS 和受控升级要求时，选择发布协调器；它目前同样是单主机方案，没有交付多机高可用部署。
+**想直接做 CPU 题，选默认 Compose；需要 GPU 与本地 AI 组合，按 PostgreSQL Compose 准备。** 后者的 GPU 重建和跨版本维护仍在验收。需要 HTTPS、受控升级和失败恢复时，选择发布协调器；这些都是单主机方案，没有交付多机高可用部署。
 
-前三种方式沿用同一套账号、内容版本、学习、社区、组织、项目和挑战功能，主要差别在服务启动、数据存储、网络配置与升级保障。默认七种评测使用 CPU/WASI；容器 GPU 的正式提交及协调器发布已有实测，操作见[生产 GPU 入口](production.md#gpu-release)。默认目录尚未发布 CUDA 候选，GPU 允许列表为空时仍关闭 GPU 提交。独立 GPU Compose worker 使用 PostgreSQL，不能直接挂入默认 SQLite 单机方案的数据卷。
+前四种方式沿用同一套账号、内容版本、学习、社区、组织、项目和挑战功能，主要差别在服务启动、数据存储、网络配置与升级保障。默认七种评测使用 CPU/WASI；容器 GPU 的正式提交及协调器发布已有实测，操作见[生产 GPU 入口](production.md#gpu-release)。默认目录尚未发布 CUDA 候选，GPU 允许列表为空时仍关闭 GPU 提交。独立 GPU Compose worker 使用 PostgreSQL，不能直接挂入默认 SQLite 单机方案的数据卷。
 
 需要保存或分发匹配的 Web、CPU worker、GPU worker 和任务镜像时，使用[四镜像发布包](releases.md#gpu-release)。它提供统一构建、校验与导入；协调器可先完成[原 GPU 节点绑定](container-gpu-worker.md#coordinator-binding)。[整站发布与恢复](container-gpu-worker.md#whole-site-release)已接入同一公共 `apply/recover`；两镜像包用于 CPU，四镜像包用于已绑定的 GPU 节点。
 
@@ -25,6 +26,8 @@ GPU 0 已通过[两轮完整启动与本地公开样例](../acceptance-gpu0-star
 [单卡设备节点检查](gpu.md#container-device-nodes)属于需要明确授权的真实设备接入，即使固定程序只读取节点信息也不能当作无设备 CPU 检查。该组件已在限定版本上实测；它不是 GPU Compose 的启动命令。
 
 ## Compose：直接做题和使用可选 AI
+
+[PostgreSQL/GPU Compose](compose-postgres.md)另有独立数据库和固定版本准备流程。以下是配置较少的默认 SQLite 方案；两者的数据卷互不通用。
 
 在 Linux x86_64 主机准备 Docker Engine、Docker Compose 和构建时可用的下载网络。无需宿主 Python、预先构建的 WASI 或模型服务。基础运行建议预留 3 GiB 可用内存，带本地 AI 建议 6 GiB；首次构建还需额外磁盘、下载及编译时间。
 

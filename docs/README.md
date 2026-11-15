@@ -25,6 +25,10 @@
 - [RFC-039：退出期间的当前查询身份](rfcs/039-terminating-task-sampled-identities.md)、[ADR-093](adr/093-terminating-task-sampled-identities.md) — 维护故障的原实例确认、查询内句柄和退出后完整空清单
 - [RFC-040：首次 GPU 曝光确认丢失](rfcs/040-initial-gpu-exposure-acknowledgement.md)、[ADR-094](adr/094-initial-gpu-exposure-acknowledgement.md) — 首次发布中断沿原实例续跑，已退出对象仍执行原库完整恢复
 - [RFC-041：统一 CPU/GPU 发布命令](rfcs/041-public-gpu-deployment-entry.md)、[ADR-095](adr/095-public-gpu-deployment-dispatch.md) — 公共 CPU/GPU 分派、数据库前原绑定检查与真实命令验收
+- [RFC-042：完整 GPU Compose 站点](rfcs/042-complete-gpu-compose-site.md)、[ADR-096](adr/096-postgres-compose-application-entry.md) — 固定版本准备与独立 PostgreSQL 入口；CPU/AI 重建通过，GPU 重建及版本维护继续验收
+- [ADR-097：Compose PostgreSQL 初始化](adr/097-compose-postgres-bootstrap.md) — 独立初始化服务与持久安装阶段，复用原有数据库最小权限
+- [ADR-098：固定实际 Compose 配置](adr/098-frozen-compose-model.md) — 准备时解析私有模型，避免宿主变量覆盖固定镜像与配置
+- [PostgreSQL Compose 验收](acceptance-compose-postgres.md) — 两轮 CPU/AI 重建、首次完整 GPU 启动与两题 API；保留外部占用导致的重建失败
 - [GitHub 托管应用与 WASI 验收](acceptance-hosted-ci.md) — 按确切提交记录工作流结果和故障定位；专用部署节点与 GPU 仍需分别验收
 - [旧 F→当前 CPU 整站升级](acceptance-f-current.md) — 真实旧应用、三项迁移、数据保留、HTTPS/WASI 与清理通过
 - [F 升级准备与当前 CPU 发布包验收](acceptance-upgrade-preparation.md) — 保留历次目标包、准备阶段和原始失败

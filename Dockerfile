@@ -26,10 +26,11 @@ COPY content ./content
 COPY templates ./templates
 COPY static ./static
 COPY scripts/container_worker_entry.py scripts/container_practice_entry.py scripts/gpu_environment_probe.py scripts/gpu_kernel_probe.py scripts/gpu_service_entry.py ./scripts/
+COPY scripts/deploy_database.py ./scripts/
 COPY manage.py gunicorn.conf.py ./
 COPY LICENSES.md ./
 RUN python -c "from judge.gpu_policy import execution_digest; print('GPU policy:', execution_digest())"
-RUN python manage.py collectstatic --noinput && mkdir /data && chown 65532:65532 /data && chmod 700 /data
+RUN python manage.py collectstatic --noinput && mkdir /data /ai && chown 65532:65532 /data /ai && chmod 700 /data /ai
 USER 65532:65532
 EXPOSE 8000
 CMD ["gunicorn", "praximesh.wsgi:application"]
@@ -71,9 +72,6 @@ RUN python scripts/build_compose_wasi.py
 
 FROM runtime AS compose-web
 COPY --from=wasi-build /build/wasi.sha256 /opt/praximesh/wasi.sha256
-USER 0:0
-RUN mkdir /ai && chown 65532:65532 /ai && chmod 700 /ai
-USER 65532:65532
 CMD ["python", "-m", "core.selfhost", "web"]
 
 FROM compose-web AS compose-worker

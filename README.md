@@ -2,7 +2,7 @@
 
 通过真实编程练习学习计算知识：用结构化知识导航找到学习方向，也可以直接筛题、写代码、运行和提交。
 
-当前交付为**已完成本地验收的自部署版本**。默认 Docker Compose 包含真实 CPU/WASI 评测；可选覆盖文件提供本地 CPU AI 辅导。GPU 的冻结版本已通过[本地公开样例](docs/acceptance-gpu0-startup.md)，以及临时站点的两题正式提交与计时、中英文榜单、撤回和 CPU→GPU→GPU→CPU 正常切换。新的进程观察与资源恢复实现也已通过站点完整启动、两题 API、worker 中断以及不同发布包升级和曝光恢复；[公共 GPU apply/recover 也已实测通过，完整 GPU Compose 继续验收](docs/acceptance-gpu-site.md#public-command-success)。[容器 worker/Compose 入口](docs/deployment/container-gpu-worker.md)和[统一发布包](docs/deployment/releases.md#gpu-release)已接通，正式题型尚未发布，网站 GPU 提交默认关闭。公开运营和项目许可证仍待维护者决定。产品需求见 [PRD.md](PRD.md)，完整范围与未完成项见[需求追踪](docs/requirements.md)。
+当前交付以**自部署使用**为主。默认 Docker Compose 的真实 CPU/WASI 评测和可选本地 CPU AI 已通过验收；新增 PostgreSQL Compose 也已通过两轮实际 CPU/AI 启动、数据保留和同版本重建。GPU 已通过正式提交与计时、分享撤回、worker 中断和[公共发布恢复命令](docs/acceptance-gpu-site.md#public-command-success)；新 Compose 的首次完整 GPU 启动及两题 API 通过，重建复验因外部占用暂未完成，见[独立验收记录](docs/acceptance-compose-postgres.md#gpu-compose)。CUDA 候选题尚未进入默认目录，GPU 提交默认关闭。公开运营和项目许可证仍待维护者决定。产品需求见 [PRD.md](PRD.md)，完整范围与未完成项见[需求追踪](docs/requirements.md)。
 
 ## 可以做什么
 
@@ -17,6 +17,8 @@
 ## 部署与运行
 
 **统一入口：[部署指南：方案选择、启动与维护](docs/deployment/README.md)。** 指南比较 Compose 单机自部署、PostgreSQL/HTTPS 发布协调器和源码开发，说明各自的适用场景、数据位置、AI 选择及升级方式。
+
+[PostgreSQL/GPU Compose](docs/deployment/compose-postgres.md)提供固定发布包准备、独立数据库以及可选 GPU/AI 组合；CPU/AI 已验证，GPU 重建和跨版本维护仍待完成。下方命令启动默认 SQLite/CPU 方案。
 
 PostgreSQL/HTTPS 协调器已通过 CPU 版本的完整发布与中断恢复演练，并完成[旧 F 应用到当前版本的真实整站升级](docs/acceptance-f-current.md)。验证范围和重放入口见[生产部署检查](docs/deployment/production.md#full-deployment-validation)。GitHub 托管检查按确切提交记录；最新结果、待验收项及专用部署 runner 接入统一见 [CI 指南](docs/deployment/ci.md)。
 

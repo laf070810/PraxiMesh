@@ -2,7 +2,7 @@
 
 更新：2026-11-16。目标：按 PRD 实施阶段 A/B/C 与 D/E/F 补充。维护者已明确当前先交付可本地验证的自部署版本；公开运营和许可证选择稍后确定，GPU 正式题型及完整验收仍未完成。**C 的专业评测、组织与辅导，D 的完整筛选、私有成就与挑战，E 的类/API，以及 F 的版本题目反馈均已通过本地验收。外部部署与授权事项仍未完成。** 当前固定制品及 E→F HTTPS 升级见 [F 验收](acceptance-f.md)，类/API见 [E 验收](acceptance-e.md)，筛选与挑战见 [D 验收](acceptance-d.md)，既有阶段 A 验收见 [acceptance.md](acceptance.md)，架构见 [RFC-006](rfcs/006-complete-product.md)和 [ADR-011](adr/011-specialists-organizations-coaching.md)。
 
-GPU 当前进度：`6e40ba7` 已通过本地与站点完整启动、两题十四项 API、八组真实成绩浏览器检查和实际 worker 丢失恢复。`d59bbc8` 又完成不同发布包升级、首次曝光确认丢失时保留新写入且不重启原 worker、开放前中断后的原库完整恢复，以及正常 CPU 退出；其应用与完整 WASI CI 均成功。具体身份与历史版本范围见[临时站点记录](acceptance-gpu-site.md)。公共部署命令仍在独立分支进行实际验收，完整 PostgreSQL/GPU Compose 站点尚未交付；现有默认 Compose 仍为已验收的 CPU/WASI 与可选本地 AI。
+GPU 当前进度：本地与站点完整启动、两题十四项 API、八组真实成绩浏览器检查、实际 worker 丢失恢复、不同发布包升级和曝光中断均已通过。公共 `apply/recover` 的正常切换及实际 SIGKILL 恢复也已通过并合入主分支，具体版本与范围见[临时站点记录](acceptance-gpu-site.md#public-command-success)。新增 PostgreSQL Compose 已通过两轮 CPU/AI 整站及保留数据重建；GPU 首次完整启动、两题十四项 API 通过，重建因外部占用尚待复验。默认目录发布、Compose 跨版本维护和目标主机仍待完成，范围见[Compose 验收](acceptance-compose-postgres.md)。
 
 ## 功能要求
 
@@ -43,7 +43,7 @@ GPU 当前进度：`6e40ba7` 已通过本地与站点完整启动、两题十四
 
 2026-11-15 获明确授权后，已实际运行旧 F 应用并完成到当前 CPU 包的整站升级，三项迁移、原数据与成绩保留、权限、HTTPS 浏览器及清理均通过，见[整站升级记录](acceptance-f-current.md)。旧 F 导入和成功升级缺口已关闭；以下项目继续保留。
 
-同日的[独立 GPU 站点验收](acceptance-gpu-site.md)已通过冻结版本的完整 worker 启动、候选队列、向量题六项普通 API 检查及正式计时，并完成 CPU→GPU→CPU 发布和七项 GPU 结果保留。矩阵 Run 的准备阶段重复检查已修复，新冻结版本完成两题十四项普通 API、中英四种宽度的真实分享、双账号排名和撤回。同一冻结包的 CPU→GPU→GPU→CPU 正常流程及完整数据保留已通过；实际发布进程中断与恢复仍在验证。原预检、控制器退出、OOM 标志和 PostgreSQL 锁冲突的失败与同一站点恢复记录继续保留。
+同日的[独立 GPU 站点验收](acceptance-gpu-site.md)已通过冻结版本的完整 worker 启动、候选队列、两题十四项普通 API、中英四种宽度的真实分享、双账号排名和撤回。CPU→GPU→GPU→CPU 正常流程、实际发布进程中断、原库恢复及开放后的新写入保留均已验证。原预检、控制器退出、OOM 标志和 PostgreSQL 锁冲突的失败与同一站点恢复记录继续保留；新 Compose 的独立结果另行记录，不能互相代替。
 
 | 未完成项 | 当前证据与限制 | 后续完成所需条件 |
 | --- | --- | --- |
@@ -57,6 +57,8 @@ GPU 当前进度：`6e40ba7` 已通过本地与站点完整启动、两题十四
 2026-10-24 开发指南交付后的只读查询记录在 `test-results/post-onboarding-blockers-1.json`；其中无远端的历史条件已被 2026-10-30 的 GitHub 接入解除。CPU 委派缺口随后由维护者修复，实际限额结果见 `test-results/cpu-controller-restored/result.json`。候选 runsc 的精确驱动版本列表检查见 `test-results/gpu-runtime-preflight/result.json`；后续单卡 CUDA 样例与实际节流已通过，范围及失败修正见 [RFC-018](rfcs/018-gpu-environment-probe.md)。nvproxy 会将受支持的 GPU 调用转交宿主 NVIDIA 驱动，驱动本身仍在信任边界内，详见 [gVisor GPU 官方指南](https://gvisor.dev/docs/user_guide/gpu/)。
 
 ## 分批结果
+
+- 2026-11-16 R-09/16 PostgreSQL Compose：冻结应用 `7b4fb25` 与准备工具 `503c7de` 通过两轮实际 CPU/AI 新站点、固定配置、55 表/33 序列和原会话/草稿跨重建保留；临时资源已清理。另一个 GPU/AI 站点首次完成 24 阶段和两题十四项正常 API，重建时外部占用导致原 worker 拒绝启动；575 条业务记录保留，自有任务/预约为零，保留原对象等待继续。组件、镜像和实际范围见[Compose 验收](acceptance-compose-postgres.md)，GPU 重建和跨版本维护仍待完成。
 
 - 2026-11-16 R-09/16 公共 GPU 命令通过：`3193c35` 的原 worker 完成 24 阶段和候选队列；曝光调用真实 SIGKILL 后，正式 `recover` 保留同一 worker 启动和新增写入，普通 GPU Submit 正确，再经正式 `apply` 切回 CPU 并完成新提交。独立审计比较三组 55 表/33 序列快照，15 个 GPU worker 均停止、任务/预约为零；该源提交的应用及完整 WASI CI 均成功。实际范围见[公共命令记录](acceptance-gpu-site.md#public-command-success)，完整 GPU Compose 和内容发布继续保留。
 
