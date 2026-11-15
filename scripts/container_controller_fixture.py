@@ -169,6 +169,7 @@ def main():
             "recover",
             "recover-normal",
             "observe-device",
+            "observe-pid-namespace",
             "observe-device-nonempty-caps",
             "gpu-nodes",
             "gpu-nodes-orphan",
@@ -184,6 +185,17 @@ def main():
         caps.mkdir(mode=0o755)
         (caps / "not-a-device").touch(mode=0o600)
     with ContainerController(device) as control:
+        if mode == "observe-pid-namespace":
+            control.host_processes.require_same_pid_namespace()
+            save(
+                "pid-namespace",
+                {
+                    "pid": os.getpid(),
+                    "gpu_executed": False,
+                    "journal_idle": control.journal.load() is None,
+                },
+            )
+            return
         if mode.startswith("gpu-nodes"):
             from scripts.container_gpu_control import run
 

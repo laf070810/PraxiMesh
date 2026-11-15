@@ -101,6 +101,9 @@ def check_devices(value):
 
 
 def check_prerequisites(value, view):
+    # NVML and SMI can both return an empty list in a private PID namespace.
+    # Agreement between those restricted sources is not evidence of an idle GPU.
+    view.require_same_pid_namespace()
     try:
         verify_bundle(value["library"])
         check_devices(value)

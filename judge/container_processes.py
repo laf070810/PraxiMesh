@@ -18,6 +18,25 @@ HOST_PROC = Path("/run/praximesh-host-proc")
 MAX_PIDS = 4096
 
 
+def host_pid_security_options(info):
+    """Never disable an active daemon SELinux policy to obtain host PID visibility.
+
+    Docker automatically appends label=disable for host PID. This profile only
+    accepts that setting when the rootless daemon has no SELinux confinement;
+    built-in seccomp and no-new-privileges remain required.
+    """
+    options = info.get("SecurityOptions") if type(info) is dict else None
+    if (
+        type(options) is not list
+        or any(type(item) is not str for item in options)
+        or "name=rootless" not in options
+        or "name=seccomp,profile=builtin" not in options
+        or any(item.split(",", 1)[0] == "name=selinux" for item in options)
+    ):
+        raise SandboxUnavailable("Host PID observation cannot disable an active security policy")
+    return ["no-new-privileges", "label=disable"]
+
+
 class ProcessDisappeared(SandboxUnavailable):
     """A missing/exited process, never evidence that its container or GPU is idle."""
 
@@ -179,6 +198,38 @@ class HostProcessView:
             raise SandboxUnavailable("Host process cannot be read") from None
         self.check()
         return second
+
+    def require_same_pid_namespace(self):
+        """NVIDIA queries must see the complete pinned host PID domain.
+
+        The kernel's fixed self link names this caller in the pinned procfs.
+        Looking up numeric getpid() would instead read host PID 1 when called
+        from a private container namespace, falsely accepting the host init.
+        """
+        self.check()
+        pid = os.getpid()
+        try:
+            directory = os.open("self", os.O_RDONLY | os.O_DIRECTORY, dir_fd=self.fd)
+            try:
+
+                def observed():
+                    return process_identity(
+                        pid,
+                        read_file(directory, "stat", 4096),
+                        read_file(directory, "status", 16384),
+                        read_file(directory, "cgroup", 4096),
+                    )
+
+                first, second = observed(), observed()
+                if first != second or first["nspids"] != [pid]:
+                    raise SandboxUnavailable(
+                        "NVIDIA observer must share the pinned host PID namespace"
+                    )
+            finally:
+                os.close(directory)
+        except (OSError, ValueError, UnicodeError):
+            raise SandboxUnavailable("NVIDIA observer PID namespace cannot be verified") from None
+        self.check()
 
     def close(self):
         if self.fd is not None:

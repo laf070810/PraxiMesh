@@ -2,7 +2,7 @@
 
 通过真实编程练习学习计算知识：用结构化知识导航找到学习方向，也可以直接筛题、写代码、运行和提交。
 
-当前交付为**已完成本地验收的自部署版本**。默认 Docker Compose 包含真实 CPU/WASI 评测；可选覆盖文件提供本地 CPU AI 辅导。GPU 已通过[本地公开样例](docs/acceptance-gpu0-startup.md)，以及临时站点的两题正式提交与计时、中英文榜单、撤回和 CPU→GPU→GPU→CPU 正常切换；发布中断恢复仍在[验收](docs/acceptance-gpu-site.md)。[容器 worker/Compose 入口](docs/deployment/container-gpu-worker.md)和[统一发布包](docs/deployment/releases.md#gpu-release)已接通，正式题型尚未发布，网站 GPU 提交默认关闭。公开运营和项目许可证仍待维护者决定。产品需求见 [PRD.md](PRD.md)，完整范围与未完成项见[需求追踪](docs/requirements.md)。
+当前交付为**已完成本地验收的自部署版本**。默认 Docker Compose 包含真实 CPU/WASI 评测；可选覆盖文件提供本地 CPU AI 辅导。GPU 已通过[本地公开样例](docs/acceptance-gpu0-startup.md)，以及临时站点的两题正式提交与计时、中英文榜单、撤回和 CPU→GPU→GPU→CPU 正常切换；目前正在修复[外部进程漏报并继续恢复验收](docs/acceptance-gpu-site.md)。[容器 worker/Compose 入口](docs/deployment/container-gpu-worker.md)和[统一发布包](docs/deployment/releases.md#gpu-release)已接通，正式题型尚未发布，网站 GPU 提交默认关闭。公开运营和项目许可证仍待维护者决定。产品需求见 [PRD.md](PRD.md)，完整范围与未完成项见[需求追踪](docs/requirements.md)。
 
 ## 可以做什么
 
@@ -10,8 +10,8 @@
 - **真实评测**：Python/JavaScript 函数、Python 完整程序、有状态类/API、线性模型训练、加权拟合和受控工具 Agent。公开 Run 与正式 Submit 分开，成绩由可信评测端产生。
 - **私有学习记录**：代码草稿、提交历史、收藏、笔记、阅读标记、学习计划、实践证据、成就与挑战进度。支持本人导出和账号删除。
 - **浏览器编辑器**：Python/JavaScript/CUDA 高亮、补全、本地检查、格式化、查找替换和常用快捷键；CUDA 检查仅提示语法结构，真实评测仍需 GPU 环境。[使用说明](docs/editor.md)。
-- **内容扩展**：沿用知识 ID、版本和审核发布流程；新增 [CUDA 候选内容与契约](docs/cuda-contract.md)，可在独立验收环境准备向量加法和矩阵乘法题。候选未进入默认题库，真实 GPU 验收仍待完成。
-- **社区与协作**：主动送审的题解、讨论、博客、评论和绑定版本的题目反馈；可撤回的[公开成果与分组榜单](docs/sharing.md)；组织角色、版本课程及第三方题库审核发布。GPU 计时榜规则和页面已接入，实际 GPU 成绩仍需完成硬件验收。
+- **内容扩展**：沿用知识 ID、版本和审核发布流程；新增 [CUDA 候选内容与契约](docs/cuda-contract.md)，可在独立验收环境准备向量加法和矩阵乘法题。候选未进入默认题库，完整 GPU 部署验收仍待完成。
+- **社区与协作**：主动送审的题解、讨论、博客、评论和绑定版本的题目反馈；可撤回的[公开成果与分组榜单](docs/sharing.md)；组织角色、版本课程及第三方题库审核发布。GPU 计时榜已有两题真实成绩与撤回验收，部署开放仍待完成。
 - **中英体验**：中英界面，20 个知识节点与 10 道题的英文内容；缺少译文时明确回退原文。手机可浏览题库、学习路径、私有笔记和账号设置，桌面端适合编写代码。可选 AI 提示先预览再发送，不修改正式成绩。
 
 ## 部署与运行

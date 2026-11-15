@@ -2,6 +2,8 @@
 
 更新：2026-11-15。目标：按 PRD 实施阶段 A/B/C 与 D/E/F 补充。维护者已明确当前先交付可本地验证的自部署版本；公开运营和许可证选择稍后确定，GPU 正式题型及完整验收仍未完成。**C 的专业评测、组织与辅导，D 的完整筛选、私有成就与挑战，E 的类/API，以及 F 的版本题目反馈均已通过本地验收。外部部署与授权事项仍未完成。** 当前固定制品及 E→F HTTPS 升级见 [F 验收](acceptance-f.md)，类/API见 [E 验收](acceptance-e.md)，筛选与挑战见 [D 验收](acceptance-d.md)，既有阶段 A 验收见 [acceptance.md](acceptance.md)，架构见 [RFC-006](rfcs/006-complete-product.md)和 [ADR-011](adr/011-specialists-organizations-coaching.md)。
 
+GPU 当前阻塞：已发现并只读复现可信容器的外部进程漏报；自有 GPU worker 已停止，独占条件下的既有成绩和正常切换结果保留其原范围。先修复 [PID 观察契约](rfcs/032-gpu-observer-pid-namespace.md)，待 GPU 0 空闲后继续 worker 丢失与升级恢复验收。两次已完成的协调器中断及原新写入保留见[临时站点记录](acceptance-gpu-site.md)。
+
 ## 功能要求
 
 | 要求 | 交付与验收依据 | 当前状态 |

@@ -1,6 +1,6 @@
 # 容器 GPU worker：构建、配置与启动
 
-适用于已经使用 PostgreSQL、准备在 Linux x86_64 节点验收独占单卡 CUDA 评测的维护者。专用 worker 命令、固定镜像和独立 Compose 文件已提供；**完整 GPU 启动、真实队列和发布升级仍待硬件验收**。当前普通单机 Compose 的 SQLite 数据不能直接接入这个 worker。方案比较见[部署首页](README.md)，检查目录见 [GPU 指南](gpu.md#validation-options)。
+适用于已经使用 PostgreSQL、准备在 Linux x86_64 节点验收独占单卡 CUDA 评测的维护者。专用 worker 命令、固定镜像和独立 Compose 文件已提供；完整启动、两题普通 API 和 CPU→GPU→GPU→CPU 正常切换已有[真实证据](../acceptance-gpu-site.md)，**当前发现外部进程漏报，正在修复，公共激活仍关闭**。当前普通单机 Compose 的 SQLite 数据不能直接接入这个 worker。方案比较见[部署首页](README.md)，检查目录见 [GPU 指南](gpu.md#validation-options)。
 
 它复用原有账号、题目版本、GPU 预约和队列。可信控制容器使用数据库网络和私有 Docker socket；学员任务继续在单独的无网络 gVisor guest 中运行，拿不到这些挂载或数据库凭据。初始化、完整二十四阶段、当前私有凭证、领取、取消和隔离停用均由同一生命周期完成。
 

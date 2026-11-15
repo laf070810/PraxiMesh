@@ -23,6 +23,19 @@ from tests.test_container_journal import journal  # noqa: F401
 from tests.test_container_processes import observed_task  # noqa: F401
 
 
+def test_incomplete_pid_domain_fails_before_library_or_device_access(monkeypatch):
+    calls = []
+
+    def denied():
+        raise SandboxUnavailable("Private PID namespace")
+
+    monkeypatch.setattr(module, "verify_bundle", lambda *_: calls.append("library"))
+    monkeypatch.setattr(module, "check_devices", lambda *_: calls.append("devices"))
+    with pytest.raises(SandboxUnavailable, match="Private PID namespace"):
+        module.check_prerequisites({}, SimpleNamespace(require_same_pid_namespace=denied))
+    assert calls == []
+
+
 @pytest.fixture
 def bundle(tmp_path):
     value = {

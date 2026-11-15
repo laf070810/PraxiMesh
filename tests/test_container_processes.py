@@ -26,6 +26,28 @@ def stat_line(pid=1234, birth=100, state="S"):
     )
 
 
+@pytest.mark.parametrize(
+    "options,accepted",
+    [
+        (["name=rootless", "name=seccomp,profile=builtin", "name=cgroupns"], True),
+        (["name=rootless", "name=seccomp,profile=builtin", "name=selinux"], False),
+        (["name=rootless", "name=seccomp,profile=builtin", "name=selinux,enabled"], False),
+        (["name=rootless"], False),
+        (["name=seccomp,profile=builtin"], False),
+        (None, False),
+    ],
+)
+def test_host_pid_profile_does_not_disable_active_selinux_or_seccomp(options, accepted):
+    if accepted:
+        assert module.host_pid_security_options({"SecurityOptions": options}) == [
+            "no-new-privileges",
+            "label=disable",
+        ]
+    else:
+        with pytest.raises(SandboxUnavailable):
+            module.host_pid_security_options({"SecurityOptions": options})
+
+
 def test_proc_identity_preserves_cgroup_namespace_relative_path():
     value = process_identity(1234, stat_line(), "NSpid:\t1234\t1\n", "0::/../docker-abc.scope\n")
     assert value == {
@@ -140,6 +162,51 @@ def test_missing_process_and_symlink_are_not_treated_as_empty(view, tmp_path):
     (tmp_path / "5678").symlink_to(tmp_path / "1234")
     with pytest.raises(SandboxUnavailable):
         view.read(5678)
+
+
+@pytest.mark.parametrize(
+    "defect",
+    [None, "private-pid", "nested", "missing", "duplicate", "unreadable", "birth-change"],
+)
+def test_management_observer_requires_the_callers_complete_pid_domain(
+    view, tmp_path, monkeypatch, defect
+):
+    (tmp_path / "self").symlink_to("1234")
+    (tmp_path / "1234/status").write_text("NSpid:\t1234\n")
+    monkeypatch.setattr(module.os, "getpid", lambda: 1234)
+    if defect == "private-pid":
+        monkeypatch.setattr(module.os, "getpid", lambda: 1)
+        # Host init could look valid if the check used the caller's numeric PID.
+        (tmp_path / "1").mkdir()
+        (tmp_path / "1/stat").write_text(stat_line(pid=1))
+        (tmp_path / "1/status").write_text("NSpid:\t1\n")
+        (tmp_path / "1/cgroup").write_text("0::/\n")
+        (tmp_path / "1234/status").write_text("NSpid:\t1234\t1\n")
+    elif defect == "nested":
+        (tmp_path / "1234/status").write_text("NSpid:\t1234\t1234\n")
+    elif defect == "missing":
+        (tmp_path / "1234/status").write_text("Pid:\t1234\n")
+    elif defect == "duplicate":
+        (tmp_path / "1234/status").write_text("NSpid:\t1234\nNSpid:\t1234\n")
+    elif defect in {"unreadable", "birth-change"}:
+        original = module.read_file
+        reads = 0
+
+        def changed(directory, name, maximum):
+            nonlocal reads
+            if name == "stat":
+                reads += 1
+                if defect == "unreadable":
+                    raise PermissionError(errno.EACCES, "Fixed denial")
+                return stat_line(birth=100 if reads == 1 else 101)
+            return original(directory, name, maximum)
+
+        monkeypatch.setattr(module, "read_file", changed)
+    if defect is None:
+        view.require_same_pid_namespace()
+    else:
+        with pytest.raises(SandboxUnavailable):
+            view.require_same_pid_namespace()
 
 
 def test_missing_process_is_distinct_from_a_permission_failure(view, monkeypatch):

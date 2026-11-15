@@ -53,6 +53,7 @@ class Control:
         proc_path="/proc",
         proc_readonly=True,
         observation_devices=(),
+        host_pid=False,
         local_mode=None,
     ):
         if local_mode is not None and local_mode not in {"initialize", "run", "recover"}:
@@ -63,6 +64,13 @@ class Control:
         self.host_processes = host_processes
         self.proc_readonly = proc_readonly
         self.observation_devices = tuple(observation_devices)
+        if type(host_pid) is not bool or (host_pid and not host_processes):
+            raise ValueError("Host PID observation requires the pinned host process view")
+        self.host_pid = host_pid
+        if host_pid:
+            from judge.container_processes import host_pid_security_options
+
+            host_pid_security_options(engine.verify())
         observer_mount = []
         if host_processes:
             observer_mount = [
@@ -114,6 +122,7 @@ class Control:
                 "--network=none",
                 "--ipc=private",
                 "--cgroupns=private",
+                *(["--pid=host"] if host_pid else []),
                 "--pids-limit=128",
                 "--memory=512m",
                 "--memory-swap=512m",
@@ -168,6 +177,8 @@ class Control:
         return value
 
     def start(self):
+        from judge.container_processes import host_pid_security_options
+
         info = self.inspect()
         expected = {
             "Runtime": "runc",
@@ -180,9 +191,11 @@ class Control:
             ],
             "DeviceRequests": None,
             "ReadonlyRootfs": True,
-            "PidMode": "",
+            "PidMode": "host" if self.host_pid else "",
             "CgroupnsMode": "private",
-            "SecurityOpt": ["no-new-privileges"],
+            "SecurityOpt": host_pid_security_options(self.engine.verify())
+            if self.host_pid
+            else ["no-new-privileges"],
             "Memory": 536870912,
             "MemorySwap": 536870912,
             "NanoCpus": 1000000000,
@@ -388,6 +401,25 @@ def main():
                 )
                 report["controller_image"] = controller_image
             save(result_path, report)
+        for host_pid in (False, True):
+            name = "pid-domain-" + ("shared" if host_pid else "private")
+            path = Path(storage.name) / name
+            config = state(engine, path, task_image, host_processes=True)
+            states.append((path, config))
+            current = control(
+                path, config, "observe-pid-namespace", host_processes=True, host_pid=host_pid
+            )
+            result = current.wait(0 if host_pid else 1).strip()
+            if host_pid:
+                details = json.loads((path / "pid-namespace.json").read_text())
+                assert details["pid"] > 1 and details["gpu_executed"] is False
+                assert details["journal_idle"] is True
+            else:
+                assert result == "SandboxUnavailable"
+                assert not (path / "pid-namespace.json").exists()
+                details = {"refused": True, "failure_class": result}
+            assert not list((path / "journal").glob("*.active.json"))
+            passed(name, details)
         for mode in ("initialize", "run", "recover"):
             path, config = new_state("local-entry-" + mode)
             current = control(path, config, "normal", local_mode=mode)
