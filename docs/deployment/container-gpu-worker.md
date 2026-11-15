@@ -260,6 +260,8 @@ GPU 数据库冻结持有排空锁，直到 runtime 连接权限撤销和现有�
 
 组件入口为 `tests/test_deploy_gpu_abort.py`，使用真实私有文件/锁与自有进程中断，数据库和 Docker 是模型。实际冻结边界使用 `scripts/postgres_tests.py -q tests/test_deploy_database_postgres.py tests/test_deploy_gpu_config_database.py`，沿用自有 PostgreSQL 资源；模型结果不能代替原临时站点回退。
 
+已冻结候选的配置退出会打开自己的检查事务；此时只允许当前已验证 guard 的精确 owner backend，离开作用域后恢复零会话要求。不能扩大成允许任意 owner 连接，也不能跳过冻结检查。
+
 <a id="configuration-retirement"></a>
 ### 回到 CPU 前退出原 GPU 配置
 

@@ -989,8 +989,28 @@ class DeploymentDatabase:
     @contextmanager
     def gpu_configuration_guard(self, names, token):
         """Hold original/target admission and reservation rows across publication."""
-        with self._gpu_configuration_guard(names, token) as (check, _):
-            yield check
+        if getattr(self, "_configuration_observation", None) is not None:
+            raise DeploymentDatabaseError("Nested GPU configuration observation is forbidden")
+        with self._gpu_configuration_guard(names, token) as (check, connections):
+            self._configuration_observation = (check, tuple(connections))
+            try:
+                yield check
+            finally:
+                self._configuration_observation = None
+
+    def require_frozen_configuration(self, name):
+        """Allow only this live, validated configuration guard's exact owner backend."""
+        self._require_operation_lock()
+        scope = getattr(self, "_configuration_observation", None)
+        if scope is None:
+            return self._require_frozen(name)
+        check, connections = scope
+        check()
+        matching = [connection for connection in connections if connection.info.dbname == name]
+        if len(matching) > 1 or any(connection.closed for connection in connections):
+            raise DeploymentDatabaseError("Original configuration observation was lost")
+        self._require_frozen(name, guard_pid=matching[0].info.backend_pid if matching else None)
+        check()
 
     @contextmanager
     def _gpu_configuration_guard(self, names, token):

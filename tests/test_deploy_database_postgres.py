@@ -230,6 +230,53 @@ def test_current_schema_freeze_and_thaw_preserve_private_data_and_runtime_permis
             worker.execute("SELECT username FROM auth_user")
 
 
+def test_frozen_publication_allows_only_its_current_guard_backend(migrated_pg):
+    item, database = migrated_pg, migrated_pg.database
+    token = str(uuid.uuid4())
+    with database.operation_lock():
+        with database.connection(item.name) as owner:
+            owner.execute(
+                "INSERT INTO core_queuelock(id,pause_token,paused_at) VALUES(1,%s,now()) "
+                "ON CONFLICT(id) DO UPDATE SET pause_token=excluded.pause_token,paused_at=excluded.paused_at",
+                (token,),
+            )
+        database.freeze_gpu(item.name, token)
+        database.require_frozen_configuration(item.name)
+        with database.gpu_configuration_guard([item.name], token):
+            # Reproduces the old abort/publication interaction: the ordinary
+            # no-session check correctly refuses even the legitimate owner guard.
+            with pytest.raises(DeploymentDatabaseError, match="active sessions"):
+                database._require_frozen(item.name)
+            database.require_frozen_configuration(item.name)
+            with database._connect(item.name) as other:
+                other.execute("SELECT 1")
+                with pytest.raises(DeploymentDatabaseError, match="active sessions"):
+                    database.require_frozen_configuration(item.name)
+            database.require_frozen_configuration(item.name)
+            with pytest.raises(DeploymentDatabaseError, match="Nested"):
+                with database.gpu_configuration_guard([item.name], token):
+                    pytest.fail("A nested guard cannot replace the original backend")
+        database.require_frozen_configuration(item.name)
+        # The exact-backend allowance ends with the context, including errors.
+        with pytest.raises(RuntimeError, match="interrupted publication"):
+            with database.gpu_configuration_guard([item.name], token):
+                database.require_frozen_configuration(item.name)
+                raise RuntimeError("interrupted publication")
+        with database._connect(item.name) as later:
+            later.execute("SELECT 1")
+            with pytest.raises(DeploymentDatabaseError, match="active sessions"):
+                database.require_frozen_configuration(item.name)
+        database.require_frozen_configuration(item.name)
+        for role in ("web", "worker"):
+            with pytest.raises(psycopg.OperationalError):
+                item.runtime(item.name, role)
+        database.thaw(item.name)
+    with item.runtime(item.name, "web") as web:
+        assert web.execute(
+            "SELECT first_name FROM auth_user WHERE id=%s", (item.user_id,)
+        ).fetchone() == ("private-original",)
+
+
 @pytest.mark.parametrize(
     "role,table,column,privilege",
     [

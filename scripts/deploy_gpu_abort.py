@@ -113,7 +113,7 @@ def completed_recovery_abort(host, node, binding, key, recovery):
     runtime = host.state.get("gpu_runtime", {}).get(value["generation"]["gpu_worker"])
     if runtime is None or runtime["phase"] != "stopped" or snapshot(runtime) != value["runtime"]:
         raise GPUStartupAbortError("Aborted GPU startup instance changed")
-    host.database._require_frozen(value["generation"]["database"])
+    host.database.require_frozen_configuration(value["generation"]["database"])
     return True
 
 

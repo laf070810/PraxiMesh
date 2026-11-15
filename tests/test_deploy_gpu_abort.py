@@ -292,6 +292,25 @@ def test_arbitrary_abort_flag_cannot_bypass_recovery_guard(aborting):
                 require_stopped_workers(host, node, runtime.binding, abort=True)
 
 
+def test_completed_abort_allows_only_original_configuration_retirement(aborting):
+    value = aborting
+    value.run()
+    before = state(value.item)
+    host = value.q.coordinator()
+    with host.locked():
+        value.held.value = True
+        try:
+            retired = host.retire_gpu_configuration(value.item.generation)
+        finally:
+            value.held.value = False
+    after = state(value.item)
+    assert retired["phase"] == "retired"
+    assert after["gpu_configuration"] == {"schema": 1, "active": None, "transition": None}
+    for key in ("gpu_preparations", "gpu_recoveries", "gpu_startup_aborts", "current"):
+        assert after[key] == before[key]
+    assert value.q.read()["frozen"]
+
+
 @pytest.mark.parametrize("phase", ["prepared", "stopped", "freezing", "aborted"])
 def test_sigkill_retries_original_abort_without_starting_or_rewriting_failed_recovery(
     aborting, monkeypatch, phase
