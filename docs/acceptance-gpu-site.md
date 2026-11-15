@@ -185,6 +185,10 @@ worker 崩溃验收的首个普通 API 任务因观察端轮询触发限流而�
 
 完整身份和原始证据见[本地启动记录](acceptance-gpu0-startup.md#current-process-observation)。对应四镜像发布包、正式 worker、API 和 worker 丢失恢复仍需分别验收；此前所有失败记录继续保留。
 
+同一源码的[冻结四镜像与配套 CPU 包](acceptance-current-releases.md#termination-window-release)随后通过完整归档核验、十项无设备 worker 检查及 435.777 秒 CPU 应用验收。原临时站点从 CPU 代 `1c25ce130649` 升级为 GPU 代 `dfb8aece2e84`；原 worker `37ba90d14ad7904bf853e54ae1b224f6f939ddb55fc20173ae799969ee951317` 于 13:59:11 UTC 启动，14:13:33 完成全部 24 阶段并发布就绪。正常队列的候选正确/错误提交与清理通过，CPU→GPU 发布成功。
+
+发布前后 55 张非运行状态表摘要完全一致，33 个序列不回退，原成绩、账号、目录与历史保留。原始状态和逐阶段时间线在 `test-results/uvm-releases-2026-11-15/owned-gpu-site-14/`，其中 `initial-startup-audit.json` 绑定原镜像、容器和启动时间。该结果证明这次发布与候选队列；普通 API、浏览器及实际 worker 丢失继续分别验收。
+
 ## 待完成的真实范围
 
 重查原卡独占后，使用新冻结版本验证正式任务中的 worker 丢失、原预约清理与正确性恢复，以及升级和曝光恢复。已有结果只证明上述固定版本与实际范围；全部成功前，仍按[需求追踪](requirements.md)保留网站 GPU 发布门槛。

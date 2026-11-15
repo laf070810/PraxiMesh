@@ -2,6 +2,20 @@
 
 更新：2026-11-15。对应 PRD R-09/15/16。下方按冻结版本记录同源 CPU/四镜像包，旧归档均保留，不原地覆盖。原 G42 包缺少后续代际配置声明，旧契约不能用于当前 worker。
 
+<a id="termination-window-release"></a>
+## 11 月 15 日：进程观察与资源恢复修复后的配套包
+
+源提交 `6e40ba770db11a65bc51b2a9cbf91cf59decf236`，source ID `f1c1cffdd917a3ef2f2c42e40688923df5747f0b68ebf67741db2ccb512ae27a`。1026 个归档文件与 Git 原始对象逐字节匹配，两包的源码、Web/CPU worker 镜像和评测配置一致。
+
+| 格式 | 不可变目录 | release.json SHA-256 |
+| --- | --- | --- |
+| CPU | `var/releases/2026-11-15-cpu-upgrade-target-16/` | `009c484727f17bcab8d60a977fb208357bf2093622391579e904b0a22c0a18b7` |
+| GPU | `var/releases/2026-11-15-termination-window-four-image-1/` | `c7f827b01a78abea2bef8424f98e287ebb8abb290ee094f3965b61716e2506f8` |
+
+完整核验、标准导入和十项无设备 worker/Compose/PostgreSQL 检查通过。相同 Web/CPU 镜像的完整应用验收用时 435.777 秒，包含真实 WASI 启动探针、三组基础与七组扩展浏览器旅程、真实提交、准入/排空恢复及资源清理。证据在 `test-results/termination-window-releases-2026-11-15/` 的 `process.json`、`source-and-pair-audit.json` 和 `cpu-application/release-acceptance.json`。
+
+任务镜像为 `sha256:b2e57b104d804ae73f873cadbcd0b8339003d1d9badb7376faddac7d964e44fb`，GPU worker 为 `sha256:9c4695155bfdb411e74bcd88dd162349a772e84a74e45e9249b6bcc180601264`。任务镜像与[本轮本地完整 GPU 启动](acceptance-gpu0-startup.md#current-process-observation)一致；正式站点仍须使用本包重新验证 worker、队列和发布恢复，见[站点记录](acceptance-gpu-site.md)。旧 F 导入和真实跨版本升级已另行通过，具体目标版本见 [F→当前验收](acceptance-f-current.md)，不能把下方早期的授权等待状态当作当前阻塞。
+
 <a id="uvm-release"></a>
 ## 11 月 15 日：宿主/guest UVM 身份修复后的配套包
 
