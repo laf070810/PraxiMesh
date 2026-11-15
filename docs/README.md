@@ -13,6 +13,7 @@
 - [RFC-027：rootless worker 的 OOM 启动配置](rfcs/027-rootless-worker-oom-contract.md)、[ADR-081](adr/081-rootless-worker-oom-contract.md) — 固定有效设置及原无设备预检的有限恢复
 - [RFC-028：GPU 候选启动失败后的 CPU 回退](rfcs/028-failed-gpu-startup-cpu-rollback.md)、[ADR-082](adr/082-unexposed-gpu-startup-abort.md) — 未曝光、已退出且无待恢复工作的候选中止
 - [RFC-029：控制器故障中的原任务退出观察](rfcs/029-controller-termination-observation.md)、[ADR-083](adr/083-controller-termination-observation.md) — 故障触发后保留原对象与完整设备清单核对
+- [RFC-030：GPU 控制事务与部署检查的锁顺序](rfcs/030-gpu-database-lock-order.md)、[ADR-084](adr/084-gpu-control-table-lock-order.md) — 原心跳锁升级冲突及有界旧候选清理
 - [GitHub 托管应用与 WASI 验收](acceptance-hosted-ci.md) — 按确切提交记录工作流结果和故障定位；专用部署节点与 GPU 仍需分别验收
 - [旧 F→当前 CPU 整站升级](acceptance-f-current.md) — 真实旧应用、三项迁移、数据保留、HTTPS/WASI 与清理通过
 - [F 升级准备与当前 CPU 发布包验收](acceptance-upgrade-preparation.md) — 保留历次目标包、准备阶段和原始失败

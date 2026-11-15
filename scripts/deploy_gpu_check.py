@@ -4,6 +4,7 @@ This is an internal component, not a GPU activation or readiness bypass.
 """
 
 import copy
+import hashlib
 import json
 import uuid
 from datetime import datetime
@@ -17,7 +18,14 @@ from scripts.release import verify_source
 
 PROTOCOL = "gpu-deployment-check-v2"
 MAX_ROUNDS = 16
-SOURCES = ("core/deployment_gpu_check.py", "core/management/commands/deployment_gpu_check.py")
+SOURCES = (
+    "core/deployment_gpu_check.py",
+    "core/management/commands/deployment_gpu_check.py",
+    "core/gpu_control.py",
+)
+DEVICE_TRANSACTION_LOCK_SQL = "LOCK TABLE core_gpudevice IN ROW EXCLUSIVE MODE"
+LEGACY_CONTROL_SHA256 = "6ca5c454312f5d38a0dddd059b1f3169afc20be00b8bebac625db489751b6f4a"
+LEGACY_COMMAND_SHA256 = "e9606323c77ef7736c07f36238ef578d0c25ba43ea037f7c814e5ac56b7f2adb"
 PHASES = {"checking", "checked", "cleaning", "verified", "cleaned"}
 OBSERVATION = {
     "container",
@@ -134,6 +142,17 @@ def validate_record(record):
         raise GPUCandidateError("Invalid original GPU candidate verification record")
 
 
+def cleanup_database_timeout(contents):
+    """A shorter existing CLI budget only for the exact reviewed legacy pair."""
+    if hashlib.sha256(contents[SOURCES[2]]).hexdigest() == LEGACY_CONTROL_SHA256:
+        if hashlib.sha256(contents[SOURCES[1]]).hexdigest() != LEGACY_COMMAND_SHA256:
+            raise GPUCandidateError("Legacy GPU cleanup command source is not reviewed")
+        return "0.2"
+    if literal(contents, SOURCES[2], "DEVICE_TRANSACTION_LOCK_SQL") != DEVICE_TRANSACTION_LOCK_SQL:
+        raise GPUCandidateError("Frozen GPU control table-lock contract is unsupported")
+    return None
+
+
 def require_protocol(generation, release):
     """Inspect verified frozen bytes without constructing or operating a worker."""
     manifest = generation["manifest"]
@@ -144,6 +163,7 @@ def require_protocol(generation, release):
     )
     if literal(contents, SOURCES[0], "PROTOCOL") != PROTOCOL:
         raise GPUCandidateError("Frozen GPU candidate protocol is unsupported")
+    return cleanup_database_timeout(contents)
 
 
 class GPUCandidateCheck:
@@ -151,7 +171,7 @@ class GPUCandidateCheck:
         self.host = host
         self.generation = copy.deepcopy(generation)
         self.readiness = GPUReadiness(host, generation, release)
-        require_protocol(generation, release)
+        self.cleanup_database_timeout = require_protocol(generation, release)
 
     def save(self, phase):
         self.record["phase"] = phase
@@ -320,6 +340,8 @@ class GPUCandidateCheck:
             "started-at": observed["started_at"],
         }.items():
             command.extend(("--" + key, value))
+        if cleanup and self.cleanup_database_timeout is not None:
+            command.extend(("--database-timeout", self.cleanup_database_timeout))
         raw = self.host.control(self.generation, *command, timeout=540)
         try:
             if len(raw) > 16384:

@@ -20,6 +20,7 @@ from judge.sandbox import SandboxUnavailable
 
 LOCK_MILLISECONDS = 250
 STATEMENT_MILLISECONDS = 1000
+DEVICE_TRANSACTION_LOCK_SQL = "LOCK TABLE core_gpudevice IN ROW EXCLUSIVE MODE"
 
 
 class GPUJobLost(SandboxUnavailable):
@@ -45,6 +46,7 @@ def bounded_database():
                     "SELECT set_config('statement_timeout', %s, true)",
                     [f"{STATEMENT_MILLISECONDS}ms"],
                 )
+                cursor.execute(DEVICE_TRANSACTION_LOCK_SQL)
             yield
     elif connection.vendor == "sqlite":
         with connection.cursor() as cursor:

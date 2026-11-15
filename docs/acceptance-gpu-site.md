@@ -71,6 +71,14 @@ worker 失败日志现只增加最多四个已冻结平台源码文件/行号，
 
 本轮再次自动回退到原 CPU 版本；`owned-gpu-site-5/automatic-recovery-audit.json` 确认数据保留、GPU 空闲、全部原 worker 停止、配置退出和原服务不变。本轮尚未到达控制器故障检查，不能据此认定退出观察修复已通过 GPU；正式 API 仍未验证。
 
+## 正式 worker 完整启动通过后的数据库冲突
+
+`9cc50bc63212552b449c1284255fab44ff6bf192` 的同源包包含 1002 个与 Git 完全一致的文件，source ID 为 `f0de9397ab9be75f9fb3a2e8183c942c7c887e06dfdb30e31e4e4b4509c1d4d6`。CPU 包 `2026-11-15-cpu-upgrade-target-9` 清单摘要为 `ff1c655ae4959068d04d694cb5a2b1f144ca95883ac414e39e1568a6547b5409`，GPU 包 `2026-11-15-oom-observation-four-image-1` 为 `c06cee7dc55393e954f6d5ec2007c188d41c1b930141847704a8054df25ac2be`。构建、核验、导入及无设备 worker 检查通过，CPU 应用完整验收 434.955 秒、清理通过；见 `test-results/oom-observation-releases-2026-11-15/`。
+
+原站点 `owned-gpu-site-6/` 的正式 worker 于 03:06:57 UTC 启动，03:25:50 完成全部 24 个阶段，03:25:51 发布就绪。资源检查、控制器退出、断连和独立硬期限及各自新恢复均通过；这是该固定版本的真实完整启动证据。
+
+随后候选队列检查期间，03:26:40 的心跳 UPDATE 因 PostgreSQL 锁等待超时退出，就绪随后失效。原轮次和测试提交保留，普通 API 尚未验证。`database-error-observation.json` 只记录固定错误类别。原锁升级冲突已在自有 PostgreSQL 重现，修复后的 36 项及旧清理专项三项实际检查通过；112 项相关组件通过，普通环境跳过的四项 PostgreSQL 检查已在实际数据库运行。规则见 [RFC-030](rfcs/030-gpu-database-lock-order.md)。原站点的恢复仍在进行，完整启动不能外推为队列或发布通过。
+
 ## 待完成的真实范围
 
 继续原站点，依次完成 CPU→GPU、正式 API 参考解/错解/恢复正确解、GPU→GPU、GPU→CPU，以及曝光前后的实际中断和恢复。分别核对历史数据、会话、GPU 环境、正式性能、物理预约和清理。全部成功前，仍按[需求追踪](requirements.md)保留网站 GPU 发布门槛。

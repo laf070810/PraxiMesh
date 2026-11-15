@@ -14,6 +14,7 @@ from types import SimpleNamespace
 import pytest
 
 from scripts import deploy
+from scripts import deploy_gpu_check as check_module
 from scripts.deploy_gpu_check import SOURCES, GPUCandidateError, expected_report, record_key
 from tests import test_deploy_gpu_readiness as fixture_module
 from tests.test_container_adapter import configured as configured
@@ -28,6 +29,24 @@ from tests.test_deploy_gpu_readiness import readiness as readiness
 from tests.test_deploy_gpu_worker import lifecycle as lifecycle
 
 
+def test_only_exact_reviewed_legacy_sources_get_shorter_cleanup_wait():
+    root = Path(__file__).resolve().parents[1]
+    contents = {
+        SOURCES[1]: (root / "tests/fixtures/gpu_legacy_candidate_command.py").read_bytes(),
+        SOURCES[2]: (root / "tests/fixtures/gpu_legacy_control.py").read_bytes(),
+    }
+    assert check_module.cleanup_database_timeout(contents) == "0.2"
+    changed = contents | {SOURCES[1]: contents[SOURCES[1]] + b"\n"}
+    with pytest.raises(GPUCandidateError, match="not reviewed"):
+        check_module.cleanup_database_timeout(changed)
+    assert (
+        check_module.cleanup_database_timeout(
+            contents | {SOURCES[2]: (root / SOURCES[2]).read_bytes()}
+        )
+        is None
+    )
+
+
 @pytest.fixture
 def candidate(request, monkeypatch):
     original = fixture_module.remember
@@ -38,7 +57,9 @@ def candidate(request, monkeypatch):
             generation["manifest"]["source_files"][name] = hashlib.sha256(
                 (root / name).read_bytes()
             ).hexdigest()
-            generation["manifest"]["gpu"]["source_scopes"]["worker"].append(name)
+            scope = generation["manifest"]["gpu"]["source_scopes"]["worker"]
+            if name not in scope:
+                scope.append(name)
         original(item, generation)
 
     monkeypatch.setattr(fixture_module, "remember", remember)
@@ -105,6 +126,29 @@ def test_verified_check_is_bound_to_original_startup_and_reobserved(candidate):
     with pytest.raises(GPUCandidateError, match="fresh readiness"):
         candidate.run()
     assert len(candidate.calls()) == 2
+
+
+def test_legacy_cleanup_wait_never_changes_check_budget_or_original_round(candidate, monkeypatch):
+    monkeypatch.setattr(check_module, "cleanup_database_timeout", lambda _contents: "0.2")
+
+    def failed_cleanup(report):
+        if report["action"] == "cleanup":
+            raise RuntimeError("Original cleanup transaction rolled back")
+
+    candidate.mutate = failed_cleanup
+    with pytest.raises(RuntimeError, match="rolled back"):
+        candidate.run()
+    before = candidate.record()
+    assert before["phase"] == "checked" and before["cleanup_report"] is None
+    assert "--database-timeout" not in candidate.calls()[0]
+    assert candidate.calls()[1][-2:] == ["--database-timeout", "0.2"]
+    candidate.mutate = None
+    candidate.run()
+    after = candidate.record()
+    assert after["phase"] == "verified"
+    for key in ("round_id", "observation", "report", "cleanup_observation"):
+        assert after[key] == before[key]
+    assert candidate.calls()[1] == candidate.calls()[2]
 
 
 def test_failed_command_retains_identity_and_can_resume_with_its_pending_jobs(candidate):
