@@ -141,6 +141,16 @@ worker 崩溃验收的首个普通 API 任务因观察端轮询触发限流而�
 
 管理查询重放时 GPU 0 已空闲，宿主和可信容器的完整列表均为空；任务保持私有 PID。该结果与前面实际外部占用时的只读对照分别保存，不把本次空闲结果当作外部占用正例。全部自有测试资源已清理，原用户服务未变。当前仍需新冻结四镜像的完整 CUDA 启动、正式任务和故障恢复；上述检查不签发就绪凭证。
 
+## 新 PID 契约的首轮 CUDA 启动与回退
+
+提交 `f27d085e1949c84799b7fabe0b1c9f6ee3295da1` 的 1011 个归档文件与 Git 一致，source ID 为 `fbc0ffda9e61b7924f54975cff8c977aa1dcb3c1b5f6cd717b700706db8054a5`。四镜像包 `2026-11-15-host-pid-four-image-1` 的清单摘要为 `8a0249169f97195fb48ab969e630155bcb903ce2006699b776194fd5a8cd30a2`，配套 CPU 包 `2026-11-15-cpu-upgrade-target-12` 为 `f52237506c3e435716360fee12969b8c3cdffa40b64ca10dbc7abfdef99bb553`。标准核验、导入、十项无设备 worker 和完整 CPU 应用检查通过；CPU 应用用时 434.071 秒并完成清理，记录为 `test-results/host-pid-releases-2026-11-15/`。
+
+确认 GPU 0 空闲后，原站点新代 `bf26ff6714e4` 的 schema 3 worker 于 09:14:14 UTC 启动，09:14:42 因 `ProcessDisappeared` 退出，未完成首个启动阶段。错误来自 NVIDIA 列表之后的宿主 PID 归属读取；原维护任务 `f6eab90eaf116c999f17bf0b656ba71dc89ace04ac1756ff0cac931b7fad9b23` 已按原记录清理，没有签发就绪或开放提交。
+
+协调器自动退回原 CPU 代 `1c25ce130649`，GPU 配置正常退出。55 张业务表、33 个序列、无物理预约、设备空闲及三个原用户服务不变均已核验；证据为 `owned-gpu-site-10/rollback-audit.json` 和 `after-rollback-data.json`，原启动失败报告保持失败。
+
+同一实现随后沿原本地状态和固定参考解复现，宿主只读记录证实短暂 NVIDIA PID 属于原任务 cgroup，普通恢复成功。下一步按 [RFC-033](rfcs/033-gpu-pid-observation-order.md) 调整查询与身份读取间的重复检查，并用实际 CUDA 重放验证；尚不能判定该竞态已解决。
+
 ## 待完成的真实范围
 
 重查原卡独占后，使用新冻结版本验证正式任务中的 worker 丢失、原预约清理与正确性恢复，以及升级和曝光恢复。已有结果只证明上述固定版本与实际范围；全部成功前，仍按[需求追踪](requirements.md)保留网站 GPU 发布门槛。

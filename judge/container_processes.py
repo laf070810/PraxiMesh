@@ -337,6 +337,24 @@ class OwnedProcesses:
         return main
 
     def require_owned(self, pids):
+        self._validate_pids(pids)
+        return self._owned_members(pids, self.check())
+
+    def observe_owned(self, read_inventory):
+        """Fence the query and immediate PID reads with the same original task.
+
+        A slow extra container inspection between query and PID reads can make
+        a short-lived CUDA process disappear before its identity is read.
+        Missing processes still fail; no identity or inventory is cached.
+        """
+        main = self.check()
+        pids = read_inventory()
+        self._validate_pids(pids)
+        self._owned_members(pids, main)
+        return pids
+
+    @staticmethod
+    def _validate_pids(pids):
         if (
             type(pids) is not list
             or len(pids) > MAX_PIDS
@@ -344,7 +362,8 @@ class OwnedProcesses:
             or len(set(pids)) != len(pids)
         ):
             raise SandboxUnavailable("Invalid host process inventory")
-        main = self.check()
+
+    def _owned_members(self, pids, main):
         found = [self.control.host_processes.read(pid) for pid in pids]
         if any(item["cgroup"] != main["cgroup"] for item in found):
             raise SandboxUnavailable("An observed host process is outside the original task")

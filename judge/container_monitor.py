@@ -278,15 +278,16 @@ class ContainerDeviceMonitor:
         if service is not None and self.owned is None:
             self.owned = OwnedProcesses(self.control, service)
             self.service = service
-        if self.owned is not None:
-            self.owned.check()
-        value = self.read()
-        pids = validate_observation(value, self.saved)
+
+        def read_inventory():
+            return validate_observation(self.read(), self.saved)
+
         if self.owned is None:
+            pids = read_inventory()
             if pids:
                 raise SandboxUnavailable("Selected GPU is occupied; nothing was stopped")
         else:
-            self.owned.require_owned(pids)
+            pids = self.owned.observe_owned(read_inventory)
         self.check()
         return pids
 

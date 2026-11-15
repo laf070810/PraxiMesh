@@ -16,6 +16,7 @@ from judge.container_monitor import (
     validate_observation,
     validate_observer,
 )
+from judge.container_processes import ProcessDisappeared
 from judge.nvml_artifacts import PROFILE, manifest_digest, validate_manifest, verify_bundle
 from judge.nvml_reader import MAX_PIDS, NVMLFailure, ProcessInfo, process_list
 from judge.sandbox import SandboxUnavailable
@@ -294,6 +295,80 @@ def test_running_monitor_preserves_one_original_anchor_even_on_empty_inventory(m
     assert item.monitor.owned is anchored
     item.task.members[1234]["birth"] += 1
     with pytest.raises(SandboxUnavailable, match="changed"):
+        item.monitor.observe(item.task.service)
+
+
+def test_short_lived_owned_pid_is_read_before_another_slow_container_inspection(
+    monitored, monkeypatch
+):
+    item = monitored
+    item.monitor.observe(item.task.service)
+    observer = item.monitor.owned
+    clock = {"now": 0.0, "exit": 0.0}
+    original_check = observer.check
+    original_read = item.task.control.host_processes.read
+
+    def check():
+        clock["now"] += 0.4  # Explicit Docker timing model, not a GPU measurement.
+        return original_check()
+
+    def query():
+        clock["now"] += 0.3
+        clock["exit"] = clock["now"] + 0.2
+        return observation(item.monitor.saved, pids={"compute": [5678], "graphics": [], "mps": []})
+
+    def read(pid):
+        if pid == 5678 and clock["now"] >= clock["exit"]:
+            raise ProcessDisappeared("Modeled owned CUDA child has exited")
+        return original_read(pid)
+
+    monkeypatch.setattr(observer, "check", check)
+    monkeypatch.setattr(item.monitor, "read", query)
+    monkeypatch.setattr(item.task.control.host_processes, "read", read)
+    # The former query -> full inspection -> PID read order misses the child.
+    observer.check()
+    pids = validate_observation(query(), item.monitor.saved)
+    with pytest.raises(ProcessDisappeared):
+        observer.require_owned(pids)
+    clock["now"] = 0.0
+    assert item.monitor.observe(item.task.service) == [5678]
+    assert clock["now"] > clock["exit"]  # Ownership was read while alive, not cached afterward.
+
+
+@pytest.mark.parametrize(
+    "defect", ["missing", "foreign", "reused", "moved", "root-changed", "empty-root-changed"]
+)
+def test_query_fence_never_accepts_unreadable_foreign_or_changed_identity(
+    monitored, monkeypatch, defect
+):
+    item = monitored
+    item.monitor.observe(item.task.service)
+    original_read = item.task.control.host_processes.read
+    reads = 0
+
+    def query():
+        pids = [9999] if defect == "foreign" else [5678]
+        if defect == "missing":
+            del item.task.members[5678]
+        if defect in {"root-changed", "empty-root-changed"}:
+            item.task.members[1234]["birth"] += 1
+        if defect == "empty-root-changed":
+            pids = []
+        return observation(item.monitor.saved, pids={"compute": pids, "graphics": [], "mps": []})
+
+    def read(pid):
+        nonlocal reads
+        if pid == 5678:
+            reads += 1
+            if reads == 2 and defect == "reused":
+                item.task.members[pid]["birth"] += 1
+            if reads == 2 and defect == "moved":
+                item.task.members[pid]["cgroup"] = "0::/foreign"
+        return original_read(pid)
+
+    monkeypatch.setattr(item.monitor, "read", query)
+    monkeypatch.setattr(item.task.control.host_processes, "read", read)
+    with pytest.raises(SandboxUnavailable):
         item.monitor.observe(item.task.service)
 
 
