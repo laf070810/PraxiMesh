@@ -187,6 +187,13 @@ class HostProcessView:
             raise SandboxUnavailable("Host process view cannot be verified") from None
 
     def read(self, pid):
+        return self._read(pid, allow_exited=False)
+
+    def read_observed(self, pid):
+        """A complete readable member identity, never a liveness or idle claim."""
+        return self._read(pid, allow_exited=True)
+
+    def _read(self, pid, *, allow_exited):
         if type(pid) is not int or not 0 < pid < 2**31:
             raise SandboxUnavailable("A positive host PID is required")
         self.check()
@@ -202,13 +209,20 @@ class HostProcessView:
                     field = name
                     return read_file(directory, name, maximum)
 
+                def parsed(process_stat, status, group):
+                    try:
+                        return process_identity(pid, process_stat, status, group)
+                    except ProcessDisappeared as error:
+                        if not allow_exited or error.identity is None:
+                            raise
+                        return error.identity
+
                 before = read("stat", 4096)
                 status = read("status", 16384)
                 group = read("cgroup", 4096)
                 after = read("stat", 4096)
-                first = process_identity(pid, before, status, group)
-                second = process_identity(
-                    pid,
+                first = parsed(before, status, group)
+                second = parsed(
                     after,
                     read("status", 16384),
                     read("cgroup", 4096),
@@ -376,7 +390,7 @@ class OwnedProcesses:
         main = self.check()
         pids = read_inventory()
         self._validate_pids(pids)
-        self._owned_members(pids, main)
+        self._owned_members(pids, main, allow_exited=True)
         return pids
 
     @staticmethod
@@ -389,13 +403,18 @@ class OwnedProcesses:
         ):
             raise SandboxUnavailable("Invalid host process inventory")
 
-    def _owned_members(self, pids, main):
-        found = [self.control.host_processes.read(pid) for pid in pids]
+    def _owned_members(self, pids, main, *, allow_exited=False):
+        read = (
+            self.control.host_processes.read_observed
+            if allow_exited
+            else self.control.host_processes.read
+        )
+        found = [read(pid) for pid in pids]
         if any(item["cgroup"] != main["cgroup"] for item in found):
             raise SandboxUnavailable("An observed host process is outside the original task")
         # Re-read after the complete inventory, so a reused PID cannot inherit a
         # prior record's ownership within this observation.
-        if [self.control.host_processes.read(pid) for pid in pids] != found:
+        if [read(pid) for pid in pids] != found:
             raise SandboxUnavailable("Observed process identity changed")
         self.check()
         return found

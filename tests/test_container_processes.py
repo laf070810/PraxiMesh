@@ -258,6 +258,41 @@ def test_missing_proc_field_is_reported_even_when_kernel_error_has_no_filename(v
     assert module.process_failure_details(caught.value) == {"pid": 1234, "field": "status"}
 
 
+@pytest.mark.parametrize("state", ["Z", "X", "x"])
+def test_readable_exited_identity_is_not_a_liveness_or_missing_pid_exemption(view, tmp_path, state):
+    (tmp_path / "1234/stat").write_text(stat_line(state=state))
+    with pytest.raises(ProcessDisappeared):
+        view.read(1234)
+    found = view.read_observed(1234)
+    assert found["pid"] == 1234 and found["birth"] == 100
+    (tmp_path / "1234/stat").unlink()
+    with pytest.raises(ProcessDisappeared) as error:
+        view.read_observed(1234)
+    assert error.value.identity is None
+
+
+@pytest.mark.parametrize("change", ["reaped", "reused", "moved"])
+def test_exited_member_still_needs_two_complete_matching_reads(view, tmp_path, monkeypatch, change):
+    (tmp_path / "1234/stat").write_text(stat_line(state="Z"))
+    original = module.read_file
+    counts = {}
+
+    def read(directory, name, maximum):
+        counts[name] = counts.get(name, 0) + 1
+        if name == "stat" and counts[name] == 2:
+            if change == "reaped":
+                raise FileNotFoundError(errno.ENOENT, "reaped")
+            if change == "reused":
+                return stat_line(birth=101, state="Z")
+        if name == "cgroup" and counts[name] == 2 and change == "moved":
+            return "0::/elsewhere\n"
+        return original(directory, name, maximum)
+
+    monkeypatch.setattr(module, "read_file", read)
+    with pytest.raises(SandboxUnavailable):
+        view.read_observed(1234)
+
+
 def test_exited_process_retains_birth_and_cgroup_for_original_identity_check():
     with pytest.raises(ProcessDisappeared) as error:
         process_identity(1234, stat_line(state="Z"), "NSpid:\t1234\t1\n", "0::/original\n")
@@ -295,6 +330,7 @@ def observed_task(journal, request):  # noqa: F811
     control = SimpleNamespace(
         journal=journal, check=journal.check, host_processes=SimpleNamespace(read=read)
     )
+    control.host_processes.read_observed = lambda pid: control.host_processes.read(pid)
     observer = OwnedProcesses(control, service)
     return SimpleNamespace(
         observer=observer,
@@ -316,6 +352,30 @@ def test_task_membership_uses_original_cgroup_and_birth(observed_task):
         call[:2] in {("container", "kill"), ("container", "rm")}
         for call in task.journal.engine.calls
     )
+
+
+def test_observed_exited_child_is_owned_but_original_pid_one_must_remain_live(
+    observed_task, view, tmp_path
+):
+    task = observed_task
+    group = task.members[1234]["cgroup"]
+    (tmp_path / "1234/cgroup").write_text(group)
+    child = tmp_path / "5678"
+    child.mkdir()
+    (child / "stat").write_text(stat_line(pid=5678, birth=105, state="Z"))
+    (child / "status").write_text("NSpid:\t5678\t9\n")
+    (child / "cgroup").write_text(group)
+    task.control.host_processes = view
+    assert task.observer.observe_owned(lambda: [5678]) == [5678]
+    with pytest.raises(ProcessDisappeared):
+        task.observer.require_owned([5678])
+    (child / "cgroup").write_text("0::/another-task\n")
+    with pytest.raises(SandboxUnavailable, match="outside the original task"):
+        task.observer.observe_owned(lambda: [5678])
+    (child / "cgroup").write_text(group)
+    (tmp_path / "1234/stat").write_text(stat_line(state="Z"))
+    with pytest.raises(ProcessDisappeared):
+        task.observer.observe_owned(lambda: [])
 
 
 def test_child_oom_marker_during_observation_does_not_replace_live_task(observed_task):
