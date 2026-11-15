@@ -1,15 +1,18 @@
 """Read-only host PID ownership for trusted containerized control code."""
 
 import errno
+import math
 import os
 import re
 import select
 import stat
+import time
 import uuid
 from copy import deepcopy
 from pathlib import Path
 
 from judge.container_compiler import CompilerContainerService
+from judge.container_contract import STOP_SECONDS
 from judge.container_driver import DriverContainerService
 from judge.container_gpu import GPUContainerService
 from judge.container_journal import PersistentRuntimeService
@@ -58,7 +61,7 @@ def process_failure_details(error):
         and type(error.requested_pid) is int
         and 0 < error.requested_pid < 2**31
         and type(error.field) is str
-        and error.field in {"directory", "stat", "status", "cgroup", "state"}
+        and error.field in {"directory", "stat", "status", "cgroup", "state", "pidfd"}
     ):
         return {"pid": error.requested_pid, "field": error.field}
     return {}
@@ -295,22 +298,42 @@ class SampledProcess:
             if view.read_observed(pid) != self.identity:
                 raise SandboxUnavailable("Sampled process identity changed")
             self.bound()
-        except (AttributeError, OSError):
+        except OSError as error:
+            self.close()
+            if error.errno in {errno.ENOENT, errno.ESRCH}:
+                raise ProcessDisappeared(
+                    "Sampled process disappeared before binding",
+                    identity=self.identity,
+                    requested_pid=pid,
+                    field="pidfd",
+                ) from None
+            raise SandboxUnavailable("Sampled process handle is unavailable") from None
+        except AttributeError:
             self.close()
             raise SandboxUnavailable("Sampled process handle is unavailable") from None
         except BaseException:
             self.close()
             raise
 
-    def bound(self):
+    def bound(self, *, final=False):
         with Path(f"/proc/self/fdinfo/{self.fd}").open() as stream:
             data = stream.read(4097)
         fields = [line.split() for line in data.splitlines()]
+        pid = [row[1:] for row in fields if row[:1] == ["Pid:"]]
+        nspids = [row[1:] for row in fields if row[:1] == ["NSpid:"]]
+        if len(data) <= 4096 and pid == nspids == [["-1"]]:
+            if final and self.exited():
+                return
+            raise ProcessDisappeared(
+                "Sampled process was reaped",
+                identity=self.identity,
+                requested_pid=self.pid,
+                field="pidfd",
+            )
         if (
             len(data) > 4096
-            or [row[1:] for row in fields if row[:1] == ["Pid:"]] != [[str(self.pid)]]
-            or [row[1:] for row in fields if row[:1] == ["NSpid:"]]
-            != [[str(pid) for pid in self.identity["nspids"]]]
+            or pid != [[str(self.pid)]]
+            or nspids != [[str(pid) for pid in self.identity["nspids"]]]
         ):
             raise SandboxUnavailable("Sampled process handle changed its original PID")
 
@@ -322,25 +345,30 @@ class SampledProcess:
             # Only the final fence can confirm an already pinned member's exit.
             if not final:
                 raise
-            poll = select.poll()
-            poll.register(self.fd, select.POLLIN)
-            events = poll.poll(0)
-            if (
-                len(events) != 1
-                or events[0][0] != self.fd
-                or not (
-                    events[0][1] & select.POLLIN
-                    and not events[0][1] & ~(select.POLLIN | select.POLLHUP)
-                )
-            ):
+            if not self.exited():
                 raise SandboxUnavailable("Missing sampled process has no confirmed exit") from None
         else:
             if current != self.identity:
                 raise SandboxUnavailable("Sampled process identity changed")
             try:
-                self.bound()
+                self.bound(final=final)
             except OSError:
                 raise SandboxUnavailable("Sampled process handle cannot be verified") from None
+
+    def exited(self):
+        poll = select.poll()
+        poll.register(self.fd, select.POLLIN)
+        events = poll.poll(0)
+        if not events:
+            return False
+        if (
+            len(events) != 1
+            or events[0][0] != self.fd
+            or not events[0][1] & select.POLLIN
+            or events[0][1] & ~(select.POLLIN | select.POLLHUP)
+        ):
+            raise SandboxUnavailable("Sampled process exit observation is invalid")
+        return True
 
     def close(self):
         if self.fd is not None:
@@ -461,9 +489,65 @@ class OwnedProcesses:
         self._owned_members(pids, main, allow_exited=True)
         return pids
 
-    def observe_samples(self, read_inventory):
+    def termination_deadline(self, deadline=None):
+        if self.record["purpose"] != "maintenance":
+            raise SandboxUnavailable("Termination observation requires original maintenance")
+        hard = float(self.record["arguments"][1])
+        deadline = hard + STOP_SECONDS if deadline is None else deadline
+        if (
+            type(deadline) not in {int, float}
+            or not math.isfinite(deadline)
+            or not math.isfinite(hard)
+            or not hard < deadline <= hard + STOP_SECONDS
+            or time.monotonic() >= deadline
+        ):
+            raise SandboxUnavailable("Original termination observation deadline expired or changed")
+        return deadline
+
+    def _wait_original_exit(self, deadline, root=None):
+        while True:
+            self.termination_deadline(deadline)
+            if root is not None:
+                root.check(final=True)
+                if not root.exited():
+                    raise SandboxUnavailable("Original sampled task has not exited")
+            try:
+                if self.check_empty_termination() is None:
+                    return
+            except ProcessDisappeared:
+                pass  # No exit claim until the same runtime confirms it.
+            time.sleep(min(0.05, max(0, deadline - time.monotonic())))
+
+    def _terminated_inventory(self, read_inventory, deadline):
+        self.termination_deadline(deadline)
+
+        def empty(pids):
+            self._validate_pids(pids)
+            if pids:
+                raise SandboxUnavailable("Selected GPU is occupied after original termination")
+
+        pids = read_inventory(empty)
+        empty(pids)
+        if self.check_empty_termination() is not None:
+            raise SandboxUnavailable("Original terminated task became live again")
+        self.termination_deadline(deadline)
+        return pids
+
+    def observe_samples(self, read_inventory, *, termination_deadline=None):
         """Pin identities at each current sample, then confirm their final lifetime."""
-        main = self.check()
+        terminating = termination_deadline is not None
+        if terminating:
+            self.termination_deadline(termination_deadline)
+            try:
+                main = self.check_empty_termination()
+            except ProcessDisappeared:
+                self._wait_original_exit(termination_deadline)
+                main = None
+            if main is None:
+                return self._terminated_inventory(read_inventory, termination_deadline)
+        else:
+            main = self.check()
+        root = None
         sampled = {}
 
         def capture(pids):
@@ -477,17 +561,45 @@ class OwnedProcesses:
                     sampled[pid] = SampledProcess(self.control.host_processes, pid, main["cgroup"])
 
         try:
+            if terminating:
+                try:
+                    root = SampledProcess(self.control.host_processes, main["pid"], main["cgroup"])
+                except ProcessDisappeared as error:
+                    if error.identity is not None and error.identity != main:
+                        raise SandboxUnavailable("Original task changed before binding") from None
+                    self._wait_original_exit(termination_deadline)
+                    return self._terminated_inventory(read_inventory, termination_deadline)
+                if root.identity != main:
+                    raise SandboxUnavailable("Original task changed before binding")
             pids = read_inventory(capture)
             self._validate_pids(pids)
             if set(sampled) != set(pids):
                 raise SandboxUnavailable("Complete inventory differs from its sampled identities")
             for item in sampled.values():
                 item.check(final=True)
-            self.check()
+            if terminating:
+                root.check(final=True)
+                try:
+                    ended = self.check_empty_termination() is None
+                except ProcessDisappeared:
+                    if not root.exited():
+                        raise
+                    self._wait_original_exit(termination_deadline, root)
+                    ended = True
+                if not ended and root.exited():
+                    self._wait_original_exit(termination_deadline, root)
+                    ended = True
+                if ended:
+                    self._terminated_inventory(read_inventory, termination_deadline)
+                self.termination_deadline(termination_deadline)
+            else:
+                self.check()
             return pids
         finally:
             for item in sampled.values():
                 item.close()
+            if root is not None:
+                root.close()
 
     @staticmethod
     def _validate_pids(pids):

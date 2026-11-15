@@ -10,6 +10,7 @@ import pytest
 from judge import container_monitor as monitor_module
 from judge import container_processes as process_module
 from judge.container_monitor import ContainerDeviceMonitor, validate_observation, validate_observer
+from judge.container_processes import ProcessDisappeared
 from judge.nvml_artifacts import (
     DIRECTORY,
     INVENTORY_PROFILE,
@@ -286,11 +287,23 @@ def combined(monitored, monkeypatch):  # noqa: F811
                 raise SandboxUnavailable("An observed host process is outside the original task")
 
         def check(self, *, final=False):
-            if self.view.read_observed(self.pid) != self.identity:
+            try:
+                current = self.view.read_observed(self.pid)
+            except ProcessDisappeared:
+                if final and self.exited():
+                    return
+                raise
+            if current != self.identity:
                 raise SandboxUnavailable("Sampled identity changed")
 
         def close(self):
             pass
+
+        def exited(self):
+            return (
+                self.pid in getattr(item.task, "exited_pids", set())
+                or not item.task.state["State"]["Running"]
+            )
 
     monkeypatch.setattr(process_module, "SampledProcess", Handle)
     monkeypatch.setattr(item.monitor, "read", read)

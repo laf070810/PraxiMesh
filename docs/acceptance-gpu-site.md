@@ -173,6 +173,10 @@ worker 崩溃验收的首个普通 API 任务因观察端轮询触发限流而�
 
 不访问 GPU 的资源矩阵与内存采样显示，原 guest 子进程被 OOM 终止后，共享内存仍会短暂留在原 cgroup。按 [ADR-092](adr/092-nested-sandbox-oom-priority.md) 为私有 sandbox/gofer 固定更高淘汰优先级；351 项相关组件和三组实际 CPU 资源检查通过，分数、原监督进程、内存释放、清理及正确恢复均有实际观察。原 512 MiB 配额、期限和整个任务 OOM 必须失败的条件不变，GPU 路径仍需新匹配镜像重放。两轮 CPU 原始数据分别在 `test-results/resource-memory-diagnostic-2026-11-15/` 与 `test-results/resource-oom-priority-diagnostic-2026-11-15/`。
 
+`2210e04` 的新双镜像实际重放已越过资源检查及后续正确恢复：一次 OOM 后原监督进程继续存活，内存下降，原总限额不变。随后运行到最后的 service-deadline 场景，在查询后对非空列表执行严格存活核对时，原 PID 1 已消失，完整启动仍失败。原容器退出码 124，普通恢复完成、GPU 0 空闲；原 1102.295 秒调用、内存采样和退出事件在 `test-results/oom-priority-local-diagnostic-2026-11-15/observation-1/`。此前准备的该提交发布与服务器脚本尚未执行。
+
+该边界按 [ADR-093](adr/093-terminating-task-sampled-identities.md) 改用同次查询绑定的原任务/成员句柄，并在原期限内确认同一容器停止后重查完整空清单。391 项相关检查和五组实际 CPU/Docker 故障矩阵通过，其中独立期限采样确实跨越原进程退出。CPU 清单是明确夹具，尚不能证明新 NVIDIA 退出观察成功；后续仍须新匹配镜像重放完整 GPU 启动。
+
 ## 待完成的真实范围
 
 重查原卡独占后，使用新冻结版本验证正式任务中的 worker 丢失、原预约清理与正确性恢复，以及升级和曝光恢复。已有结果只证明上述固定版本与实际范围；全部成功前，仍按[需求追踪](requirements.md)保留网站 GPU 发布门槛。

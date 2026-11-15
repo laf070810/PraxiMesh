@@ -329,7 +329,7 @@ class ContainerDeviceMonitor:
         self.check()
         return pids
 
-    def observe_termination(self, service):
+    def observe_termination(self, service, *, deadline=None):
         """Triggered maintenance only; preserve the anchor and all nonempty checks."""
         if (
             self.saved["schema"] != 2
@@ -338,16 +338,9 @@ class ContainerDeviceMonitor:
             or self.owned.record["purpose"] != "maintenance"
         ):
             raise SandboxUnavailable("Termination requires the original full maintenance observer")
-        self.owned.original_state()
-        pids = validate_observation(self.read(), self.saved)
-        if pids:
-            self.owned.require_owned(pids)
-        elif self.owned.check_empty_termination() is None:
-            # Query again after runtime confirmation. A prior empty list cannot
-            # stand in for the original exit or hide a newly arriving process.
-            if validate_observation(self.read(), self.saved):
-                raise SandboxUnavailable("Selected GPU is occupied after original termination")
-            if self.owned.check_empty_termination() is not None:
-                raise SandboxUnavailable("Original terminated task became live again")
+        pids = self.owned.observe_samples(
+            lambda capture: validate_observation(self.read(on_sample=capture), self.saved),
+            termination_deadline=self.owned.termination_deadline(deadline),
+        )
         self.check()
         return pids

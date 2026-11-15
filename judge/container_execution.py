@@ -109,7 +109,7 @@ class KernelTask:
             self.original_record()
             if not self.finishing:
                 if self.fault_observation:
-                    self.monitor.observe_termination(self.service)
+                    self.monitor.observe_termination(self.service, deadline=deadline)
                 else:
                     self.monitor.observe(self.service)
 

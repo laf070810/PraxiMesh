@@ -76,8 +76,9 @@ def flow(monkeypatch, bundle):
         def observe(self, service=None):
             events.append("task-observed" if service is not None else "idle-observed")
 
-        def observe_termination(self, service):
+        def observe_termination(self, service, *, deadline=None):
             assert service is task.service
+            assert deadline is not None
             events.append("termination-observed")
 
     class Service:

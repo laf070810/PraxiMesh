@@ -330,7 +330,7 @@ def observed_task(journal, request):  # noqa: F811
 
     def read(pid):
         if pid not in members:
-            raise SandboxUnavailable("Process disappeared")
+            raise ProcessDisappeared("Process disappeared")
         return copy.deepcopy(members[pid])
 
     control = SimpleNamespace(

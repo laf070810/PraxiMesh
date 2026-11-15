@@ -5,6 +5,7 @@ import io
 import os
 import subprocess
 import sys
+import time
 from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
@@ -167,6 +168,42 @@ def test_handle_does_not_accept_a_different_kernel_descriptor(live_sample, monke
     monkeypatch.setattr(os, "pidfd_open", lambda _pid: actual(os.getpid()))
     with pytest.raises(SandboxUnavailable, match="changed its original PID"):
         SampledProcess(item.view, item.process.pid, item.group)
+
+
+def test_termination_window_uses_real_handles_and_waits_for_runtime_confirmation(live_sample):
+    item = live_sample
+    observer = object.__new__(OwnedProcesses)
+    observer.control = SimpleNamespace(host_processes=item.view)
+    deadline = time.monotonic() + 8
+    observer.record = {"purpose": "maintenance", "arguments": ["unused", str(deadline - 5)]}
+    original = item.view.read(item.process.pid)
+    confirmed_at = None
+    calls = []
+
+    def runtime():
+        # Explicit Docker reporting model around an actual reaped CPU process.
+        if confirmed_at is not None:
+            if time.monotonic() >= confirmed_at:
+                return None
+            raise ProcessDisappeared("Original runtime has not yet confirmed exit")
+        assert item.view.read(item.process.pid) == original
+        return original
+
+    def query(capture):
+        nonlocal confirmed_at
+        calls.append(time.monotonic())
+        if len(calls) == 1:
+            capture([item.process.pid])
+            reap(item)
+            confirmed_at = time.monotonic() + 0.05
+            return [item.process.pid]
+        assert time.monotonic() >= confirmed_at
+        capture([])
+        return []
+
+    observer.check_empty_termination = runtime
+    assert observer.observe_samples(query, termination_deadline=deadline) == [item.process.pid]
+    assert len(calls) == 2 and calls[1] >= confirmed_at
 
 
 @pytest.mark.parametrize(
