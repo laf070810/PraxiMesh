@@ -62,6 +62,7 @@ class DockerModel:
                 "io.praximesh.controller.contract": release["gpu"]["contracts"]["controller"],
                 "io.praximesh.worker.contract": release["gpu"]["contracts"]["worker"],
                 "io.praximesh.controller.observer": manifest_digest(release["gpu"]["management"]),
+                "io.praximesh.controller.pid-observer": "host-pid-v1",
             },
         }
         self.network = {
@@ -156,7 +157,10 @@ class DockerModel:
             "Privileged": False,
             "ReadonlyRootfs": True,
             "CapDrop": ["ALL"],
-            "SecurityOpt": ["no-new-privileges"],
+            "SecurityOpt": ["no-new-privileges", "label=disable"]
+            if "--pid=host" in arguments
+            else ["no-new-privileges"],
+            "PidMode": "host" if "--pid=host" in arguments else "",
             "NetworkMode": self.network["Id"],
             "IpcMode": "private",
             "CgroupnsMode": "private",
@@ -337,8 +341,11 @@ def test_preflight_and_worker_use_fixed_separate_contracts_and_original_lock_han
     check = act("check", "check")
     assert check["State"]["ExitCode"] == 0
     assert not check["HostConfig"]["Devices"] and len(check["Mounts"]) == 1
+    assert check["HostConfig"]["PidMode"] == ""
     assert check["Mounts"][0]["RW"] is False
     created = act("create")
+    assert created["HostConfig"]["PidMode"] == "host"
+    assert state(item)["gpu_runtime"][item.generation["gpu_worker"]]["schema"] == 3
     assert created["Id"] != check["Id"]
     started = act("start")
     assert started["State"]["Running"] is True and model.guard is not None
@@ -354,6 +361,53 @@ def test_preflight_and_worker_use_fixed_separate_contracts_and_original_lock_han
     assert item.database.config["worker_password"] not in json.dumps(state(item))
     assert not any(call[:2] == ["container", "rm"] for call in calls)
     item.publish(enabled=True)  # Terminal check/worker records permit an unchanged pair.
+
+
+def test_new_worker_rejects_old_image_before_claiming_a_container(lifecycle):
+    lifecycle.model.image_config["Labels"].pop("io.praximesh.controller.pid-observer")
+    with pytest.raises(WorkerLifecycleError, match="host PID observation image"):
+        lifecycle.act("create")
+    assert not lifecycle.model.read()["containers"]
+    assert not state(lifecycle.item).get("gpu_runtime")
+
+
+def test_new_worker_rejects_lost_host_pid_mode_before_start(lifecycle):
+    original = lifecycle.act("create")
+    lifecycle.model.change(
+        lambda data: data["containers"][original["Name"]]["HostConfig"].update(PidMode="")
+    )
+    with pytest.raises(WorkerLifecycleError):
+        lifecycle.act("start")
+    assert not any(call[:2] == ["container", "start"] for call in lifecycle.model.read()["calls"])
+
+
+def test_legacy_private_pid_worker_is_stopped_without_conversion_or_restart(lifecycle):
+    from scripts.deploy_gpu_oom import runtime_fingerprint
+
+    original = lifecycle.act("create")
+    host = lifecycle.item.coordinator()
+    data = lifecycle.model.read()
+    with host.locked():
+        record = host.state["gpu_runtime"][original["Name"][1:]]
+        record["schema"] = 2
+        record["arguments"].remove("--pid=host")
+        info = data["containers"][original["Name"]]
+        info["HostConfig"].update(PidMode="", SecurityOpt=["no-new-privileges"])
+        record["runtime_sha256"] = runtime_fingerprint(info, record)
+        host.state["gpu_workers"][lifecycle.item.generation["id"]]["runtime_sha256"] = record[
+            "runtime_sha256"
+        ]
+        frozen = copy.deepcopy(record)
+        host.save()
+    lifecycle.model.save(data)
+    with pytest.raises(WorkerLifecycleError, match="only be stopped or retired"):
+        lifecycle.act("start")
+    stopped = lifecycle.act("stop")
+    assert stopped["Id"] == original["Id"] and stopped["HostConfig"]["PidMode"] == ""
+    record = state(lifecycle.item)["gpu_runtime"][original["Name"][1:]]
+    for key in ("schema", "arguments", "runtime_sha256", "id", "metadata"):
+        assert record[key] == frozen[key]
+    assert not any(call[:2] == ["container", "start"] for call in lifecycle.model.read()["calls"])
 
 
 def test_worker_cannot_start_without_completed_fixed_preflight(lifecycle):

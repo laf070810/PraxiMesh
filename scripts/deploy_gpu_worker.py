@@ -16,7 +16,13 @@ from datetime import datetime
 from judge.container_controller import SOCKET, STATE, identity
 from judge.container_deployment_config import OWNER, canonical, digest
 from judge.container_journal import private
-from judge.container_processes import HOST_PROC
+from judge.container_processes import (
+    HOST_PID_SECURITY_OPTIONS,
+    HOST_PROC,
+    PID_OBSERVER_LABEL,
+    PID_OBSERVER_PROFILE,
+    host_pid_security_options,
+)
 from judge.container_worker_config import read_config
 from scripts.deploy_gpu import GPUDeploymentNode, read_private
 from scripts.deploy_gpu_config import context, frozen
@@ -204,9 +210,10 @@ class WorkerRuntime:
         try:
             valid = (
                 type(record) is dict
-                and set(record) == FIELDS | ({"oom"} if record.get("schema") == 2 else set())
+                and set(record) == FIELDS | ({"oom"} if record.get("schema") in {2, 3} else set())
                 and type(record["schema"]) is int
-                and record["schema"] in {1, 2}
+                and record["schema"] in {1, 2, 3}
+                and (record["schema"] != 3 or self.mode == "worker")
                 and re.fullmatch(r"[a-f0-9]{32}", record["token"])
                 and record["mode"] == self.mode
                 and record["generation"] == self.generation
@@ -226,7 +233,7 @@ class WorkerRuntime:
                 )
                 and str(uuid.UUID(record["operation"])) == record["operation"]
             )
-            if record["schema"] == 2:
+            if record["schema"] in {2, 3}:
                 validate_daemon(record["oom"])
                 valid = (
                     valid
@@ -317,7 +324,9 @@ class WorkerRuntime:
             "--log-opt=compress=false",
             "--tmpfs=/tmp:" + TMPFS,
         ]
-        if record["schema"] == 2:
+        if record["schema"] == 3:
+            result += ["--pid=host"]
+        if record["schema"] in {2, 3}:
             result += ["--oom-score-adj=" + str(max(0, record["oom"]["oom_score_adj"]))]
         for key, value in self.labels(record).items():
             result += ["--label", key + "=" + value]
@@ -370,7 +379,10 @@ class WorkerRuntime:
             "Privileged": False,
             "ReadonlyRootfs": True,
             "CapDrop": ["ALL"],
-            "SecurityOpt": ["no-new-privileges"],
+            "SecurityOpt": HOST_PID_SECURITY_OPTIONS
+            if record["schema"] == 3
+            else ["no-new-privileges"],
+            "PidMode": "host" if record["schema"] == 3 else "",
             "NetworkMode": record["network"]["id"],
             "IpcMode": "private",
             "CgroupnsMode": "private",
@@ -400,6 +412,10 @@ class WorkerRuntime:
             and info["Image"] == self.generation["manifest"]["images"]["gpu_worker"]
             and (record["id"] is None or info["Id"] == record["id"])
             and digest(image) == record["image_config_sha256"]
+            and (
+                record["schema"] != 3
+                or image.get("Labels", {}).get(PID_OBSERVER_LABEL) == PID_OBSERVER_PROFILE
+            )
             and config.get("User") == "0:0"
             and config.get("Hostname") == self.name
             and config.get("Entrypoint") == image["Entrypoint"]
@@ -422,7 +438,6 @@ class WorkerRuntime:
                     "CapAdd",
                     "DeviceRequests",
                     "DeviceCgroupRules",
-                    "PidMode",
                     "UTSMode",
                     "UsernsMode",
                     "Links",
@@ -613,8 +628,15 @@ class WorkerRuntime:
                     raise WorkerLifecycleError(
                         "Worker creation requires a recorded deployment generation"
                     )
+                image = self.image()
+                if self.mode == "worker":
+                    host_pid_security_options(self.node.engine.verify())
+                    if image.get("Labels", {}).get(PID_OBSERVER_LABEL) != PID_OBSERVER_PROFILE:
+                        raise WorkerLifecycleError(
+                            "A new GPU worker requires the host PID observation image contract"
+                        )
                 self.record = {
-                    "schema": 2,
+                    "schema": 3 if self.mode == "worker" else 2,
                     "oom": self.daemon_oom(),
                     "token": uuid.uuid4().hex,
                     "mode": self.mode,
@@ -622,7 +644,7 @@ class WorkerRuntime:
                     "binding_sha256": digest(self.binding),
                     "metadata": metadata,
                     "network": self.network(),
-                    "image_config_sha256": digest(self.image()),
+                    "image_config_sha256": digest(image),
                     "arguments": None,
                     "id": None,
                     "runtime_sha256": None,
@@ -738,6 +760,12 @@ class WorkerRuntime:
             )
         if self.legacy_proof() is not None:
             raise WorkerLifecycleError("A legacy OOM recovery proof only permits retirement")
+        if self.mode == "worker":
+            if record["schema"] != 3:
+                raise WorkerLifecycleError(
+                    "Legacy private-PID GPU workers may only be stopped or retired"
+                )
+            host_pid_security_options(self.node.engine.verify())
         info = self.inspect()
         if record["phase"] in {"running", "completed"}:
             if info["State"]["StartedAt"] != record["started_at"]:
@@ -790,7 +818,7 @@ class WorkerRuntime:
             return self.confirm_start(info)
         if not stopped(info):
             raise WorkerLifecycleError("Worker changed before its recorded start")
-        if record["schema"] == 2 and self.daemon_oom() != record["oom"]:
+        if record["schema"] in {2, 3} and self.daemon_oom() != record["oom"]:
             raise WorkerLifecycleError("Original daemon OOM defaults changed before startup")
         self.command("container", "start", record["id"], timeout=30)
         return self.confirm_start(self.inspect())

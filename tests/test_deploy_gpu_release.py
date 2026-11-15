@@ -414,6 +414,7 @@ def model(tmp_path, monkeypatch):
         module, "verify", lambda path, sha: json.loads((Path(path) / "manifest.json").read_text())
     )
     monkeypatch.setattr(module, "require_protocol", lambda generation, release: None)
+    monkeypatch.setattr(module, "require_host_pid_protocol", lambda generation, release: None)
     monkeypatch.setattr(module, "inspect_images", lambda manifest: None)
     monkeypatch.setattr(module, "initial_content_commands", lambda manifest: [("content_import",)])
 

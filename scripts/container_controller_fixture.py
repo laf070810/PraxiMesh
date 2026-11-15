@@ -227,7 +227,7 @@ def main():
             else:
                 assert found == pids == []
                 report["external_occupation_rejected"] = False
-            report["private_pid"] = os.getpid()
+            report["controller_pid"] = os.getpid()
             report["host_pid"] = int(os.readlink("/run/praximesh-host-proc/self"))
         if mode == "hold":
             save("held", report)

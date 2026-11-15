@@ -19,7 +19,13 @@ from judge.container_monitor import devices
 from judge.container_practice_host import RECORD, HostWorkspace
 from judge.container_practice_protocol import ENTRY, MODES, PROTOCOL, hello
 from judge.container_practice_state import require
-from judge.container_processes import HOST_PROC
+from judge.container_processes import (
+    HOST_PID_SECURITY_OPTIONS,
+    HOST_PROC,
+    PID_OBSERVER_LABEL,
+    PID_OBSERVER_PROFILE,
+    host_pid_security_options,
+)
 from judge.container_service import HEX_ID, IMAGE_ID
 from judge.gpu_execution_contract import canonical_digest
 from judge.nvml_artifacts import manifest_digest
@@ -99,6 +105,7 @@ def arguments(host, record):
         "--network=none",
         "--ipc=private",
         "--cgroupns=private",
+        *(["--pid=host"] if record["schema"] == 2 else []),
         "--pids-limit=128",
         "--memory=512m",
         "--memory-swap=512m",
@@ -179,7 +186,7 @@ def validate_record(host, record):
     value = record["hello"]
     require(
         type(record["schema"]) is int
-        and record["schema"] == 1
+        and record["schema"] in {1, 2}
         and record["scope"] == SCOPE
         and canonical_digest(record["anchor"]) == canonical_digest(host.anchor)
         and type(record["nonce"]) is str
@@ -223,6 +230,11 @@ def validate_record(host, record):
         record["image_config"],
         value["controller_contract"],
         host.mounts["device_observer"]["library"],
+    )
+    require(
+        record["schema"] != 2
+        or record["image_config"]["Labels"].get(PID_OBSERVER_LABEL) == PID_OBSERVER_PROFILE,
+        "Original host PID observer image contract changed",
     )
     registered = record["id"] is not None
     require(
@@ -270,7 +282,10 @@ def validate_container(host, record, info):
         "Privileged": False,
         "ReadonlyRootfs": True,
         "CapDrop": ["ALL"],
-        "SecurityOpt": ["no-new-privileges"],
+        "SecurityOpt": HOST_PID_SECURITY_OPTIONS
+        if record["schema"] == 2
+        else ["no-new-privileges"],
+        "PidMode": "host" if record["schema"] == 2 else "",
         "NetworkMode": "none",
         "IpcMode": "private",
         "CgroupnsMode": "private",
@@ -330,7 +345,6 @@ def validate_container(host, record, info):
                 "CapAdd",
                 "DeviceRequests",
                 "DeviceCgroupRules",
-                "PidMode",
                 "UTSMode",
                 "UsernsMode",
                 "Links",
@@ -500,6 +514,7 @@ class ControllerInvocation:
             "An immutable controller image is required",
         )
         with self.host.physical() as state:
+            host_pid_security_options(self.host.engine.verify())
             operation = state.operation()
             if mode != "recover":
                 require(
@@ -531,6 +546,10 @@ class ControllerInvocation:
                     self.host.mounts["device_observer"]["library"],
                 )
             )
+            require(
+                config["Labels"].get(PID_OBSERVER_LABEL) == PID_OBSERVER_PROFILE,
+                "A new local controller requires the host PID observation image contract",
+            )
             if self.record is not None:
                 name = "local-controller." + self.record["nonce"] + ".done.json"
                 existing = state.journal.read(name)
@@ -541,7 +560,7 @@ class ControllerInvocation:
                 if existing is None:
                     state.journal.write(name, self.record, create=True)
             self.record = {
-                "schema": 1,
+                "schema": 2,
                 "scope": SCOPE,
                 "anchor": deepcopy(self.host.anchor),
                 "nonce": nonce,
@@ -630,6 +649,8 @@ class ControllerInvocation:
         )
         with self.host.physical():
             self.check_fresh()
+            require(self.record["schema"] == 2, "Legacy local controllers may only be cleaned")
+            host_pid_security_options(self.host.engine.verify())
             info = self.present()
             require(
                 info is not None

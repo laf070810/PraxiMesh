@@ -2,6 +2,7 @@
 FROM python:3.11.15-slim-bookworm@sha256:77923445c077d8eb971b14b2b114a1d9cd4a87edb4c75654820ca4832ee8cb15
 ARG CONTROLLER_CONTRACT
 LABEL io.praximesh.controller.contract=${CONTROLLER_CONTRACT}
+LABEL io.praximesh.controller.pid-observer=host-pid-v1
 COPY docker /usr/local/bin/docker
 COPY source /opt/praximesh/
 RUN mkdir -p /run/praximesh-engine /var/lib/praximesh-control && chmod 700 /run/praximesh-engine /var/lib/praximesh-control && printf '%s\n' "$CONTROLLER_CONTRACT" > /opt/praximesh/controller-contract

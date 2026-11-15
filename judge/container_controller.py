@@ -13,7 +13,12 @@ from judge.container_driver import SOURCES as DRIVER_SOURCES
 from judge.container_gpu import SOURCES as GPU_SOURCES
 from judge.container_journal import ContainerJournal, private
 from judge.container_monitor import check_prerequisites, validate_observer
-from judge.container_processes import HostProcessView, host_manifest, validate_manifest
+from judge.container_processes import (
+    HostProcessView,
+    host_manifest,
+    host_pid_security_options,
+    validate_manifest,
+)
 from judge.container_runtime_service import ROOT
 from judge.container_service import LocalEngine
 from judge.gpu_device_lock import DeviceLock
@@ -190,6 +195,8 @@ class ContainerController:
                 self.host_processes = HostProcessView(self.saved["host_processes"])
             self.check_mounts()
             self.engine = LocalEngine(SOCKET)
+            if version >= 3:
+                host_pid_security_options(self.engine.verify())
             self.guard = DeviceLock(STATE / "locks", device).acquire()
             self.journal = ContainerJournal(STATE / "journal", self.guard, self.engine)
             if self.journal.identity["engine"] != self.saved["engine"]:

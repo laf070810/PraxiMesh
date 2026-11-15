@@ -6,6 +6,7 @@ ARG CONTROLLER_CONTRACT
 ARG WORKER_CONTRACT
 ARG OBSERVER_CONTRACT
 LABEL io.praximesh.controller.contract=${CONTROLLER_CONTRACT} io.praximesh.worker.contract=${WORKER_CONTRACT} io.praximesh.controller.observer=${OBSERVER_CONTRACT}
+LABEL io.praximesh.controller.pid-observer=host-pid-v1
 COPY docker /usr/local/bin/docker
 COPY source /opt/praximesh/
 COPY observer /opt/praximesh/nvml/

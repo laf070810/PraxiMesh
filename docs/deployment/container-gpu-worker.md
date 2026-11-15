@@ -1,6 +1,6 @@
 # 容器 GPU worker：构建、配置与启动
 
-适用于已经使用 PostgreSQL、准备在 Linux x86_64 节点验收独占单卡 CUDA 评测的维护者。专用 worker 命令、固定镜像和独立 Compose 文件已提供；完整启动、两题普通 API 和 CPU→GPU→GPU→CPU 正常切换已有[真实证据](../acceptance-gpu-site.md)，**当前发现外部进程漏报，正在修复，公共激活仍关闭**。当前普通单机 Compose 的 SQLite 数据不能直接接入这个 worker。方案比较见[部署首页](README.md)，检查目录见 [GPU 指南](gpu.md#validation-options)。
+适用于已经使用 PostgreSQL、准备在 Linux x86_64 节点验收独占单卡 CUDA 评测的维护者。专用 worker 命令、固定镜像和独立 Compose 文件已提供；完整启动、两题普通 API 和 CPU→GPU→GPU→CPU 正常切换已有[真实证据](../acceptance-gpu-site.md)，**进程观察修复已通过专项检查，完整恢复验收未完成，公共激活仍关闭**。当前普通单机 Compose 的 SQLite 数据不能直接接入这个 worker。方案比较见[部署首页](README.md)，检查目录见 [GPU 指南](gpu.md#validation-options)。
 
 它复用原有账号、题目版本、GPU 预约和队列。可信控制容器使用数据库网络和私有 Docker socket；学员任务继续在单独的无网络 gVisor guest 中运行，拿不到这些挂载或数据库凭据。初始化、完整二十四阶段、当前私有凭证、领取、取消和隔离停用均由同一生命周期完成。
 
@@ -13,6 +13,8 @@
 - 所有控制器使用同一持久私有状态和锁目录。原宿主仍有任务或预约时，先由原后端完成恢复；不要另建锁目录规避竞争。
 
 宿主 procfs 必须递归只读且为 `rprivate`。Docker 的递归只读子挂载依赖 Linux 5.12 及以上；启动端仍检查实际挂载，条件不符会拒绝启动。[Docker 说明](https://docs.docker.com/engine/storage/bind-mounts/#recursive-mounts)
+
+可信 GPU worker 还须使用 `pid: host`，才能完整观察外部 NVIDIA 进程。新版 Compose 已声明此项；无设备 `gpu-check` 和学员任务保留私有 PID。当前支持 rootless daemon 未启用 SELinux 容器隔离、且保留默认 seccomp 的环境；不通过关闭现有安全策略兼容其他环境。旧镜像和旧私有 PID worker 不满足新版就绪契约，不能只更改启动参数重用旧凭证。背景、兼容与尚未完成的硬件验证见 [ADR-086](../adr/086-gpu-observer-pid-namespace.md)。
 
 ## 构建固定镜像，不访问 GPU
 

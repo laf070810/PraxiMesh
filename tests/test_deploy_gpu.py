@@ -68,7 +68,14 @@ def prepared(tmp_path, monkeypatch, private_config):
         calls.append(args)
         return SimpleNamespace(stdout=engine_id.encode(), returncode=0)
 
-    monkeypatch.setattr(engine, "verify", lambda: {"ID": engine_id})
+    monkeypatch.setattr(
+        engine,
+        "verify",
+        lambda: {
+            "ID": engine_id,
+            "SecurityOptions": ["name=rootless", "name=seccomp,profile=builtin"],
+        },
+    )
     monkeypatch.setattr(engine, "run", run)
     monkeypatch.setattr(deploy_gpu, "LocalEngine", lambda path: engine)
     observer = synthetic_observer()

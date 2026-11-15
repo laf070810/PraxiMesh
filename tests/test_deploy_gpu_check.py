@@ -29,6 +29,41 @@ from tests.test_deploy_gpu_readiness import readiness as readiness
 from tests.test_deploy_gpu_worker import lifecycle as lifecycle
 
 
+@pytest.mark.parametrize("profile", [None, "private-pid-v0", "host-pid-v1"])
+def test_new_activation_reads_pid_capability_from_original_archive_only(tmp_path, profile):
+    from scripts.release import source_archive
+
+    name = "judge/container_processes.py"
+    root = tmp_path / "source"
+    (root / "judge").mkdir(parents=True)
+    raw = (
+        ("PID_OBSERVER_PROFILE = " + repr(profile) + "\n") if profile is not None else ""
+    ) + "raise RuntimeError('Archived code must never execute')\n"
+    (root / name).write_text(raw)
+    hashes = {name: hashlib.sha256(raw.encode()).hexdigest()}
+    release = tmp_path / "release"
+    release.mkdir()
+    source_archive(root, hashes, release / "source.tar.gz")
+    generation = {
+        "manifest": {
+            "source_files": hashes,
+            "gpu": {
+                "source_scopes": {scope: [name] for scope in ("execution", "controller", "worker")}
+            },
+        }
+    }
+    # A different file outside the archive must not supply a missing capability.
+    (root / name).write_text("PID_OBSERVER_PROFILE = 'host-pid-v1'\n")
+    if profile == "host-pid-v1":
+        check_module.require_host_pid_protocol(generation, release)
+        generation["manifest"]["gpu"]["source_scopes"]["execution"] = []
+        with pytest.raises(GPUCandidateError, match="omits"):
+            check_module.require_host_pid_protocol(generation, release)
+    else:
+        with pytest.raises(RuntimeError, match="declaration|unsupported"):
+            check_module.require_host_pid_protocol(generation, release)
+
+
 def test_only_exact_reviewed_legacy_sources_get_shorter_cleanup_wait():
     root = Path(__file__).resolve().parents[1]
     contents = {

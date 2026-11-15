@@ -62,6 +62,7 @@ def readiness(lifecycle, configured, monkeypatch, tmp_path):
     # Full image archive verification is tested separately; source reads below are real.
     monkeypatch.setattr(module, "verify", lambda path, sha: copy.deepcopy(manifest))
     engine = dict(configured.engine, ID=item.bound.prepared.engine_id)
+    engine["SecurityOptions"] = ["name=rootless", "name=seccomp,profile=builtin"]
     monkeypatch.setattr(item.bound.prepared.engine, "verify", lambda: copy.deepcopy(engine))
     lifecycle.act("check", "check")
     lifecycle.act("create")
@@ -135,6 +136,19 @@ def test_readiness_observes_original_full_environment_without_mutating_state(rea
     assert all(call[1] in {"ls", "inspect"} for call in value.model.read()["calls"][calls:])
     assert value.model.guard is not None  # Observer never takes the worker's device lock.
     assert value.item.database.config["worker_password"] not in json.dumps(result)
+
+
+def test_legacy_pid_runtime_cannot_supply_new_exposure_readiness(readiness, monkeypatch):
+    original = module.WorkerRuntime.load
+
+    def legacy(runtime):
+        record = original(runtime)
+        return record | {"schema": 2} if record is not None else None
+
+    monkeypatch.setattr(module.WorkerRuntime, "load", legacy)
+    with pytest.raises(GPUReadinessError, match="original running worker generation"):
+        readiness.observe()
+    assert readiness.calls == []
 
 
 @pytest.mark.parametrize(

@@ -16,6 +16,7 @@ from judge.container_journal import private  # noqa: E402
 from judge.container_monitor import validate_observer  # noqa: E402
 from judge.container_practice_state import reject_local_state  # noqa: E402
 from judge.container_preparation import create_json, initialize_state  # noqa: E402
+from judge.container_processes import host_pid_security_options  # noqa: E402
 from judge.container_service import IMAGE_ID, LocalEngine  # noqa: E402
 from judge.container_worker_config import MAX_CONFIG, validate_config  # noqa: E402
 from judge.driver_artifacts import validate_manifest  # noqa: E402
@@ -153,9 +154,9 @@ def main():
                         "database": database,
                     }
                 )
-            initialize_state(
-                args.state, LocalEngine(args.docker_socket), args.gpu, image["management_manifest"]
-            )
+            engine = LocalEngine(args.docker_socket)
+            host_pid_security_options(engine.verify())
+            initialize_state(args.state, engine, args.gpu, image["management_manifest"])
         elif any((args.gpu, args.docker_socket, args.worker_image_manifest)):
             raise ValueError("Metadata initialization options require --initialize")
         if args.prepare_only:

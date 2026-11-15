@@ -155,7 +155,7 @@ def runtime_fingerprint(info, record, proof=None):
         return record["runtime_sha256"]
     if record["schema"] == 1:
         return fingerprint(info)
-    if record["schema"] != 2:
+    if record["schema"] not in {2, 3}:
         raise ValueError("Unknown worker OOM lifecycle schema")
     validate_daemon(record["oom"])
     runtime = info["HostConfig"]

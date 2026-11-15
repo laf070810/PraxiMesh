@@ -70,6 +70,7 @@ def observation_checks(
         "wrong-driver",
         "wrong-device",
         "missing-proc",
+        "private-pid",
         "nonempty-caps",
     ) + (("wrong-utility", "legacy-contract") if full else ())
     for name in defects:
@@ -101,6 +102,7 @@ def observation_checks(
             config,
             "observe-device-nonempty-caps" if name == "nonempty-caps" else "observe-device",
             host_processes=name != "missing-proc",
+            host_pid=name not in {"missing-proc", "private-pid"},
             observation_devices=selection,
         )
         controls.append(control)
@@ -131,6 +133,7 @@ def observation_checks(
         "observe-device",
         host_processes=True,
         observation_devices=tuple(mapped),
+        host_pid=True,
     )
     controls.append(control)
     control.start()
@@ -143,7 +146,10 @@ def observation_checks(
     assert sorted(set(host_before)) == initial == during == sorted(set(host_after)), (
         "Inventory changed during comparison; retain the original observation"
     )
-    assert active["private_pid"] == 1 and active["host_pid"] != 1
+    assert active["controller_pid"] == active["host_pid"] and active["host_pid"] > 1
+    assert active["task_anchor"]["pid"] > 1
+    assert len(active["task_anchor"]["nspids"]) >= 2
+    assert active["task_anchor"]["nspids"][-1] == 1
     assert active["external_occupation_rejected"] == bool(initial)
     assert active["foreign_task_processes_rejected"] == bool(during)
     report["real_external_gpu_processes_observed"] = bool(initial)

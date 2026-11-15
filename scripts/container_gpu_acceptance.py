@@ -129,6 +129,7 @@ def main():
                 mode,
                 host_processes=True,
                 observation_devices=tuple(devices(observer)),
+                host_pid=True,
             )
             controls.append(control)
             row = {"name": name, "passed": False}

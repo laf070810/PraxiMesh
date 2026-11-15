@@ -37,6 +37,7 @@ services:
   gpu-worker:
     <<: *worker
     profiles: [gpu]
+    pid: host
     volumes:
       - type: bind
         source: ${PRAXIMESH_GPU_STATE:?private state directory required}

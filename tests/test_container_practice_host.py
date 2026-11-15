@@ -38,7 +38,14 @@ def prepared(tmp_path, monkeypatch):
     engine = LocalEngine(tmp_path / "docker.sock")
     fake = Engine()
     monkeypatch.setattr(engine, "run", fake.run)
-    monkeypatch.setattr(engine, "verify", lambda: {"ID": fake.identifier})
+    monkeypatch.setattr(
+        engine,
+        "verify",
+        lambda: {
+            "ID": fake.identifier,
+            "SecurityOptions": ["name=rootless", "name=seccomp,profile=builtin"],
+        },
+    )
     observer = {
         "schema": 2,
         "minor": 0,

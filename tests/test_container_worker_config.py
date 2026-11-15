@@ -5,6 +5,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -83,11 +84,13 @@ def test_invalid_preparation_options_do_not_read_a_device(tmp_path, monkeypatch,
     assert not (tmp_path / "new").exists()
 
 
+@pytest.mark.parametrize("selinux", [False, True])
 def test_prepare_only_delegates_explicit_metadata_initialization_without_worker_settings(
     tmp_path,
     monkeypatch,
     configuration,
     configured,
+    selinux,
 ):
     metadata = tmp_path / "worker-image.json"
     write_private(
@@ -100,7 +103,12 @@ def test_prepare_only_delegates_explicit_metadata_initialization_without_worker_
             ],
         },
     )
-    engine = object()
+    engine = SimpleNamespace(
+        verify=lambda: {
+            "SecurityOptions": ["name=rootless", "name=seccomp,profile=builtin"]
+            + (["name=selinux"] if selinux else [])
+        }
+    )
     calls = []
     monkeypatch.setattr(preparation, "LocalEngine", lambda *a: engine)
     monkeypatch.setattr(preparation, "initialize_state", lambda *args: calls.append(args))
@@ -122,7 +130,10 @@ def test_prepare_only_delegates_explicit_metadata_initialization_without_worker_
             str(metadata),
         ],
     )
-    assert preparation.main() == 0
+    assert preparation.main() == (1 if selinux else 0)
+    if selinux:
+        assert calls == [] and not (tmp_path / "new").exists()
+        return
     assert len(calls) == 1 and calls[0][1] is engine and calls[0][2] == configuration["gpu"]
     assert calls[0][3] == json.loads(metadata.read_text())["management_manifest"]
     assert not (tmp_path / "new" / "worker.json").exists()

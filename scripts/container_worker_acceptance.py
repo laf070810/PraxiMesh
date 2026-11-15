@@ -295,7 +295,9 @@ def main():
         plan = json.loads(rendered.stdout)
         assert set(plan["services"]) == {"gpu-check", "gpu-worker"}
         assert not plan["services"]["gpu-check"].get("devices")
+        assert not plan["services"]["gpu-check"].get("pid")
         assert plan["services"]["gpu-worker"]["profiles"] == ["gpu"]
+        assert plan["services"]["gpu-worker"]["pid"] == "host"
         assert worker_password.encode() not in rendered.stdout
         (output / "compose.json").write_text(redact(rendered.stdout))
 

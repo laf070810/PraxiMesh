@@ -120,7 +120,9 @@ def old_failed_check(lifecycle, *, initial_stop=True):
             record["schema"] = 1
             record.pop("oom")
             record["arguments"] = [
-                a for a in record["arguments"] if not a.startswith("--oom-score-adj=")
+                a
+                for a in record["arguments"]
+                if not a.startswith("--oom-score-adj=") and a != "--pid=host"
             ]
             info = data["containers"][
                 "/"
@@ -128,6 +130,8 @@ def old_failed_check(lifecycle, *, initial_stop=True):
                 + ("-check" if record["mode"] == "check" else "")
             ]
             info["HostConfig"]["OomScoreAdj"] = 0
+            info["HostConfig"]["PidMode"] = ""
+            info["HostConfig"]["SecurityOpt"] = ["no-new-privileges"]
             record["runtime_sha256"] = fingerprint(info)
             key = "gpu_checks" if record["mode"] == "check" else "gpu_workers"
             host.state[key][record["generation"]["id"]]["runtime_sha256"] = record["runtime_sha256"]

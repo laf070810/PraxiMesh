@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 from judge.container_deployment_config import canonical, digest
+from judge.container_processes import PID_OBSERVER_PROFILE
 from scripts.deploy_gpu_config import context
 from scripts.deploy_gpu_readiness import GPUReadiness, literal
 from scripts.deploy_gpu_worker import HEX, started
@@ -164,6 +165,22 @@ def require_protocol(generation, release):
     if literal(contents, SOURCES[0], "PROTOCOL") != PROTOCOL:
         raise GPUCandidateError("Frozen GPU candidate protocol is unsupported")
     return cleanup_database_timeout(contents)
+
+
+def require_host_pid_protocol(generation, release):
+    """New activation capability comes from verified bytes, never old image labels alone."""
+    manifest = generation["manifest"]
+    name = "judge/container_processes.py"
+    if any(
+        name not in manifest["gpu"]["source_scopes"][scope]
+        for scope in ("execution", "controller", "worker")
+    ):
+        raise GPUCandidateError("Frozen release omits the host PID observation contract")
+    contents = verify_source(
+        Path(release) / "source.tar.gz", manifest["source_files"], capture=(name,)
+    )
+    if literal(contents, name, "PID_OBSERVER_PROFILE") != PID_OBSERVER_PROFILE:
+        raise GPUCandidateError("Frozen host PID observation protocol is unsupported")
 
 
 class GPUCandidateCheck:

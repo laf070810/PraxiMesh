@@ -10,7 +10,7 @@ from pathlib import Path
 from scripts.deploy_gpu import GPUDeploymentNode
 from scripts.deploy_gpu_candidate import MAX_ATTEMPTS
 from scripts.deploy_gpu_candidate import validate_record as validate_preparation
-from scripts.deploy_gpu_check import require_protocol
+from scripts.deploy_gpu_check import require_host_pid_protocol, require_protocol
 from scripts.deploy_gpu_check import validate_record as validate_check
 from scripts.deploy_gpu_config import (
     FILES,
@@ -452,6 +452,7 @@ class GPURelease:
         if gpu(candidate):
             candidate["gpu_worker"] = prefix + "-gpu-worker"
             require_protocol(candidate, release)
+            require_host_pid_protocol(candidate, release)
         archives = {identifier: str(release)}
         if gpu(previous):
             archives[previous["id"]] = str(self.prior_archive(previous))

@@ -16,6 +16,9 @@ from judge.sandbox import SandboxUnavailable
 
 HOST_PROC = Path("/run/praximesh-host-proc")
 MAX_PIDS = 4096
+PID_OBSERVER_LABEL = "io.praximesh.controller.pid-observer"
+PID_OBSERVER_PROFILE = "host-pid-v1"
+HOST_PID_SECURITY_OPTIONS = ["no-new-privileges", "label=disable"]
 
 
 def host_pid_security_options(info):
@@ -34,7 +37,7 @@ def host_pid_security_options(info):
         or any(item.split(",", 1)[0] == "name=selinux" for item in options)
     ):
         raise SandboxUnavailable("Host PID observation cannot disable an active security policy")
-    return ["no-new-privileges", "label=disable"]
+    return list(HOST_PID_SECURITY_OPTIONS)
 
 
 class ProcessDisappeared(SandboxUnavailable):

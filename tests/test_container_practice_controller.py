@@ -72,7 +72,10 @@ def snapshot(host, record):
             "Privileged": False,
             "ReadonlyRootfs": True,
             "CapDrop": ["ALL"],
-            "SecurityOpt": ["no-new-privileges"],
+            "SecurityOpt": ["no-new-privileges", "label=disable"]
+            if "--pid=host" in record["arguments"]
+            else ["no-new-privileges"],
+            "PidMode": "host" if "--pid=host" in record["arguments"] else "",
             "NetworkMode": "none",
             "IpcMode": "private",
             "CgroupnsMode": "private",
@@ -125,6 +128,7 @@ def lifecycle(prepared, monkeypatch):
             ],
             "Labels": {
                 "io.praximesh.controller.contract": module.controller_digest(),
+                module.PID_OBSERVER_LABEL: module.PID_OBSERVER_PROFILE,
                 "io.praximesh.controller.observer": module.manifest_digest(
                     host.mounts["device_observer"]["library"]
                 ),
@@ -193,12 +197,51 @@ def start(value):
 def test_fixed_creation_start_binding_and_cleanup_without_physical_lock(lifecycle):
     value = lifecycle
     original = start(value)
+    assert value.state["HostConfig"]["PidMode"] == "host"
+    assert value.host.read(RECORD)["schema"] == 2
     assert value.host.read(RECORD)["started_at"] == STARTED
     assert value.host.read(RECORD)["id"] == original
     with DeviceLock(value.host.root / "locks", value.host.device):
         value.control.remove()
     assert value.host.read(RECORD)["phase"] == "removed"
     assert value.state is None
+
+
+def test_legacy_local_controller_can_only_be_removed_under_original_contract(lifecycle):
+    value = lifecycle
+    create(value)
+    record = copy.deepcopy(value.host.read(RECORD))
+    record["schema"] = 1
+    record["arguments"].remove("--pid=host")
+    value.state["HostConfig"].update(PidMode="", SecurityOpt=["no-new-privileges"])
+    record["runtime_sha256"] = module.fingerprint(value.state)
+    value.host.write_record(record)
+    value.control.record = copy.deepcopy(record)
+    with pytest.raises(SandboxUnavailable, match="only be cleaned"):
+        value.control.request_start()
+    recovered = module.ControllerInvocation(value.host)
+    recovered.remove()
+    assert recovered.record["schema"] == 1
+    assert recovered.record["arguments"] == record["arguments"]
+    assert recovered.record["id"] == record["id"]
+    assert recovered.record["phase"] == "removed" and value.state is None
+
+
+def test_local_host_pid_start_refuses_a_new_selinux_policy(lifecycle, monkeypatch):
+    value = lifecycle
+    create(value)
+    original = copy.deepcopy(value.host.read(RECORD))
+    monkeypatch.setattr(
+        value.host.engine,
+        "verify",
+        lambda: {
+            "ID": value.prepared.fake.identifier,
+            "SecurityOptions": ["name=rootless", "name=seccomp,profile=builtin", "name=selinux"],
+        },
+    )
+    with pytest.raises(SandboxUnavailable, match="active security policy"):
+        value.control.request_start()
+    assert value.host.read(RECORD) == original
     assert not (value.host.root / "journal" / OPERATION).exists()
     assert not any(args[:2] == ("container", "start") for args in value.calls)
     with pytest.raises(SandboxUnavailable, match="Recover the previous"):

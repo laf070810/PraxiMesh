@@ -134,6 +134,7 @@ class GPUReadiness:
         if (
             not config["enabled"]
             or record is None
+            or record["schema"] != 3
             or record["phase"] != "running"
             or record["metadata"] != metadata
         ):
