@@ -95,10 +95,14 @@ def aborting(quiescence, monkeypatch):
         }
         host.state["gpu_releases"] = {
             item.token: {
+                "schema": 1,
                 "operation": item.token,
                 "previous": previous,
                 "candidate": copy.deepcopy(item.generation),
                 "phase": "recovering",
+                "archives": {item.generation["id"]: str(item.root / "frozen-release")},
+                "initial_content": False,
+                "recoveries": [],
             }
         }
         host.save()
@@ -309,6 +313,51 @@ def test_completed_abort_allows_only_original_configuration_retirement(aborting)
     for key in ("gpu_preparations", "gpu_recoveries", "gpu_startup_aborts", "current"):
         assert after[key] == before[key]
     assert value.q.read()["frozen"]
+
+
+@pytest.mark.parametrize("defect", [None, "no-recovery", "candidate-target", "unfinished"])
+def test_retired_abort_allows_next_operation_only_after_original_cpu_recovery(aborting, defect):
+    from scripts.deploy_gpu_abort import completed_recovery_abort
+    from scripts.deploy_gpu_worker import WorkerRuntime
+
+    value = aborting
+    value.run()
+    host = value.q.coordinator()
+    with host.locked():
+        value.held.value = True
+        try:
+            host.retire_gpu_configuration(value.item.generation)
+            release = host.state["gpu_releases"][value.item.token]
+            release["phase"] = "active"
+            release["recoveries"] = [
+                {
+                    "id": value.item.token,
+                    "target": value.previous["id"],
+                    "source": value.item.generation["id"],
+                    "phase": "finished",
+                }
+            ]
+            if defect == "no-recovery":
+                release["recoveries"] = []
+            elif defect == "candidate-target":
+                release["recoveries"][-1]["target"] = value.item.generation["id"]
+            elif defect == "unfinished":
+                release["recoveries"][-1]["phase"] = "expose_target"
+            host.save("rolled_back")
+            before = copy.deepcopy(host.state)
+            runtime = WorkerRuntime(host, value.item.generation)
+            with runtime.node.locked() as node:
+                recovery = host.state["gpu_recoveries"][value.key]
+                if defect:
+                    with pytest.raises(GPUStartupAbortError, match="history"):
+                        completed_recovery_abort(host, node, runtime.binding, value.key, recovery)
+                else:
+                    assert completed_recovery_abort(
+                        host, node, runtime.binding, value.key, recovery
+                    )
+            assert host.state == before
+        finally:
+            value.held.value = False
 
 
 @pytest.mark.parametrize("phase", ["prepared", "stopped", "freezing", "aborted"])

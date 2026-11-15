@@ -1,6 +1,6 @@
 # ADR-082：未开放 GPU 候选的有界 CPU 回退
 
-日期：2026-11-15。状态：采纳；组件与现有 PostgreSQL 冻结边界检查通过，原临时站点重放待完成。设计见 [RFC-028](../rfcs/028-failed-gpu-startup-cpu-rollback.md)。
+日期：2026-11-15。状态：采纳；组件、实际 PostgreSQL 边界及原临时站点的 CPU 回退通过，范围见[实际记录](../acceptance-gpu-site.md)。设计见 [RFC-028](../rfcs/028-failed-gpu-startup-cpu-rollback.md)。
 
 原目标是已存在 CPU 版本、候选从未曝光、准备停在完整启动观察且没有候选检查轮次时，可以中止已正常退出为错误码 1 的原 GPU worker。运行中、OOM、未知退出、未完成任务或物理预约不适用；仍沿原恢复路径处理。
 
@@ -11,3 +11,5 @@
 中止意图存在后，原代的 GPU 启动与正常恢复拒绝继续；只允许同一 CPU 回退完成原配置退出。新操作仍受原发布状态限制，不新建节点、不删任务/预约、不刷新期限、不手工补恢复记录。原配置、锁、安装身份、数据库和全部历史保留。
 
 配置退出本身持有原 token 的数据库检查事务。完成证明在该事务内调用 `require_frozen_configuration`，只允许已验证 guard 的当前精确 owner backend；额外连接、嵌套 guard、已关闭或离开作用域的连接均不能获豁免。普通 `_require_frozen` 继续要求零会话，前后重新核对 CONNECT。该边界已有完整迁移 schema 的真实 PostgreSQL 回归。
+
+整站日志在成功恢复后使用内部 `active`，外层操作另记 `rolled_back`。后续部署校验旧中止证明时，必须验证完整整站记录，并确认最后一次恢复已 `finished`、目标仍是证明绑定的原 CPU 代；不能仅凭内部 `active` 接受。保留既有记录格式及全部失败历史。

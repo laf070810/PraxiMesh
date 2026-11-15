@@ -37,9 +37,19 @@ GPU 构建在完整制品保存后，清理唯一临时镜像标签时失败：�
 
 此时原 CPU 回退也等待同一 GPU 完整启动，因此新增[有限中止路径](rfcs/028-failed-gpu-startup-cpu-rollback.md)。300 项相关组件、补充后的 26 项边界检查及 39 项真实 PostgreSQL 冻结/配置检查通过；临时 PostgreSQL 资源已清理。原站点只读资格预检通过，发布日志字节未变。
 
-首次实际中止已确认原 worker 停止并冻结候选库，随后配置退出因自己的合法 owner 检查事务触发零会话校验而保留现场。补充精确 guard backend 作用域后，40 项真实 PostgreSQL 与 178 项组件回归通过；额外及后续连接仍拒绝。原报告为 `failed-startup-cpu-recovery-1/`，完整回退仍待继续确认。
+首次实际中止已确认原 worker 停止并冻结候选库，随后配置退出因自己的合法 owner 检查事务触发零会话校验而保留现场。补充精确 guard backend 作用域后，40 项真实 PostgreSQL 与 178 项组件回归通过；额外及后续连接仍拒绝。原报告为 `failed-startup-cpu-recovery-1/`。
+
+同一原操作随后完整回退通过，346.884 秒；原 CPU 库/版本恢复，GPU 配置退出、设备空闲，原准备和恢复记录保持不变。独立核对原账号、草稿、CPU 提交、目录摘要及序列通过，三项原有服务未变。证据为 `failed-startup-cpu-recovery-2/result.json` 和 `data-preservation.json`。
 
 worker 失败日志现只增加最多四个已冻结平台源码文件/行号，不输出异常消息、源代码、局部变量或外部路径。112 项诊断/worker/制品组件检查通过；该改动改变执行源码身份，后续硬件检查必须使用新匹配镜像，不能沿用本批包作为新版本通过证据。
+
+## 新诊断版本与后续部署
+
+提交 `ccf07eff47e6760b15446066b18fddc6c1698964` 的 999 个源码文件逐字节匹配 Git，同源 source ID 为 `4e9e71dc33a0dd450f3c3623fcfa5de3ce949b7d6ba37aee9717e2002b6bf57e`。CPU 包 `2026-11-15-cpu-upgrade-target-7` 的清单摘要为 `6060519cbb8e6b6d082fcc45dd64e19d2d8f8c1e588535b2aba5103d8d91a061`；GPU 包 `2026-11-15-worker-location-four-image-1` 为 `b0789bee43448b7804867eaa6654dd3e6193ae17f31ca1783b940f8ac55f4b95`。
+
+两包构建、归档核验、导入及 10 项无设备 worker 检查通过。CPU 应用完整检查用时 440.141 秒，129 项探针、三组基础/七组扩展浏览器、真实提交及清理通过。结果保存在 `test-results/worker-location-releases-2026-11-15/`，这些结果不证明该新执行身份的 GPU 启动通过。
+
+再次部署在启动 GPU 前被旧中止证明拒绝：整站完成回退后内部阶段为 `active`，而新增证明只接受恢复中状态。原历史摘要全部一致。修复按完整整站记录、最后一次已完成恢复及原 CPU 目标核对，不改写历史；新增拒绝错误目标、无恢复记录及未完成恢复的检查，66 项相关测试通过。原始失败保留在 `owned-gpu-site-3/`。
 
 ## 待完成的真实范围
 

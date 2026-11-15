@@ -1,6 +1,6 @@
 # RFC-028：未开放 GPU 候选启动失败后的 CPU 回退
 
-日期：2026-11-15。状态：已实施，原临时站点重放待完成；决策见 [ADR-082](../adr/082-unexposed-gpu-startup-abort.md)。组件检查和现有完整 PostgreSQL 冻结边界检查通过，不能据此宣称实际中止回退成功。
+日期：2026-11-15。状态：已实施，原临时站点已完成 CPU 回退及数据保留核对；决策见 [ADR-082](../adr/082-unexposed-gpu-startup-abort.md)，实际范围见[验收记录](../acceptance-gpu-site.md)。GPU 启动故障与完整发布矩阵仍待通过。
 
 ## 已复现的问题
 

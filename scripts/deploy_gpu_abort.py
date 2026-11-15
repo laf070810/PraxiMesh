@@ -80,15 +80,27 @@ def validate(value):
 
 
 def history_matches(host, key, value):
+    from scripts.deploy_gpu_release import validate_record as validate_release
+
     validate(value)
     preparation = host.state.get("gpu_preparations", {}).get(key)
     recovery = host.state.get("gpu_recoveries", {}).get(key)
     release = host.state.get("gpu_releases", {}).get(value["operation"]) or {}
+    validate_release(release)
     previous = release.get("previous")
+    # The coordinated journal ends both forward deployment and rollback at
+    # "active"; only the public operation records "rolled_back". Bind the
+    # completed recovery's original CPU target instead of trusting that phase.
+    completed = (
+        release["phase"] == "active"
+        and bool(release["recoveries"])
+        and release["recoveries"][-1]["phase"] == "finished"
+        and release["recoveries"][-1]["target"] == value["previous_id"]
+    )
     if (
         release.get("candidate") != value["generation"]
         or release.get("operation") != value["operation"]
-        or release.get("phase") not in {"recovering", "rolled_back"}
+        or not (release["phase"] == "recovering" or completed)
         or previous is None
         or "gpu" in previous.get("manifest", {})
         or previous.get("id") != value["previous_id"]
