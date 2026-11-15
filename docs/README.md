@@ -24,6 +24,7 @@
 - [RFC-038：嵌套 sandbox 的 OOM 优先级](rfcs/038-nested-sandbox-oom-priority.md)、[ADR-092](adr/092-nested-sandbox-oom-priority.md) — 固定提高原 sandbox 淘汰优先级，整任务限额和恢复门槛不变
 - [RFC-039：退出期间的当前查询身份](rfcs/039-terminating-task-sampled-identities.md)、[ADR-093](adr/093-terminating-task-sampled-identities.md) — 维护故障的原实例确认、查询内句柄和退出后完整空清单
 - [RFC-040：首次 GPU 曝光确认丢失](rfcs/040-initial-gpu-exposure-acknowledgement.md)、[ADR-094](adr/094-initial-gpu-exposure-acknowledgement.md) — 首次发布中断沿原实例续跑，已退出对象仍执行原库完整恢复
+- [RFC-041：统一 CPU/GPU 发布命令](rfcs/041-public-gpu-deployment-entry.md)、[ADR-095](adr/095-public-gpu-deployment-dispatch.md) — 分支中的入口分派、数据库前绑定检查与待验收的公共命令
 - [GitHub 托管应用与 WASI 验收](acceptance-hosted-ci.md) — 按确切提交记录工作流结果和故障定位；专用部署节点与 GPU 仍需分别验收
 - [旧 F→当前 CPU 整站升级](acceptance-f-current.md) — 真实旧应用、三项迁移、数据保留、HTTPS/WASI 与清理通过
 - [F 升级准备与当前 CPU 发布包验收](acceptance-upgrade-preparation.md) — 保留历次目标包、准备阶段和原始失败
