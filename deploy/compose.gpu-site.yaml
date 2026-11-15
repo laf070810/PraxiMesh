@@ -1,0 +1,21 @@
+# Overlay for compose.postgres.yaml; the original GPU state must be prepared first.
+services:
+  gpu-check:
+    extends:
+      file: compose.gpu-worker.yaml
+      service: gpu-check
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+
+  gpu-worker:
+    extends:
+      file: compose.gpu-worker.yaml
+      service: gpu-worker
+    container_name: px-${PRAXIMESH_COMPOSE_INSTANCE:?prepared instance required}-gpu-worker
+    labels:
+      org.praximesh.site: ${PRAXIMESH_COMPOSE_SITE:?prepared site identity required}
+      org.praximesh.role: gpu-worker
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully

@@ -1,0 +1,20 @@
+# Optional local CPU tutor for a prepared PostgreSQL installation.
+services:
+  web:
+    environment:
+      PRAXIMESH_LOCAL_AI: "1"
+    volumes:
+      - ai-credentials:/ai
+
+  tutor:
+    extends:
+      file: ../compose.ai.yaml
+      service: tutor
+    build:
+      context: ${PRAXIMESH_SOURCE_DIRECTORY:?verified frozen sources required}
+
+volumes:
+  ai-credentials:
+    name: px-${PRAXIMESH_COMPOSE_INSTANCE:?prepared instance required}-ai
+    labels:
+      org.praximesh.site: ${PRAXIMESH_COMPOSE_SITE:?prepared site identity required}

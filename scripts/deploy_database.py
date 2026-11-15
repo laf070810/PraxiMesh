@@ -248,8 +248,7 @@ def write_private_backup(path, writer):
 
 
 class DeploymentDatabase:
-    @safe_errors
-    def __init__(self, config):
+    def _configure(self, config):
         required = {
             "instance",
             "site_id",
@@ -285,6 +284,10 @@ class DeploymentDatabase:
         self.roles = {role: f"px_{self.instance}_{role}" for role in ["web", "worker"]}
         if config["owner_user"] in self.roles.values():
             raise DeploymentDatabaseError("Database owner must be distinct from runtime roles")
+
+    @safe_errors
+    def __init__(self, config):
+        self._configure(config)
         raw = docker_output(
             "inspect",
             "--type",
@@ -301,6 +304,21 @@ class DeploymentDatabase:
             raise DeploymentDatabaseError("PostgreSQL container name or running state differs")
         self.host = "127.0.0.1"
         self.port = loopback_port(docker_output("port", self.container, "5432/tcp"))
+
+    @classmethod
+    def for_compose_bootstrap(cls, config):
+        """Owner-only initialization on the prepared private Compose network.
+
+        This has no Docker access and cannot inspect/manage containers or copy
+        databases. Normal host deployment retains its loopback/container checks.
+        Ownership markers, operation locks and exact grants remain unchanged.
+        """
+        value = cls.__new__(cls)
+        value._configure(config)
+        if value.container != f"px-{value.instance}-postgres":
+            raise DeploymentDatabaseError("Compose PostgreSQL must use its installation service")
+        value.host, value.port = value.container, 5432
+        return value
 
     def name(self, generation):
         if not isinstance(generation, str) or not GENERATION.fullmatch(generation):

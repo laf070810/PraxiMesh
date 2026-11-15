@@ -26,6 +26,7 @@ COPY content ./content
 COPY templates ./templates
 COPY static ./static
 COPY scripts/container_worker_entry.py scripts/container_practice_entry.py scripts/gpu_environment_probe.py scripts/gpu_kernel_probe.py scripts/gpu_service_entry.py ./scripts/
+COPY scripts/deploy_database.py ./scripts/
 COPY manage.py gunicorn.conf.py ./
 COPY LICENSES.md ./
 RUN python -c "from judge.gpu_policy import execution_digest; print('GPU policy:', execution_digest())"

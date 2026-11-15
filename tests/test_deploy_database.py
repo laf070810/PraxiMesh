@@ -68,6 +68,19 @@ def test_postgres_port_accepts_exact_mapping():
     assert loopback_port("127.0.0.1:15432\n") == 15432
 
 
+def test_compose_bootstrap_has_only_its_fixed_internal_endpoint(monkeypatch, configuration):
+    monkeypatch.setattr(
+        deploy_database, "docker_output", lambda *_: pytest.fail("Bootstrap accessed Docker")
+    )
+    configuration["container"] = "px-example1-postgres"
+    database = DeploymentDatabase.for_compose_bootstrap(configuration)
+    assert (database.host, database.port) == ("px-example1-postgres", 5432)
+    assert database.roles == {"web": "px_example1_web", "worker": "px_example1_worker"}
+    configuration["container"] = "other-postgres"
+    with pytest.raises(DeploymentDatabaseError, match="installation service"):
+        DeploymentDatabase.for_compose_bootstrap(configuration)
+
+
 @pytest.mark.parametrize(
     "key,value",
     [

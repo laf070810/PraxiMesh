@@ -1,0 +1,116 @@
+# Prepared independent PostgreSQL installation. See RFC-042 while under development.
+# The preparation command writes the private interpolation and per-role env files.
+name: px-${PRAXIMESH_COMPOSE_INSTANCE:?prepared instance required}
+
+x-application: &application
+  pull_policy: never
+  user: "65532:65532"
+  read_only: true
+  init: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=134217728,uid=65532,gid=65532,mode=700
+  restart: unless-stopped
+  logging:
+    driver: local
+    options: {max-size: 10m, max-file: "2"}
+  depends_on:
+    bootstrap:
+      condition: service_completed_successfully
+
+services:
+  postgres:
+    image: postgres:17-alpine@sha256:e4cb93687b062cd25a0e8f672d85a7708235009d70d31f8a7698d9370092a9c4
+    container_name: px-${PRAXIMESH_COMPOSE_INSTANCE:?prepared instance required}-postgres
+    env_file: ${PRAXIMESH_POSTGRES_ENV:?private PostgreSQL env file required}
+    volumes:
+      - database-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${PRAXIMESH_POSTGRES_PORT:-0}:5432"
+    networks: [database, frontend]
+    labels:
+      org.praximesh.site: ${PRAXIMESH_COMPOSE_SITE:?prepared site identity required}
+      org.praximesh.role: postgres
+    mem_limit: 512m
+    pids_limit: 128
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d postgres']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  web:
+    <<: *application
+    image: ${PRAXIMESH_WEB_IMAGE:?immutable Web image required}
+    container_name: px-${PRAXIMESH_COMPOSE_INSTANCE:?prepared instance required}-web
+    env_file: ${PRAXIMESH_WEB_ENV:?private Web env file required}
+    command: [python, -m, core.postgres_selfhost, web]
+    ports:
+      - "${PRAXIMESH_BIND:-0.0.0.0}:${PRAXIMESH_PORT:-8000}:8000"
+    networks: [database, frontend]
+    labels:
+      org.praximesh.site: ${PRAXIMESH_COMPOSE_SITE:?prepared site identity required}
+      org.praximesh.role: web
+    mem_limit: 512m
+    pids_limit: 64
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      start_period: 30s
+      retries: 12
+
+  bootstrap:
+    <<: *application
+    image: ${PRAXIMESH_WEB_IMAGE:?immutable Web image required}
+    env_file: ${PRAXIMESH_BOOTSTRAP_ENV:?private bootstrap env file required}
+    command: [python, -m, core.compose_bootstrap]
+    networks: [database]
+    labels:
+      org.praximesh.site: ${PRAXIMESH_COMPOSE_SITE:?prepared site identity required}
+      org.praximesh.role: bootstrap
+    mem_limit: 512m
+    pids_limit: 32
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    <<: *application
+    image: ${PRAXIMESH_WORKER_IMAGE:?immutable CPU worker image required}
+    container_name: px-${PRAXIMESH_COMPOSE_INSTANCE:?prepared instance required}-worker
+    env_file: ${PRAXIMESH_WORKER_ENV:?private CPU worker env file required}
+    command: [python, -m, core.postgres_selfhost, worker]
+    networks: [database]
+    labels:
+      org.praximesh.site: ${PRAXIMESH_COMPOSE_SITE:?prepared site identity required}
+      org.praximesh.role: worker
+    mem_limit: 2g
+    pids_limit: 32
+    stop_grace_period: 4m
+    healthcheck:
+      test: [CMD, python, -m, core.postgres_selfhost, health]
+      interval: 5s
+      timeout: 5s
+      start_period: 5m
+      retries: 3
+
+volumes:
+  database-data:
+    name: px-${PRAXIMESH_COMPOSE_INSTANCE:?prepared instance required}-database
+    labels:
+      org.praximesh.site: ${PRAXIMESH_COMPOSE_SITE:?prepared site identity required}
+
+networks:
+  database:
+    name: px-${PRAXIMESH_COMPOSE_INSTANCE:?prepared instance required}-database
+    internal: true
+    labels:
+      org.praximesh.site: ${PRAXIMESH_COMPOSE_SITE:?prepared site identity required}
+  frontend:
+    name: px-${PRAXIMESH_COMPOSE_INSTANCE:?prepared instance required}-frontend
+    labels:
+      org.praximesh.site: ${PRAXIMESH_COMPOSE_SITE:?prepared site identity required}

@@ -128,6 +128,7 @@
 - 无头 Chromium 统一通过 `tests/browser_runtime.py` 启动，只对浏览器子进程移除显示连接与 D-Bus 会话环境，保留调用者环境、缓存路径及原 TLS 参数。长时验收前运行 `python -m tests.browser_runtime`，实际截图成功才算渲染就绪；不能仅凭浏览器启动成功、延长超时或跳过截图宣称通过。发布验收的预检失败须在 Docker 操作前结束，并清除本轮入口的旧成功摘要。
 - Compose 单机入口为 `core/selfhost.py`，复用 `core/preview.py` 的原子数据库初始化；默认包括真实 WASI worker，可选 `compose.ai.yaml` 启动本地模型。修改时重放 `python3 scripts/compose_acceptance.py`；涉及模型或界面时使用 `--ai --browsers`。核对真实探针与七种题型、worker 离线关闭提交、直接 IP/CSRF、初始化恢复、旧内容不重导及成绩/会话跨重建保留。不得用旧 receipt 或宿主缓存代替镜像内自检。此入口不替代生产发布协调器。
 - PostgreSQL Compose 应用入口为 `core/postgres_selfhost.py`，只接受已经准备好的安装、数据库与角色；不迁移、不导入内容、不启动 GPU。复用本地 AI 配置与 CPU 健康检查，保留 SQLite 入口的原限制。完整站点准备与维护见 [RFC-042](docs/rfcs/042-complete-gpu-compose-site.md)；入口组件通过不能代替真实镜像、最小数据库权限和 Compose 生命周期验收。
+- PostgreSQL Compose 初始化在 `core/compose_bootstrap.py`，复用 `scripts/deploy_database.py` 的原角色和授权定义；独立私有 schema 绑定配置与阶段。完成后的启动只检查，不重导内容、不重建丢失数据库、不自动升级。授权确认丢失时核对既有权限，不冻结已开放的库；按 `tests/test_compose_bootstrap_postgres.py` 重放真实迁移、原库保留与进程中断。初始化服务不得获得设备或 Docker socket。
 - 重型 WASI/worker 验收按资源预算串行安排，避免争用造成假超时。长进程须跟踪原进程或工具句柄；观察超时不代表进程结束，不据此重复启动。
 - CI 结果绑定确切提交。失败位置摘要使用 `scripts/ci_diagnostics.py`，只从该提交的原始 Git 对象解析已有测试定义，不执行源码，不采用工作区、替换对象或参数/异常正文。系统依赖诊断使用 `scripts/ci_install_diagnostics.py`，仅在内存中分类并输出固定注释，不额外上传原始安装日志。保留原安装和 pytest 失败状态；本地通过不能替代远端失败定位。操作和诊断统一见 [CI 指南](docs/deployment/ci.md)。
 - 构建和验收的镜像清理仅操作自有对象，包括失败路径的 `finally`；删除临时镜像使用 `--no-prune`，并核对原固定基镜像仍存在，避免 Docker 连带清掉未打标签的原镜像缓存。不得覆盖原发布归档或未知镜像标签。构建脚本若参与冻结源码契约，修复清理逻辑后也须重建匹配镜像，不能沿用旧身份。
