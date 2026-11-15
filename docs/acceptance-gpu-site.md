@@ -151,6 +151,14 @@ worker 崩溃验收的首个普通 API 任务因观察端轮询触发限流而�
 
 同一实现随后沿原本地状态和固定参考解复现，宿主只读记录证实短暂 NVIDIA PID 属于原任务 cgroup，普通恢复成功。下一步按 [RFC-033](rfcs/033-gpu-pid-observation-order.md) 调整查询与身份读取间的重复检查，并用实际 CUDA 重放验证；尚不能判定该竞态已解决。
 
+## 原状态重放与短暂进程的归属
+
+后续各轮均沿原本地 GPU 状态、同一固定公开参考解及普通恢复运行，不用新状态跳过历史。`07fb091` 的查询顺序调整仍失败；`47bdfe2` 的受限诊断确认 NVML 与稍后单次 XML 存在时间差，原状态恢复成功。`598ff4e` 改为两次完整 XML 包围 NVML，随后失败于 PID 651065 的已退出状态；完整身份当时仍可读取，来源窗口结果不能算完整启动通过。
+
+`6df9c6b` 将完整已退出身份与存活核对分开，328 项相关检查通过；真实重放运行 132.877 秒后仍因 PID 964938 的目录被回收而失败。旁路样本中的原出生时间、NSpid 和 cgroup 仅用于定位，不能代替执行时的归属证据。普通恢复成功，原状态 recovered、无活动 journal、GPU 0 空闲。各轮原日志分别在 `test-results/` 下的 `pid-order-local-diagnostic-2026-11-15/`、`pid-failure-local-diagnostic-2026-11-15/`、`inventory-window-local-diagnostic-2026-11-15/` 和 `exited-member-local-diagnostic-2026-11-15/`。
+
+下一轮按 [ADR-090](adr/090-sampled-gpu-process-handles.md) 在每个完整 XML 样本返回时绑定身份和原 pidfd，仅用同次查询的句柄确认后续退出。345 项相关检查含实际 CPU 子进程与句柄关闭通过；匹配镜像的 CUDA 重放尚待完成，服务器提交仍未开放。
+
 ## 待完成的真实范围
 
 重查原卡独占后，使用新冻结版本验证正式任务中的 worker 丢失、原预约清理与正确性恢复，以及升级和曝光恢复。已有结果只证明上述固定版本与实际范围；全部成功前，仍按[需求追踪](requirements.md)保留网站 GPU 发布门槛。

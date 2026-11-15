@@ -58,6 +58,12 @@ def test_proc_identity_preserves_cgroup_namespace_relative_path():
     }
 
 
+def test_systemd_user_unit_cgroup_is_kept_as_opaque_identity():
+    group = "0::/user.slice/user-2031.slice/user@2031.service/app.slice/owned.scope\n"
+    value = process_identity(1234, stat_line(), "NSpid:\t1234\n", group)
+    assert value["cgroup"] == group.strip()
+
+
 @pytest.mark.parametrize(
     "change",
     [

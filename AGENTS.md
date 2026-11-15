@@ -87,6 +87,7 @@
 - 宿主 PID 创建使用协调器 worker schema 3、本地控制器 schema 2；无设备预检不变。精确核对原安全选项，仅在 daemon 本来未启用 SELinux 容器隔离且保留默认 seccomp 时接受 Docker 自动附加的 `label=disable`。新发布从已核验归档读取 PID 协议字面量，镜像标签或旧 ready 记录不能代替；旧私有 PID worker 不能再次启动或用于曝光，但原停止、退役和本地清理保持可用。
 - 活跃任务的 NVIDIA 采样通过 `OwnedProcesses.observe_owned()` 放在同一次完整前后核对内，查询后立即读取并复读全部 PID 身份。不要在采样与身份读取之间叠加容器检查，也不能以缓存、消失 PID 豁免或重新查询为空来掩盖未确认的归属；直接 PID 核对和受控终止边界保持原义，见 [ADR-087](docs/adr/087-gpu-pid-observation-order.md)。
 - 当前清单中已退出但身份完整的成员可经 `read_observed()` 核对归属，仍须两次完整读取与原 cgroup；缺失、复用、部分读取和外部成员继续拒绝。原 PID 1、直接存活核对及受控终止保持严格要求，不能把已退出成员身份当作设备空闲，见 [ADR-089](docs/adr/089-exited-gpu-process-identity.md)。
+- 完整来源使用 `observe_samples()` 在每个 XML 样本返回时立即核对成员，并绑定 pidfd。只在同次查询的最终核对中接受已绑定成员的明确退出；首次缺失、后续正面样本无法重新核对或身份变化仍拒绝。句柄逐次关闭，不跨查询缓存、不发信号，也不替代来源、原任务或空闲检查，见 [ADR-090](docs/adr/090-sampled-gpu-process-handles.md)。
 - 新观察 schema 3 在原同一三秒期限内用两次完整 SMI XML 包围 NVML，保留两个样本，完整清单只能取 XML 列表并集，三类 NVML PID 仍须是其子集。旧 schema 1/2 语义不变；不能补入仅 NVML 出现的 PID、丢弃前次正面记录、循环重查为空或刷新期限。所有返回 PID 仍逐项验证原归属，见 [ADR-088](docs/adr/088-gpu-inventory-sampling-window.md)。
 - 本地失败诊断只追加到原私有 journal 的 `local-failure.<nonce>.json`，并关联同 nonce 的控制器记录；仅保存固定类别、冻结平台位置及经过限定的 PID/字段。诊断不得保存错误正文、源码、配置或局部变量，不覆盖原记录，不遮盖原异常；诊断 PID 和 `ProcessDisappeared` 的附加字段不能作为归属、信号或清理依据。
 - 数据库与容器清理绑定在 `core/gpu_container_recovery.py`，已通过可选 journal 接入宿主 worker 的启动、续检和取消恢复。先停止原对象，归档前后核对隔离状态、拥有者与原预约；DB 锁失败也保留可重试记录，不能释放额度或借用其他任务。维护身份统一由 `core/gpu_identity.py` 生成。修改后重放[数据库/容器联合检查](docs/deployment/gpu.md#container-database)，并验证旧宿主生命周期；CPU 清理结果不能签发 GPU receipt。

@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from judge import container_monitor as monitor_module
+from judge import container_processes as process_module
 from judge.container_monitor import ContainerDeviceMonitor, validate_observation, validate_observer
 from judge.nvml_artifacts import (
     DIRECTORY,
@@ -267,7 +268,32 @@ def combined(monitored, monkeypatch):  # noqa: F811
     item.task.control.saved = {"version": 4, "device_observer": selected}
     item.monitor = ContainerDeviceMonitor(item.task.control)
     item.value = complete(selected)
-    monkeypatch.setattr(item.monitor, "read", lambda: copy.deepcopy(item.value))
+
+    def read(*, on_sample=None):
+        value = copy.deepcopy(item.value)
+        if on_sample is not None:
+            for sample in value.get("inventory_samples", [value["pids"]["inventory"]]):
+                on_sample(sample)
+        return value
+
+    class Handle:
+        # Source-order fixtures use synthetic PIDs. Actual Linux handle and
+        # reaping checks live in test_container_process_samples.py.
+        def __init__(self, view, pid, group):
+            self.view, self.pid = view, pid
+            self.identity = view.read_observed(pid)
+            if self.identity["cgroup"] != group:
+                raise SandboxUnavailable("An observed host process is outside the original task")
+
+        def check(self, *, final=False):
+            if self.view.read_observed(self.pid) != self.identity:
+                raise SandboxUnavailable("Sampled identity changed")
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(process_module, "SampledProcess", Handle)
+    monkeypatch.setattr(item.monitor, "read", read)
     return item
 
 
@@ -315,10 +341,15 @@ def test_live_query_preserves_both_xml_samples_around_native_contexts(
 
     monkeypatch.setattr(monitor_module, "run_command", run)
     captured = []
+    sample_order = []
     original = item.monitor.read
 
-    def read():
-        value = original()
+    def read(*, on_sample=None):
+        def capture(pids):
+            sample_order.append((len(queries), list(pids)))
+            on_sample(pids)
+
+        value = original(on_sample=capture)
         captured.append(value)
         return value
 
@@ -326,6 +357,7 @@ def test_live_query_preserves_both_xml_samples_around_native_contexts(
     assert item.monitor.observe(item.task.service) == [5678]
     assert captured[0]["schema"] == 3
     assert captured[0]["inventory_samples"] == ([[5678], []] if ending else [[], [5678]])
+    assert sample_order == ([(2, [5678]), (4, [])] if ending else [(2, []), (4, [5678])])
     assert len(queries) == 4 and len({v[1]["deadline"] for v in queries}) == 1
 
 

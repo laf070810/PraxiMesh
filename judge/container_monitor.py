@@ -202,7 +202,7 @@ class ContainerDeviceMonitor:
         ):
             raise SandboxUnavailable("NVIDIA observer changed its selected device")
 
-    def read(self):
+    def read(self, *, on_sample=None):
         """Management metadata only; a successful read does not imply an idle GPU."""
         self.check()
         deadline = time.monotonic() + 3
@@ -212,6 +212,8 @@ class ContainerDeviceMonitor:
                 self.saved["target"]["driver"],
             )
             before = self.smi_inventory(deadline)
+            if on_sample is not None:
+                on_sample(before)
         result = run_command(
             [
                 sys.executable,
@@ -227,9 +229,13 @@ class ContainerDeviceMonitor:
         )
         value = decode_frame(result.stdout)
         if self.saved["schema"] == 2:
-            value = self.full_inventory(value, deadline, before=before, version=version)
+            value = self.full_inventory(
+                value, deadline, before=before, version=version, on_sample=on_sample
+            )
         validate_observation(value, self.saved)
         self.check()
+        if time.monotonic() >= deadline:
+            raise SandboxUnavailable("NVIDIA observation deadline expired")
         return value
 
     def task_device_spec(self):
@@ -275,7 +281,7 @@ class ContainerDeviceMonitor:
             self.saved,
         )
 
-    def full_inventory(self, value, deadline, *, before, version):
+    def full_inventory(self, value, deadline, *, before, version, on_sample=None):
         # The native child returns its original schema. Never silently overwrite
         # an existing full inventory, extra field or category from that child.
         if (
@@ -289,6 +295,8 @@ class ContainerDeviceMonitor:
         ):
             raise SandboxUnavailable("Unexpected native NVIDIA observation")
         after = self.smi_inventory(deadline)
+        if on_sample is not None:
+            on_sample(after)
         pids = sorted(pid_set(before) | pid_set(after))
         return {
             **value,
@@ -312,6 +320,10 @@ class ContainerDeviceMonitor:
             pids = read_inventory()
             if pids:
                 raise SandboxUnavailable("Selected GPU is occupied; nothing was stopped")
+        elif self.saved["schema"] == 2:
+            pids = self.owned.observe_samples(
+                lambda capture: validate_observation(self.read(on_sample=capture), self.saved)
+            )
         else:
             pids = self.owned.observe_owned(read_inventory)
         self.check()

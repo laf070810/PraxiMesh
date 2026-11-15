@@ -3,6 +3,7 @@
 import errno
 import os
 import re
+import select
 import stat
 import uuid
 from copy import deepcopy
@@ -138,7 +139,7 @@ def process_identity(pid, process_stat, status, cgroup):
             or not nspids[0]
             or any(not n.isascii() or not n.isdecimal() or int(n) <= 0 for n in nspids[0])
             or int(nspids[0][0]) != pid
-            or not re.fullmatch(r"0::/[a-zA-Z0-9/._\\:-]*\n?", cgroup)
+            or not re.fullmatch(r"0::/[a-zA-Z0-9/._@\\:-]*\n?", cgroup)
         ):
             raise ValueError
         identity = {
@@ -280,6 +281,72 @@ class HostProcessView:
             self.fd = None
 
 
+class SampledProcess:
+    """One current-query identity and its kernel lifetime handle; never a PID cache."""
+
+    def __init__(self, view, pid, group):
+        self.view, self.pid, self.fd = view, pid, None
+        self.identity = view.read_observed(pid)
+        if self.identity["cgroup"] != group:
+            raise SandboxUnavailable("An observed host process is outside the original task")
+        try:
+            self.fd = os.pidfd_open(pid)
+            self.bound()
+            if view.read_observed(pid) != self.identity:
+                raise SandboxUnavailable("Sampled process identity changed")
+            self.bound()
+        except (AttributeError, OSError):
+            self.close()
+            raise SandboxUnavailable("Sampled process handle is unavailable") from None
+        except BaseException:
+            self.close()
+            raise
+
+    def bound(self):
+        with Path(f"/proc/self/fdinfo/{self.fd}").open() as stream:
+            data = stream.read(4097)
+        fields = [line.split() for line in data.splitlines()]
+        if (
+            len(data) > 4096
+            or [row[1:] for row in fields if row[:1] == ["Pid:"]] != [[str(self.pid)]]
+            or [row[1:] for row in fields if row[:1] == ["NSpid:"]] != [[str(self.pid)]]
+        ):
+            raise SandboxUnavailable("Sampled process handle changed its original PID")
+
+    def check(self, *, final=False):
+        try:
+            current = self.view.read_observed(self.pid)
+        except ProcessDisappeared:
+            # A subsequent positive sample must still bind its numeric PID.
+            # Only the final fence can confirm an already pinned member's exit.
+            if not final:
+                raise
+            poll = select.poll()
+            poll.register(self.fd, select.POLLIN)
+            events = poll.poll(0)
+            if (
+                len(events) != 1
+                or events[0][0] != self.fd
+                or not (
+                    events[0][1] & select.POLLIN
+                    and not events[0][1] & ~(select.POLLIN | select.POLLHUP)
+                )
+            ):
+                raise SandboxUnavailable("Missing sampled process has no confirmed exit") from None
+        else:
+            if current != self.identity:
+                raise SandboxUnavailable("Sampled process identity changed")
+            try:
+                self.bound()
+            except OSError:
+                raise SandboxUnavailable("Sampled process handle cannot be verified") from None
+
+    def close(self):
+        if self.fd is not None:
+            os.close(self.fd)
+            self.fd = None
+
+
 class OwnedProcesses:
     """A live observation fence, never a device lease or readiness capability."""
 
@@ -392,6 +459,34 @@ class OwnedProcesses:
         self._validate_pids(pids)
         self._owned_members(pids, main, allow_exited=True)
         return pids
+
+    def observe_samples(self, read_inventory):
+        """Pin identities at each current sample, then confirm their final lifetime."""
+        main = self.check()
+        sampled = {}
+
+        def capture(pids):
+            self._validate_pids(pids)
+            if len(set(sampled) | set(pids)) > MAX_PIDS:
+                raise SandboxUnavailable("Sampled process inventory exceeded its bound")
+            for pid in pids:
+                if pid in sampled:
+                    sampled[pid].check()
+                else:
+                    sampled[pid] = SampledProcess(self.control.host_processes, pid, main["cgroup"])
+
+        try:
+            pids = read_inventory(capture)
+            self._validate_pids(pids)
+            if set(sampled) != set(pids):
+                raise SandboxUnavailable("Complete inventory differs from its sampled identities")
+            for item in sampled.values():
+                item.check(final=True)
+            self.check()
+            return pids
+        finally:
+            for item in sampled.values():
+                item.close()
 
     @staticmethod
     def _validate_pids(pids):
