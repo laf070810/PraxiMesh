@@ -10,6 +10,7 @@ from pathlib import Path
 
 from psycopg import sql
 
+from core.compose_bootstrap_state import STATE, InstallationState
 from scripts.deploy_database import DeploymentDatabase, DeploymentDatabaseError
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -63,7 +64,7 @@ def configuration_digest(spec):
 
 
 class Bootstrap:
-    def __init__(self, spec, database=None):
+    def __init__(self, spec, database=None, *, state_directory=STATE):
         self.spec = validate_spec(spec)
         self.database = database or DeploymentDatabase.for_compose_bootstrap(spec["database"])
         if self.database.config != spec["database"]:
@@ -72,6 +73,7 @@ class Bootstrap:
         self.schema = "px_bootstrap_" + spec["instance"]
         self.digest = configuration_digest(spec)
         self.marker = "praximesh compose bootstrap v1 site=" + spec["site_id"]
+        self.state = InstallationState(state_directory, self.digest)
 
     def journal(self):
         """Create the private identity and initial intent in one transaction."""
@@ -83,6 +85,10 @@ class Bootstrap:
                 (self.schema,),
             ).fetchone()
             if row is None:
+                if self.state.check():
+                    raise DeploymentDatabaseError(
+                        "Original PostgreSQL bootstrap metadata is missing"
+                    )
                 # A missing installation journal cannot authorize an existing DB.
                 if self.database.owned_exists(self.name):
                     raise DeploymentDatabaseError("Existing database has no bootstrap journal")
@@ -205,8 +211,10 @@ class Bootstrap:
 
     def run(self):
         database = self.database
-        with database.operation_lock():
+        with self.state.locked(), database.operation_lock():
             phase, completed = self.journal()
+            # Persist outside the PG volume before creating/publishing application data.
+            self.state.bind()
             if phase == "ready":
                 database.require_owned(self.name)
                 database._require_roles()

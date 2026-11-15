@@ -26,6 +26,8 @@ GPU 0 已通过[两轮完整启动与本地公开样例](../acceptance-gpu0-star
 
 ## Compose：直接做题和使用可选 AI
 
+开发分支正在补充[完整 PostgreSQL/GPU Compose](compose-postgres.md)，目前已接通独立数据库初始化和固定版本准备，整站与硬件验收、版本维护仍待完成。以下默认 SQLite 方案保持原有启动与数据位置。
+
 在 Linux x86_64 主机准备 Docker Engine、Docker Compose 和构建时可用的下载网络。无需宿主 Python、预先构建的 WASI 或模型服务。基础运行建议预留 3 GiB 可用内存，带本地 AI 建议 6 GiB；首次构建还需额外磁盘、下载及编译时间。
 
 ```sh

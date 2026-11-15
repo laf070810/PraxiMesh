@@ -15,7 +15,8 @@ from types import SimpleNamespace
 import pytest
 from psycopg import sql
 
-from core.compose_bootstrap import Bootstrap
+from core.compose_bootstrap import Bootstrap, configuration_digest
+from core.compose_bootstrap_state import initialize
 from scripts.deploy_database import DeploymentDatabase, DeploymentDatabaseError
 from tests.test_deploy_database_postgres import owned_pg as owned_pg
 
@@ -23,7 +24,7 @@ pytestmark = pytest.mark.django_db(transaction=True)
 
 
 @pytest.fixture
-def installation(owned_pg, monkeypatch):
+def installation(owned_pg, monkeypatch, tmp_path, request):
     original = owned_pg.database
     name = owned_pg.new_name()
     config = dict(original.config, container=f"px-{original.instance}-postgres")
@@ -34,7 +35,7 @@ def installation(owned_pg, monkeypatch):
         "generation": name[-12:],
         "source_id": "a" * 64,
         "release_sha256": "b" * 64,
-        "initial_content": True,
+        "initial_content": getattr(request, "param", True),
         "database": config,
         "application_secret": "private-bootstrap-test-secret-" + uuid.uuid4().hex,
         "wasi_sha256": "c" * 64,
@@ -49,7 +50,9 @@ def installation(owned_pg, monkeypatch):
             "@" + config["container"] + ":5432/", f"@127.0.0.1:{original.port}/"
         ),
     )
-    bootstrap = Bootstrap(spec, database)
+    directory = tmp_path / "bootstrap-state"
+    initialize(directory, configuration_digest(spec))
+    bootstrap = Bootstrap(spec, database, state_directory=directory)
     try:
         yield SimpleNamespace(
             spec=spec,
@@ -57,6 +60,7 @@ def installation(owned_pg, monkeypatch):
             bootstrap=bootstrap,
             name=name,
             runtime=lambda role: owned_pg.runtime(name, role),
+            directory=directory,
         )
     finally:
         with original._connect("postgres") as connection:
@@ -97,11 +101,10 @@ def test_real_new_database_full_content_permissions_and_same_version_reopen(inst
         assert item.bootstrap.journal() == ("ready", 4)
 
 
+@pytest.mark.parametrize("installation", [False], indirect=True)
 def test_initial_catalog_requires_explicit_selection(installation):
     item = installation
-    item.spec["initial_content"] = False
-    bootstrap = Bootstrap(item.spec, item.database)
-    bootstrap.run()
+    item.bootstrap.run()
     with item.runtime("web") as connection:
         assert connection.execute("SELECT count(*) FROM core_problem").fetchone() == (0,)
 
@@ -166,11 +169,11 @@ def test_new_version_or_changed_configuration_cannot_migrate_existing_installati
     changed[field] = (
         not changed[field] if type(changed[field]) is bool else "d" * len(changed[field])
     )
-    other = Bootstrap(changed, item.database)
+    other = Bootstrap(changed, item.database, state_directory=item.directory)
     monkeypatch.setattr(
         other, "manage", lambda _: pytest.fail("Changed configuration reached migration")
     )
-    with pytest.raises(DeploymentDatabaseError, match="configuration or original phase"):
+    with pytest.raises(DeploymentDatabaseError, match="configuration"):
         other.run()
     item.database._verify_permissions(item.name, connected=True)
 
@@ -183,6 +186,30 @@ def test_completed_installation_never_recreates_a_missing_database(installation)
     with pytest.raises(DeploymentDatabaseError, match="missing"):
         item.bootstrap.run()
     assert not item.database.owned_exists(item.name)
+
+
+@pytest.mark.parametrize("remove_application_database", [False, True])
+def test_missing_postgres_metadata_cannot_turn_bound_installation_into_new_site(
+    installation, remove_application_database
+):
+    item = installation
+    item.bootstrap.run()
+    with item.database._connect("postgres", autocommit=True) as connection:
+        connection.execute(
+            sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(item.bootstrap.schema))
+        )
+        if remove_application_database:
+            connection.execute(sql.SQL("DROP DATABASE {}").format(sql.Identifier(item.name)))
+    with pytest.raises(DeploymentDatabaseError, match="metadata is missing"):
+        item.bootstrap.run()
+    assert item.database.owned_exists(item.name) is not remove_application_database
+    with item.database._connect("postgres") as connection:
+        assert (
+            connection.execute(
+                "SELECT 1 FROM pg_namespace WHERE nspname=%s", (item.bootstrap.schema,)
+            ).fetchone()
+            is None
+        )
 
 
 @pytest.mark.parametrize("checkpoint", ["migration-complete", "grants-complete"])

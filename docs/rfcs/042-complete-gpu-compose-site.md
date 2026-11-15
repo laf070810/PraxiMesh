@@ -1,6 +1,6 @@
 # RFC-042：独立 PostgreSQL/GPU Compose 站点
 
-日期：2026-11-16。状态：设计中，尚未实现或验收。目标来自维护者此前要求的完整 Compose 支持；与 [RFC-041](041-public-gpu-deployment-entry.md) 的发布协调器入口分别交付。
+日期：2026-11-16。状态：分批实施中，完整方案尚未验收。目标来自维护者此前要求的完整 Compose 支持；与 [RFC-041](041-public-gpu-deployment-entry.md) 的发布协调器入口分别交付。
 
 ## 交付目标
 
@@ -25,6 +25,8 @@ GPU 私有配置保持独立 Compose 与协调器两种归属的区别。完整�
 - 明确 Compose 启停与版本维护的资源归属，覆盖同名替换、配置响应丢失、未完成 GPU 任务和数据库失败；不能将协调器的测试直接算作该方案通过。
 
 ## 必须完成的验收
+
+已实现独立 PostgreSQL 应用入口、持久数据库初始化与宿主安装标记，以及冻结包准备和四种服务组合。原初始化增量 `7e1aff0` 已通过冻结镜像构建、十项无设备 worker 与完整 CPU 应用；新增宿主标记另有 27 项真实 PostgreSQL 与 46 项文件/配置检查通过。后续整站 Compose、GPU 和版本维护仍按下列范围分别验证，操作入口集中在[PostgreSQL Compose 指南](../deployment/compose-postgres.md)。
 
 先验证配置、归档和权限拒绝，以及无设备初始化、同版本重启、完整 PostgreSQL schema、最小角色、目录和数据保留；随后在明确授权的独占卡上运行真实 Compose GPU worker、完整启动、两题参考解/错解 API、正常停止与原状态恢复。AI 叠加、Web/worker 挂载边界和实际页面也须覆盖。
 

@@ -18,6 +18,8 @@
 
 **统一入口：[部署指南：方案选择、启动与维护](docs/deployment/README.md)。** 指南比较 Compose 单机自部署、PostgreSQL/HTTPS 发布协调器和源码开发，说明各自的适用场景、数据位置、AI 选择及升级方式。
 
+[完整 PostgreSQL/GPU Compose](docs/deployment/compose-postgres.md)正在开发分支中补齐：已实现独立初始化、固定版本准备和可选 GPU/AI 组合，实际整站 Compose 与版本维护仍待验收。下方命令继续启动已交付的默认 SQLite/CPU 方案。
+
 PostgreSQL/HTTPS 协调器已通过 CPU 版本的完整发布与中断恢复演练，并完成[旧 F 应用到当前版本的真实整站升级](docs/acceptance-f-current.md)。验证范围和重放入口见[生产部署检查](docs/deployment/production.md#full-deployment-validation)。GitHub 托管检查按确切提交记录；最新结果、待验收项及专用部署 runner 接入统一见 [CI 指南](docs/deployment/ci.md)。
 
 想直接做题，在 Linux x86_64 主机准备 Docker Engine 和 Docker Compose，于仓库根目录执行：

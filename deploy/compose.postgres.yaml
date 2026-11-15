@@ -64,9 +64,18 @@ services:
 
   bootstrap:
     <<: *application
+    # Root inside the verified rootless daemon maps to the original host user.
+    user: "0:0"
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=134217728,uid=0,gid=0,mode=700
     image: ${PRAXIMESH_WEB_IMAGE:?immutable Web image required}
     env_file: ${PRAXIMESH_BOOTSTRAP_ENV:?private bootstrap env file required}
     command: [python, -m, core.compose_bootstrap]
+    volumes:
+      - type: bind
+        source: ${PRAXIMESH_BOOTSTRAP_STATE:?original private bootstrap identity required}
+        target: /run/praximesh-bootstrap
+        bind: {create_host_path: false}
     networks: [database]
     labels:
       org.praximesh.site: ${PRAXIMESH_COMPOSE_SITE:?prepared site identity required}
