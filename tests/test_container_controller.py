@@ -82,7 +82,11 @@ def mounts(tmp_path, monkeypatch):
     engine = LocalEngine(tmp_path / "docker.sock")
     fake = Engine()
     monkeypatch.setattr(engine, "run", fake.run)
-    monkeypatch.setattr(engine, "verify", lambda: None)
+    monkeypatch.setattr(
+        engine,
+        "verify",
+        lambda: {"SecurityOptions": ["name=rootless", "name=seccomp,profile=builtin"]},
+    )
     monkeypatch.setattr(module, "STATE", root)
     monkeypatch.setattr(module, "SOCKET", engine.path)
     monkeypatch.setattr(module, "LocalEngine", lambda _path: engine)
