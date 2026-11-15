@@ -56,6 +56,17 @@
 
 原始结果在 `local-gpu-fixed-1/` 的命令记录、各自 stdout/stderr 和 `result.json`；阶段序列逐项与 `CHECKS` 比较，末次独立审计为 `gpu-local-final-audit.json`。两份完整启动证据摘要分别为 `af3561e96c29790d61ee0ff99902b2f9f7c1df594caa765264a513c56e80d250` 和 `16004a502f863f0664d0d1be4627d0eeb41b7944fe2ee001312c9726b47259bf`。
 
+<a id="current-process-observation"></a>
+## 进程观察与资源恢复修复的完整重放
+
+`6e40ba770db11a65bc51b2a9cbf91cf59decf236` 包含宿主 PID 视野、同次采样句柄、受控退出观察、共享检查时钟和 sandbox OOM 优先级修复。原失败及各自 CPU 复现记录见[站点验收记录](acceptance-gpu-site.md)。本轮标准构建的控制镜像为 `sha256:d391cc2be8795a29089ed125b84117fc60ad09e7e32c84eada8b1bce1ff502d6`，任务镜像为 `sha256:b2e57b104d804ae73f873cadbcd0b8339003d1d9badb7376faddac7d964e44fb`，构建来源与该提交逐项匹配。
+
+2026-11-15 13:23:51 UTC 起，沿原本地状态运行正常向量加法 `test-gpu`。1221.741 秒后退出码为 0，全部 24 个启动阶段及公开样例 2/2 通过；完整启动证据摘要为 `b44431c7ec534e3f8ca121e1f18b9ca7fa2d8c0ddcad136bf05f47e6e62efa6b`，执行源码摘要为 `2571ea3c42003dfcb67ff988cad9632a8c49b14d61ce2ebeaa10580ac0d92031`。正常 `recover-gpu` 返回 idle，未新增私有失败记录。
+
+独立审计确认本轮 28 个原任务和控制容器均不存在，操作与控制记录均为 completed，无活动 journal，GPU 0 完整清单为空。原 Web、CPU worker、tutor 的 ID、镜像、启动时间、重启次数和健康状态不变。原始命令、结果、阶段序列及有界进程/内存观察保存在 `test-results/termination-window-local-diagnostic-2026-11-15/observation-1/`，独立核验为同目录上层的 `final-audit.json`。
+
+本轮仍是公开样例，`formal_result` 与 `ready` 均为 false。正式站点、矩阵 API、worker 丢失及发布恢复使用相应冻结四镜像另行验收，不能从本轮结果外推。
+
 ## 证据与后续
 
 私有原始记录保留在 `test-results/f-current-authorized-2026-11-15/`：管理检查及清理摘要、`local-gpu-public-2/`、`local-gpu-1/`、`local-gpu-2/`、`diagnostic-1/`、`diagnostic-2/`，以及 `uvm-regression-before.xml`、`uvm-components.xml`。管理完整报告在 `test-results/px-container-controller-8e3566b0dd07/result.json`。首次公开包准备因调用参数错误失败，`local-gpu-public/` 保留原记录，站点和数据库亦已清理。

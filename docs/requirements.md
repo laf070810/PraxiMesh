@@ -2,7 +2,7 @@
 
 更新：2026-11-15。目标：按 PRD 实施阶段 A/B/C 与 D/E/F 补充。维护者已明确当前先交付可本地验证的自部署版本；公开运营和许可证选择稍后确定，GPU 正式题型及完整验收仍未完成。**C 的专业评测、组织与辅导，D 的完整筛选、私有成就与挑战，E 的类/API，以及 F 的版本题目反馈均已通过本地验收。外部部署与授权事项仍未完成。** 当前固定制品及 E→F HTTPS 升级见 [F 验收](acceptance-f.md)，类/API见 [E 验收](acceptance-e.md)，筛选与挑战见 [D 验收](acceptance-d.md)，既有阶段 A 验收见 [acceptance.md](acceptance.md)，架构见 [RFC-006](rfcs/006-complete-product.md)和 [ADR-011](adr/011-specialists-organizations-coaching.md)。
 
-GPU 当前进度：新的 sandbox OOM 优先级已在原 GPU 0 重放中越过资源检查与正确恢复；完整启动仍在最后的退出期间采样归属检查失败。原实例、数据与失败记录保留，普通恢复完成、设备空闲。[受控退出的当前查询身份](rfcs/039-terminating-task-sampled-identities.md)已修复，391 项相关检查及五组实际 CPU/Docker 故障矩阵通过，新的完整 CUDA 重放仍待完成。既有两题成绩、正常切换与协调器中断只保留原版本范围，见[临时站点记录](acceptance-gpu-site.md)；网站 GPU 发布、worker 丢失与完整升级恢复仍未完成。
+GPU 当前进度：`6e40ba7` 的进程观察、资源恢复与[受控退出修复](rfcs/039-terminating-task-sampled-identities.md)已在原 GPU 0 完成全部 24 阶段启动和向量加法 2/2 公开样例，普通恢复及独立清理审计通过。391 项相关检查及五组实际 CPU/Docker 故障矩阵也已通过。对应冻结发布包与临时站点继续验收；既有两题正式成绩、正常切换与协调器中断保留原版本范围，见[临时站点记录](acceptance-gpu-site.md)。网站 GPU 发布、worker 丢失与完整升级恢复仍未完成。
 
 ## 功能要求
 
