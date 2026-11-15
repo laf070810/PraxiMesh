@@ -12,6 +12,7 @@ import json
 import os
 import re
 import secrets
+import shlex
 import stat
 import subprocess
 import sys
@@ -174,6 +175,43 @@ def imported_images(engine, release, directory):
         release,
         runner=lambda *args, **kwargs: image_operation(engine, *args, timeout=30),
     )
+
+
+def resolved_model(engine, saved, release, state):
+    result = image_operation(
+        engine,
+        "compose",
+        *(["--profile", "gpu", "--profile", "check"] if saved["gpu"] else []),
+        "--env-file",
+        str(state / "compose.env"),
+        "config",
+        "--format",
+        "json",
+        timeout=30,
+    )
+    if len(result.stdout) > 256 * 1024:
+        raise ValueError("Prepared Compose model exceeds its size limit")
+    model = json.loads(result.stdout)
+    expected = {"postgres", "bootstrap", "web", "worker"}
+    if saved["gpu"]:
+        expected.update({"gpu-worker", "gpu-check"})
+    if saved["ai"]:
+        expected.add("tutor")
+    if (
+        model.get("name") != "px-" + saved["bootstrap"]["instance"]
+        or set(model.get("services", {})) != expected
+    ):
+        raise ValueError("Resolved Compose project or services differ from preparation")
+    services = model["services"]
+    for name, role in (("web", "web"), ("bootstrap", "web"), ("worker", "worker")):
+        if services[name].get("image") != release["images"][role]:
+            raise ValueError("Resolved Compose image differs from the frozen release")
+    if saved["gpu"] and any(
+        services[name].get("image") != release["images"]["gpu_worker"]
+        for name in ("gpu-worker", "gpu-check")
+    ):
+        raise ValueError("Resolved GPU worker image differs from the frozen release")
+    return result.stdout
 
 
 def make_installation(options, release, engine, engine_info):
@@ -405,6 +443,27 @@ def prepare(options):
             raise ValueError(
                 "Compose client configuration must remain separate from credentials and proxies"
             )
+        # These are deterministic derived files. Regenerating a missing model
+        # never replaces credentials, the original DB binding, or GPU state.
+        publish(state / "compose.json", resolved_model(engine, saved, release, state))
+        command = [
+            "docker",
+            "--config",
+            str(client),
+            "--host",
+            "unix://" + str(engine.path),
+            "compose",
+            "--project-name",
+            "px-" + spec["instance"],
+            "--file",
+            str(state / "compose.json"),
+        ]
+        if saved["gpu"]:
+            command += ["--profile", "gpu"]
+        publish(
+            state / "compose.sh",
+            ("#!/bin/sh\nset -eu\nexec " + shlex.join(command) + ' "$@"\n').encode(),
+        )
         if not completed:
             create_json(
                 state / "prepared.json",
@@ -420,16 +479,8 @@ def prepare(options):
             "state": str(state),
             "gpu_configured": bool(saved["gpu"]),
             "services_started": False,
-            "compose_command": [
-                "docker",
-                "--config",
-                str(client),
-                "--host",
-                "unix://" + str(engine.path),
-                "compose",
-                "--env-file",
-                str(state / "compose.env"),
-            ],
+            "compose_command": command,
+            "start_command": shlex.join(["sh", str(state / "compose.sh"), "up", "--build", "-d"]),
         }
     finally:
         os.close(descriptor)

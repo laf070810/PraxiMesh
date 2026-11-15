@@ -9,6 +9,7 @@ import pytest
 
 from core.compose_bootstrap import configuration_digest
 from core.compose_bootstrap_state import InstallationState, initialize
+from scripts import prepare_compose
 from scripts.deploy_database import DeploymentDatabaseError
 from scripts.prepare_compose import (
     application_environment,
@@ -139,3 +140,46 @@ def test_prepared_role_files_do_not_disclose_database_owner_or_other_role_secret
 def test_environment_cannot_inject_additional_fields(name, value):
     with pytest.raises(ValueError):
         dotenv({name: value})
+
+
+@pytest.mark.parametrize(
+    "defect",
+    ["project", "extra-service", "missing-check", "web", "bootstrap", "worker", "gpu-check"],
+)
+def test_mismatching_resolved_model_is_rejected_before_publication(tmp_path, monkeypatch, defect):
+    """Parser-result rejection only; this model supplies no runtime evidence."""
+    release = {
+        "images": {
+            "web": "sha256:" + "1" * 64,
+            "worker": "sha256:" + "2" * 64,
+            "gpu_worker": "sha256:" + "3" * 64,
+        }
+    }
+    saved = {"bootstrap": {"instance": "model1"}, "gpu": "selected-physical-uuid", "ai": False}
+    model = {
+        "name": "px-model1",
+        "services": {
+            "postgres": {},
+            "web": {"image": release["images"]["web"]},
+            "bootstrap": {"image": release["images"]["web"]},
+            "worker": {"image": release["images"]["worker"]},
+            "gpu-worker": {"image": release["images"]["gpu_worker"]},
+            "gpu-check": {"image": release["images"]["gpu_worker"]},
+        },
+    }
+    if defect == "project":
+        model["name"] = "unrelated"
+    elif defect == "extra-service":
+        model["services"]["unrelated"] = {}
+    elif defect == "missing-check":
+        del model["services"]["gpu-check"]
+    else:
+        model["services"][defect]["image"] = "sha256:" + "0" * 64
+    monkeypatch.setattr(
+        prepare_compose,
+        "image_operation",
+        lambda *a, **kw: SimpleNamespace(stdout=json.dumps(model).encode()),
+    )
+    with pytest.raises(ValueError, match="Resolved"):
+        prepare_compose.resolved_model(None, saved, release, tmp_path)
+    assert not list(tmp_path.iterdir())

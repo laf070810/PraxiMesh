@@ -18,19 +18,17 @@
 
 加 `--ai` 选择本地 CPU 模型；加 `--gpu GPU-完整物理UUID` 选择 GPU。GPU 准备会读取真实设备元数据并创建原私有锁及任务记录目录，不能在其他账号使用此卡时执行。`--port` 改端口，`--bind 127.0.0.1` 可仅绑定回环。默认在新库导入示例目录；`--empty` 只建结构，供维护者另行发布内容。当前默认示例包仍不发布 CUDA 候选题。
 
-准备核对完整归档、镜像角色、原 daemon 与配置协议，导入固定镜像并生成私有凭据。它不启动服务、不运行评测、不产生 GPU 就绪。完成后返回 `compose_command`，后续始终使用该命令前缀；不要省略指定 daemon、私有客户端目录和 `--env-file`。
+准备核对完整归档、镜像角色、原 daemon 与配置协议，导入固定镜像并生成私有凭据。它不启动服务、不运行评测、不产生 GPU 就绪。完成后返回可直接执行的 `start_command`，并生成固定项目、daemon 和实际配置的 `compose.sh`。解析后的私有 `compose.json` 包含凭据，不要公开提交或打印其完整内容。
 
 ## 启动与同版本管理
 
 例如安装目录为 `/absolute/path/to/new-installation`：
 
 ```sh
-docker --config /absolute/path/to/new-installation/docker-client \
-  --host "unix://$XDG_RUNTIME_DIR/docker.sock" compose \
-  --env-file /absolute/path/to/new-installation/compose.env up --build -d
+sh /absolute/path/to/new-installation/compose.sh up --build -d
 ```
 
-准备文件已经选择相应 Compose 组合，无需再拼接 GPU 或 AI 覆盖文件。打开 `http://服务器IP:8000`。数据库初始化成功后才启动应用和 worker；CPU 与 GPU 各自完成完整检查并发布新鲜状态后才接受相应提交。Web 可访问不表示 GPU 已就绪。
+该脚本调用真实 Docker Compose，已选择相应 GPU/AI 组合并固定镜像与配置；宿主同名环境变量不会覆盖它们。打开 `http://服务器IP:8000`。数据库初始化成功后才启动应用和 worker；CPU 与 GPU 各自完成完整检查并发布新鲜状态后才接受相应提交。Web 可访问不表示 GPU 已就绪。
 
 沿用同一命令前缀，将末尾替换为 `ps`、`logs --tail 100`、`stop` 或 `up -d`。同版本重启保留原数据库与凭据，不重新导入目录。GPU worker 使用原配置和任务记录，每次重新启动仍需完整检查；失败保留原状态，不能删除锁或任务记录来强行启动。
 
