@@ -161,6 +161,12 @@ worker 崩溃验收的首个普通 API 任务因观察端轮询触发限流而�
 
 该轮 `cbe8734` 的镜像内无设备 CPU 检查通过，真实 CUDA 随后失败于目标 pidfd 的多层 NSpid 核对，普通恢复完成。实际无设备容器的前后对照确认，应比较目标完整命名空间链；修复后的原句柄与自然退出检查、351 项相关回归通过。新匹配镜像的完整启动仍需重放，不能以 CPU 对照结果宣布 GPU 已恢复。
 
+`62eb989` 的匹配控制器与原已核验任务镜像运行 1126.844 秒，未再出现进程归属故障，但最后的 service-deadline 检查在 EOF 后核对超时。原容器独立退出码为 124；Docker 事件与事后时钟对齐显示退出发生在观察截止之前，不能据此补签原检查成功。普通恢复完成，原状态 recovered、无活动 journal、GPU 0 空闲；记录在 `test-results/namespace-handles-local-diagnostic-2026-11-15/observation-1/`，退出事件为 `deadline-events.json`。原 Web、CPU worker、tutor 的 ID、镜像、启动时间与健康状态另行复核不变。
+
+原代码上带检查耗时的模型复现同一异常，按 [ADR-091](adr/091-controller-fault-observation-checkpoints.md) 共用传输层检查时钟，EOF 后仍读取新状态，原期限不变。371 项相关组件检查通过，实际 CPU 故障矩阵和新双镜像的 CUDA 重放继续进行。该修改也属于任务镜像源码范围，不能只替换控制器；为 `62eb989` 准备的后续发布和服务器验收脚本尚未执行。
+
+标准 CPU/runsc 矩阵随后五组全部通过，含主动退出、断连、独立期限、准备失败和恢复失败；原进程、临时目录及镜像标签均已清理，源码保持不变。报告在 `test-results/px-container-lifecycle-aa1cb3a4edea/result.json`。该结果不签发 GPU 就绪，后续真实重放仍须使用新匹配双镜像。
+
 ## 待完成的真实范围
 
 重查原卡独占后，使用新冻结版本验证正式任务中的 worker 丢失、原预约清理与正确性恢复，以及升级和曝光恢复。已有结果只证明上述固定版本与实际范围；全部成功前，仍按[需求追踪](requirements.md)保留网站 GPU 发布门槛。

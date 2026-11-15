@@ -2,7 +2,7 @@
 
 更新：2026-11-15。目标：按 PRD 实施阶段 A/B/C 与 D/E/F 补充。维护者已明确当前先交付可本地验证的自部署版本；公开运营和许可证选择稍后确定，GPU 正式题型及完整验收仍未完成。**C 的专业评测、组织与辅导，D 的完整筛选、私有成就与挑战，E 的类/API，以及 F 的版本题目反馈均已通过本地验收。外部部署与授权事项仍未完成。** 当前固定制品及 E→F HTTPS 升级见 [F 验收](acceptance-f.md)，类/API见 [E 验收](acceptance-e.md)，筛选与挑战见 [D 验收](acceptance-d.md)，既有阶段 A 验收见 [acceptance.md](acceptance.md)，架构见 [RFC-006](rfcs/006-complete-product.md)和 [ADR-011](adr/011-specialists-organizations-coaching.md)。
 
-GPU 当前进度：[PID 观察契约](rfcs/032-gpu-observer-pid-namespace.md)修复已通过组件、实际容器及管理查询检查；新冻结包的启动随后因短暂进程归属失败，已正常回退原 CPU 库并保留数据。原本地状态重放进一步定位了完整采样期间的进程退出与回收，现按[查询内句柄方案](rfcs/036-sampled-gpu-process-handles.md)修复，351 项相关检查及实际 CPU 容器句柄对照已通过，新的完整 CUDA 启动尚未通过。既有两题成绩、正常切换与两次协调器中断只保留原版本范围，见[临时站点记录](acceptance-gpu-site.md)；worker 丢失与完整升级恢复继续验收。
+GPU 当前进度：[PID 观察契约](rfcs/032-gpu-observer-pid-namespace.md)修复后，原状态真实重放已进入最后的独立期限检查，但 EOF 后核对超时，普通恢复完成、设备空闲；尚未完成新的完整启动。查询内进程句柄、完整命名空间链及[退出观察检查点](rfcs/037-controller-fault-observation-checkpoints.md)已修复，371 项相关检查和五组实际 CPU/runsc 故障矩阵通过，下一步重建匹配双镜像继续 GPU 验收。既有两题成绩、正常切换与两次协调器中断只保留原版本范围，见[临时站点记录](acceptance-gpu-site.md)；网站 GPU 发布、worker 丢失与完整升级恢复仍未完成。
 
 ## 功能要求
 

@@ -8,6 +8,7 @@ import pytest
 from judge import container_lifecycle as lifecycle
 from judge.container_kernel_protocol import checked_completion, validate_request
 from judge.controller_faults import CHECKS, fault_request, phase
+from judge.gpu_transport import Channel as TransportChannel
 from judge.sandbox import SandboxUnavailable
 
 DEVICE = "GPU-12345678-1234-5678-9abc-123456789abc"
@@ -65,7 +66,15 @@ def report(request=REQUEST, *, device=DEVICE):
 
 @pytest.fixture
 def observer(monkeypatch):
-    values = SimpleNamespace(now=100.0, eof=False, name="controller-exit", defect=None)
+    values = SimpleNamespace(
+        now=100.0,
+        eof=False,
+        name="controller-exit",
+        defect=None,
+        tick_cost=0.0,
+        after_eof_delay=0.0,
+        after_eof_defect=None,
+    )
     events = []
     args = ["105.0", "150.0", "b" * 32, "fixed"]
     monkeypatch.setattr(lifecycle.time, "monotonic", lambda: values.now)
@@ -78,6 +87,7 @@ def observer(monkeypatch):
         engine = SimpleNamespace(check_socket=lambda: events.append("socket"))
 
         def inspect(self):
+            events.append("inspect")
             running = not values.eof or values.name == "transport-loss"
             if (
                 values.defect == "stopped-before"
@@ -117,6 +127,7 @@ def observer(monkeypatch):
         deadline = 150.0
         on_tick = None
         next_tick = 0
+        check = TransportChannel.check
 
         def send(self, message):
             events.append(message)
@@ -128,7 +139,10 @@ def observer(monkeypatch):
             values.now = (
                 150.1 if values.name == "service-deadline" and values.defect != "early" else 101.0
             )
-            self.on_tick()
+            self.check(force=True)
+            values.now += values.after_eof_delay
+            if values.after_eof_defect:
+                values.defect = values.after_eof_defect
 
     channel = Channel()
     connection = SimpleNamespace(channel=channel, deadline=150.0, identity=("c" * 64, tuple(args)))
@@ -138,6 +152,11 @@ def observer(monkeypatch):
         armed = lifecycle.armed_message(request)
         if values.defect == "challenge":
             armed["challenge"] = "b" * 32
+
+        def tick():
+            events.append("lease")
+            values.now += values.tick_cost
+
         return lifecycle.observe_fault(
             connection,
             Service(),
@@ -145,11 +164,35 @@ def observer(monkeypatch):
             armed,
             started=100.0,
             deadline=155.0,
-            on_tick=lambda: events.append("lease"),
+            on_tick=tick,
             on_trigger=lambda: events.append("triggered"),
         )
 
     return values, events, channel, run
+
+
+def test_eof_reuses_fresh_full_checkpoint_but_reads_new_original_state(observer):
+    values, events, _channel, run = observer
+    values.name, values.tick_cost = "service-deadline", 4.0
+    result = run()
+    assert result["termination"]["exit_code"] == 124
+    assert events.count("lease") == 2 and events.count("inspect") == 3
+    assert values.now < 155.0
+
+
+def test_expired_checkpoint_after_eof_still_checks_full_lease_and_deadline(observer):
+    values, _events, _channel, run = observer
+    values.name, values.tick_cost, values.after_eof_delay = "service-deadline", 4.0, 0.3
+    with pytest.raises(SandboxUnavailable, match="deadline expired"):
+        run()
+
+
+@pytest.mark.parametrize("defect", ["missing", "id", "nonce", "deadline", "oom", "exit"])
+def test_fresh_checkpoint_never_reuses_container_state_after_eof(observer, defect):
+    values, _events, _channel, run = observer
+    values.name, values.after_eof_defect = "service-deadline", defect
+    with pytest.raises(SandboxUnavailable):
+        run()
 
 
 @pytest.mark.parametrize("name", CHECKS)

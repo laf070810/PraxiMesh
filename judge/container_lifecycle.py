@@ -173,10 +173,11 @@ def observe_fault(connection, service, request, armed, *, started, deadline, on_
         "Controller fault observation cannot extend its original supervision budget",
     )
 
-    def state():
+    def state(*, checkpoint=True):
         service.guard.assert_held()
         service.engine.check_socket()
-        on_tick()
+        if checkpoint:
+            on_tick()
         value = service.inspect()
         require(
             value is not None
@@ -202,11 +203,19 @@ def observe_fault(connection, service, request, armed, *, started, deadline, on_
     channel.next_tick = 0
     channel.expect_eof()
     disconnected = time.monotonic()
-    observed = state()
+
+    def current_state():
+        # EOF may follow a full callback that just completed. Reuse the
+        # channel's heartbeat clock, never its prior container observation.
+        # An expired checkpoint still runs the full lease/device callback.
+        channel.check()
+        return state(checkpoint=False)
+
+    observed = current_state()
     if request["name"] != "transport-loss":
         while observed["running"]:
             time.sleep(0.05)
-            observed = state()
+            observed = current_state()
     report = {
         "scope": SCOPE,
         "name": request["name"],
