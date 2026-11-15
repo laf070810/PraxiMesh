@@ -17,6 +17,7 @@
 - [RFC-031：GPU 源码发送前的检查点](rfcs/031-gpu-preparation-checkpoints.md)、[ADR-085](adr/085-gpu-preparation-checkpoints.md) — 原 Run 预算耗尽与重复准备检查
 - [RFC-032：GPU 管理查询的进程命名空间](rfcs/032-gpu-observer-pid-namespace.md)、[ADR-086](adr/086-gpu-observer-pid-namespace.md) — 外部占用漏报的真实对照及可信控制器修复边界
 - [RFC-033：GPU PID 采样与归属核对顺序](rfcs/033-gpu-pid-observation-order.md)、[ADR-087](adr/087-gpu-pid-observation-order.md) — 短暂 GPU 子进程的实际观察及重复检查竞态
+- [RFC-034：完整 SMI 查询包围 NVML](rfcs/034-gpu-inventory-sampling-window.md)、[ADR-088](adr/088-gpu-inventory-sampling-window.md) — 保留两个完整样本，防止结束进程被后次空列表隐藏
 - [GitHub 托管应用与 WASI 验收](acceptance-hosted-ci.md) — 按确切提交记录工作流结果和故障定位；专用部署节点与 GPU 仍需分别验收
 - [旧 F→当前 CPU 整站升级](acceptance-f-current.md) — 真实旧应用、三项迁移、数据保留、HTTPS/WASI 与清理通过
 - [F 升级准备与当前 CPU 发布包验收](acceptance-upgrade-preparation.md) — 保留历次目标包、准备阶段和原始失败

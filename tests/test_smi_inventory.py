@@ -236,6 +236,30 @@ def test_native_contexts_must_be_in_full_inventory(full):
         validate_observation(value, full)
 
 
+@pytest.mark.parametrize("before,after", [([200], []), ([], [200]), ([200], [200])])
+def test_xml_window_keeps_a_process_starting_or_ending_between_queries(full, before, after):
+    value = complete(full, [200])
+    value.update(schema=3, inventory_samples=[before, after])
+    value["pids"]["compute"] = [200]
+    assert validate_observation(value, full) == [200]
+    value["inventory_samples"] = [[], []]
+    with pytest.raises(SandboxUnavailable, match="samples changed"):
+        validate_observation(value, full)
+    value["pids"]["inventory"] = []
+    with pytest.raises(SandboxUnavailable, match="sources disagree"):
+        validate_observation(value, full)
+
+
+@pytest.mark.parametrize(
+    "samples", [None, [], [[200]], [[], [], []], [[True], []], [[200, 200], []], [[200], [0]]]
+)
+def test_complete_window_requires_two_valid_original_samples(full, samples):
+    value = complete(full, [200])
+    value.update(schema=3, inventory_samples=samples)
+    with pytest.raises(SandboxUnavailable):
+        validate_observation(value, full)
+
+
 @pytest.fixture
 def combined(monitored, monkeypatch):  # noqa: F811
     item = monitored
@@ -255,6 +279,54 @@ def test_other_only_pid_is_rejected_without_signalling(combined):
     with pytest.raises(SandboxUnavailable, match="outside"):
         item.monitor.observe(item.task.service)
     assert not any(call[:2] == ("container", "kill") for call in item.task.journal.engine.calls)
+
+
+def test_later_empty_xml_never_hides_an_earlier_external_process(combined):
+    item = combined
+    item.value = complete(item.monitor.saved, [9999])
+    item.value.update(schema=3, inventory_samples=[[9999], []])
+    with pytest.raises(SandboxUnavailable, match="occupied"):
+        item.monitor.observe()
+    with pytest.raises(SandboxUnavailable, match="outside"):
+        item.monitor.observe(item.task.service)
+
+
+@pytest.mark.parametrize("ending", [False, True])
+def test_live_query_preserves_both_xml_samples_around_native_contexts(
+    combined, monkeypatch, ending
+):
+    item = combined
+    monkeypatch.delattr(item.monitor, "read")
+    queries = []
+
+    def run(command, **options):
+        queries.append((command, options))
+        options["on_tick"]()
+        if len(queries) == 1:
+            data = version()
+        elif len(queries) == 3:
+            value = observation(item.monitor.saved)
+            value["pids"]["compute"] = [5678]
+            data = json.dumps(value).encode()
+        else:
+            positive = (len(queries) == 2) == ending
+            data = xml(item.monitor.saved, row(5678, "C") if positive else "")
+        return SimpleNamespace(stdout=data, stderr=b"")
+
+    monkeypatch.setattr(monitor_module, "run_command", run)
+    captured = []
+    original = item.monitor.read
+
+    def read():
+        value = original()
+        captured.append(value)
+        return value
+
+    monkeypatch.setattr(item.monitor, "read", read)
+    assert item.monitor.observe(item.task.service) == [5678]
+    assert captured[0]["schema"] == 3
+    assert captured[0]["inventory_samples"] == ([[5678], []] if ending else [[], [5678]])
+    assert len(queries) == 4 and len({v[1]["deadline"] for v in queries}) == 1
 
 
 def test_empty_inventory_preserves_original_anchor_and_cleanup_boundary(combined):
@@ -287,7 +359,8 @@ def test_legacy_context_observer_cannot_prepare_device_task(monitored):  # noqa:
 
 
 @pytest.mark.parametrize(
-    "defect", [None, "version", "xml", "warning", "partial", "deadline", "native-schema"]
+    "defect",
+    [None, "version", "xml", "late-xml", "warning", "partial", "deadline", "native-schema"],
 )
 def test_one_fixed_deadline_covers_all_sources(combined, monkeypatch, defect):
     item = combined
@@ -297,40 +370,49 @@ def test_one_fixed_deadline_covers_all_sources(combined, monkeypatch, defect):
     def run(command, **options):
         calls.append((command, options))
         options["on_tick"]()
-        if len(calls) == 1:
+        if len(calls) == 3:
             value = observation(item.monitor.saved)
             if defect == "native-schema":
                 value["schema"] = 2
             if defect == "partial":
                 value["pids"]["compute"] = [5678]
             return SimpleNamespace(stdout=json.dumps(value).encode(), stderr=b"")
-        if defect == "deadline":
+        if defect == "deadline" and len(calls) == 4:
             raise SandboxUnavailable("Private runtime command exceeded its deadline")
         data = version("580.1.0" if defect == "version" else "590.48.01")
-        if len(calls) == 3:
-            data = b"N/A" if defect == "xml" else xml(item.monitor.saved)
-        return SimpleNamespace(stdout=data, stderr=b"warning" if defect == "warning" else b"")
+        if len(calls) in {2, 4}:
+            invalid = (
+                defect == "xml" and len(calls) == 2 or defect == "late-xml" and len(calls) == 4
+            )
+            data = b"N/A" if invalid else xml(item.monitor.saved)
+        return SimpleNamespace(
+            stdout=data, stderr=b"warning" if defect == "warning" and len(calls) == 4 else b""
+        )
 
     monkeypatch.setattr(monitor_module, "run_command", run)
     if defect is None:
         assert item.monitor.observe() == []
-        assert len(calls) == 3
+        assert len(calls) == 4
         assert len({options["deadline"] for _, options in calls}) == 1
-        for command, options in calls[1:]:
+        for command, options in (calls[0], calls[1], calls[3]):
             assert command[0] == str(DIRECTORY / "nvidia-smi")
             assert options["env"] == {
                 "PATH": "/usr/bin:/bin",
                 "LC_ALL": "C",
                 "LD_LIBRARY_PATH": str(DIRECTORY),
             }
-        assert calls[1][0][1:] == ["--version"]
-        assert calls[2][0][1:] == [
-            "-i",
-            item.monitor.saved["target"]["uuid"],
-            "--query",
-            "--xml-format",
-        ]
-        assert calls[2][1]["max_output"] == MAX_XML
+        assert calls[0][0][1:] == ["--version"]
+        assert (
+            calls[1][0][1:]
+            == calls[3][0][1:]
+            == [
+                "-i",
+                item.monitor.saved["target"]["uuid"],
+                "--query",
+                "--xml-format",
+            ]
+        )
+        assert calls[1][1]["max_output"] == calls[3][1]["max_output"] == MAX_XML
     else:
         with pytest.raises(SandboxUnavailable):
             item.monitor.observe()

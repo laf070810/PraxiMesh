@@ -114,9 +114,21 @@ def check_prerequisites(value, view):
         raise SandboxUnavailable("NVIDIA observation prerequisites cannot be verified") from None
 
 
+def pid_set(value):
+    if (
+        type(value) is not list
+        or len(value) > MAX_PIDS
+        or any(type(pid) is not int or not 0 < pid < 2**31 for pid in value)
+        or len(set(value)) != len(value)
+    ):
+        raise SandboxUnavailable("Invalid NVIDIA process inventory")
+    return set(value)
+
+
 def validate_observation(value, saved):
     validate_observer(saved)
     full = saved["schema"] == 2
+    window = full and type(value) is dict and value.get("schema") == 3
     expected = {
         "schema",
         "bundle",
@@ -130,11 +142,13 @@ def validate_observation(value, saved):
     }
     if full:
         expected.add("smi_version")
+    if window:
+        expected.add("inventory_samples")
     if (
         type(value) is not dict
         or set(value) != expected
         or type(value["schema"]) is not int
-        or value["schema"] != saved["schema"]
+        or value["schema"] not in ({2, 3} if full else {1})
         or (full and value["smi_version"] != saved["target"]["driver"])
         or value["bundle"] != manifest_digest(saved["library"])
         or type(value["minor"]) is not int
@@ -153,16 +167,17 @@ def validate_observation(value, saved):
         raise SandboxUnavailable("NVIDIA management observation identity changed")
     union = set()
     for found in value["pids"].values():
-        if (
-            type(found) is not list
-            or len(found) > MAX_PIDS
-            or any(type(pid) is not int or not 0 < pid < 2**31 for pid in found)
-            or len(set(found)) != len(found)
-        ):
-            raise SandboxUnavailable("Invalid NVIDIA process inventory")
-        union.update(found)
+        union.update(pid_set(found))
     if len(union) > MAX_PIDS:
         raise SandboxUnavailable("NVIDIA process inventory exceeded its bound")
+    if window:
+        samples = value["inventory_samples"]
+        if (
+            type(samples) is not list
+            or len(samples) != 2
+            or pid_set(samples[0]) | pid_set(samples[1]) != set(value["pids"]["inventory"])
+        ):
+            raise SandboxUnavailable("NVIDIA complete inventory samples changed")
     if full and union != set(value["pids"]["inventory"]):
         raise SandboxUnavailable("NVIDIA process sources disagree; device state is unavailable")
     return sorted(union)
@@ -191,6 +206,12 @@ class ContainerDeviceMonitor:
         """Management metadata only; a successful read does not imply an idle GPU."""
         self.check()
         deadline = time.monotonic() + 3
+        if self.saved["schema"] == 2:
+            version = utility_version(
+                self.smi_query(deadline, "--version", maximum=4096),
+                self.saved["target"]["driver"],
+            )
+            before = self.smi_inventory(deadline)
         result = run_command(
             [
                 sys.executable,
@@ -206,7 +227,7 @@ class ContainerDeviceMonitor:
         )
         value = decode_frame(result.stdout)
         if self.saved["schema"] == 2:
-            value = self.full_inventory(value, deadline)
+            value = self.full_inventory(value, deadline, before=before, version=version)
         validate_observation(value, self.saved)
         self.check()
         return value
@@ -228,7 +249,33 @@ class ContainerDeviceMonitor:
         self.check()
         return validate_selection(value)
 
-    def full_inventory(self, value, deadline):
+    def smi_query(self, deadline, *arguments, maximum):
+        result = run_command(
+            [str(DIRECTORY / "nvidia-smi"), *arguments],
+            env={"PATH": "/usr/bin:/bin", "LC_ALL": "C", "LD_LIBRARY_PATH": str(DIRECTORY)},
+            deadline=deadline,
+            seconds=3,
+            on_tick=self.check,
+            max_output=maximum,
+        )
+        if result.stderr:
+            raise SandboxUnavailable("NVIDIA inventory query returned a diagnostic")
+        return result.stdout
+
+    def smi_inventory(self, deadline):
+        return inventory(
+            self.smi_query(
+                deadline,
+                "-i",
+                self.saved["target"]["uuid"],
+                "--query",
+                "--xml-format",
+                maximum=MAX_XML,
+            ),
+            self.saved,
+        )
+
+    def full_inventory(self, value, deadline, *, before, version):
         # The native child returns its original schema. Never silently overwrite
         # an existing full inventory, extra field or category from that child.
         if (
@@ -236,40 +283,19 @@ class ContainerDeviceMonitor:
             or type(value.get("schema")) is not int
             or value["schema"] != 1
             or "smi_version" in value
+            or "inventory_samples" in value
             or type(value.get("pids")) is not dict
             or set(value["pids"]) != {"compute", "graphics", "mps"}
         ):
             raise SandboxUnavailable("Unexpected native NVIDIA observation")
-        environment = {
-            "PATH": "/usr/bin:/bin",
-            "LC_ALL": "C",
-            "LD_LIBRARY_PATH": str(DIRECTORY),
-        }
-
-        def query(*arguments, maximum):
-            result = run_command(
-                [str(DIRECTORY / "nvidia-smi"), *arguments],
-                env=environment,
-                deadline=deadline,
-                seconds=3,
-                on_tick=self.check,
-                max_output=maximum,
-            )
-            # Warnings cannot silently downgrade a partial observation to idle.
-            if result.stderr:
-                raise SandboxUnavailable("NVIDIA inventory query returned a diagnostic")
-            return result.stdout
-
-        version = utility_version(query("--version", maximum=4096), self.saved["target"]["driver"])
-        pids = inventory(
-            query("-i", self.saved["target"]["uuid"], "--query", "--xml-format", maximum=MAX_XML),
-            self.saved,
-        )
+        after = self.smi_inventory(deadline)
+        pids = sorted(pid_set(before) | pid_set(after))
         return {
             **value,
-            "schema": 2,
+            "schema": 3,
             "smi_version": version,
             "pids": {**value["pids"], "inventory": pids},
+            "inventory_samples": [before, after],
         }
 
     def observe(self, service=None):
