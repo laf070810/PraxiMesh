@@ -48,6 +48,10 @@ def specification(command):
             ],
             "cwd": "/",
             "noNewPrivileges": True,
+            # Prefer terminating this memory-owning sandbox over the trusted
+            # task supervisor. This raises only the new guest's OOM priority;
+            # the original whole-container budget and cleanup remain required.
+            "oomScoreAdj": 1000,
             "capabilities": {
                 key: [] for key in ("bounding", "effective", "inheritable", "permitted", "ambient")
             },

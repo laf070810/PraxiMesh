@@ -143,12 +143,14 @@ def test_invalid_trusted_command_is_rejected(command):
 
 
 def test_specification_does_not_inherit_host_configuration(monkeypatch):
+    monkeypatch.setenv("OOM_SCORE_ADJ", "-1000")
     monkeypatch.setenv("DATABASE_URL", "private")
     monkeypatch.setenv("HTTP_PROXY", "private")
     spec = specification(["/usr/local/bin/python", "-I", "/opt/praximesh/cpu_guest.py"])
     assert spec["root"]["readonly"] is True
     assert spec["process"]["noNewPrivileges"] is True
     assert not any(spec["process"]["capabilities"].values())
+    assert spec["process"]["oomScoreAdj"] == 1000
     assert not any("private" in item for item in spec["process"]["env"])
     assert all(mount["type"] != "bind" for mount in spec["mounts"])
     assert not spec["linux"].get("cgroupsPath")

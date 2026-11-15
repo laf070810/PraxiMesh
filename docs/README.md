@@ -21,6 +21,7 @@
 - [RFC-035：已退出 GPU 成员的完整身份](rfcs/035-exited-gpu-process-identity.md)、[ADR-089](adr/089-exited-gpu-process-identity.md) — 完整归属与存活分开，缺失、复用和外部进程继续拒绝
 - [RFC-036：查询内 GPU 进程句柄](rfcs/036-sampled-gpu-process-handles.md)、[ADR-090](adr/090-sampled-gpu-process-handles.md) — 样本返回时立即绑定原身份，仅以原句柄确认后续退出
 - [RFC-037：控制器退出观察检查点](rfcs/037-controller-fault-observation-checkpoints.md)、[ADR-091](adr/091-controller-fault-observation-checkpoints.md) — 共用原检查时钟，EOF 后仍读取新状态，固定期限不变
+- [RFC-038：嵌套 sandbox 的 OOM 优先级](rfcs/038-nested-sandbox-oom-priority.md)、[ADR-092](adr/092-nested-sandbox-oom-priority.md) — 固定提高原 sandbox 淘汰优先级，整任务限额和恢复门槛不变
 - [GitHub 托管应用与 WASI 验收](acceptance-hosted-ci.md) — 按确切提交记录工作流结果和故障定位；专用部署节点与 GPU 仍需分别验收
 - [旧 F→当前 CPU 整站升级](acceptance-f-current.md) — 真实旧应用、三项迁移、数据保留、HTTPS/WASI 与清理通过
 - [F 升级准备与当前 CPU 发布包验收](acceptance-upgrade-preparation.md) — 保留历次目标包、准备阶段和原始失败
