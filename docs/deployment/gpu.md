@@ -107,6 +107,8 @@ CPU 专项给故障任务 45 秒预算，其中监督器硬期限为 40 秒；�
 
 GPU 观察在故障触发消息完整发送后才进入原任务退出分支，正常执行继续要求原 PID 1 活跃。非空清单不能按“正在退出”忽略；空清单也必须由原启动实例确认退出并再次查询完整 NVIDIA 来源，见 [ADR-083](../adr/083-controller-termination-observation.md)。修改该边界还须重放[宿主进程归属](#container-process-observer)及真实 GPU 完整启动；CPU 故障通过不证明 NVIDIA 退出时序已通过。
 
+涉及资源 OOM 与进程观察时，还须运行下面的 `--resources-only` 检查。成功报告的 `resource_outer_observations` 保留同一活跃原容器/PID 身份和 false→true 的 OOM 标志变化，不能用整个任务被杀死代替该观察。宿主 cgroup 文本只作归属和摘要比较，不作为路径使用；资源错误、后续恢复和清理仍分别核对。
+
 五组实际故障、正常调用回归和对应验证范围见 [G39 验收](../acceptance-g39.md)。
 
 <a id="container-kernel-flow"></a>

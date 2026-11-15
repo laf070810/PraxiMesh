@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -17,6 +18,7 @@ from judge.container_contract import PYTHON, WORKLOAD_PROFILE  # noqa: E402
 from judge.container_isolation_protocol import resource_request  # noqa: E402
 from judge.container_journal import ContainerJournal, PersistentRuntimeService  # noqa: E402
 from judge.container_kernel_protocol import checked_completion  # noqa: E402
+from judge.container_processes import read_file  # noqa: E402
 from judge.container_runtime_service import SOURCES, contract_digest  # noqa: E402
 from judge.container_service import LocalEngine  # noqa: E402
 from judge.gpu_contract import project_public_problem  # noqa: E402
@@ -27,7 +29,7 @@ from judge.sandbox import SandboxUnavailable  # noqa: E402
 from scripts.container_journal_acceptance import save  # noqa: E402
 from scripts.container_kernel_fixture import IDENTITY  # noqa: E402
 from scripts.container_runtime_acceptance import build_image, read_report  # noqa: E402
-from scripts.container_supervision_acceptance import gone, tree  # noqa: E402
+from scripts.container_supervision_acceptance import birth, gone, tree  # noqa: E402
 
 
 def problem():
@@ -110,10 +112,56 @@ def scenario(engine, image, path, mode, test_mode):
                 )
                 row["container"] = service.container_id
                 cancel_at = None
+                observe_resources = test_mode == "check-resources" and mode == "normal"
 
                 def tick():
                     if cancel_at is not None and time.monotonic() >= cancel_at:
                         raise SandboxUnavailable("Fixed CPU acceptance cancellation")
+                    if observe_resources:
+                        state = service.inspect()
+                        assert state is not None and state["running"]
+                        pid = state["pid"]
+                        before = birth(pid)
+                        proc = os.open(f"/proc/{pid}", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+                        try:
+                            status = read_file(proc, "status", 16384)
+                            group = read_file(proc, "cgroup", 4096)
+                        finally:
+                            os.close(proc)
+                        nspids = [
+                            line.split()[1:]
+                            for line in status.splitlines()
+                            if line.startswith("NSpid:")
+                        ]
+                        assert len(nspids) == 1
+                        nspids = [int(value) for value in nspids[0]]
+                        assert nspids[0] == pid and nspids[-1] == 1
+                        assert before is not None and before == birth(pid)
+                        # This is the host cgroup view, which can contain e.g.
+                        # user@UID.service. Do not apply the container view's
+                        # namespace-relative parser or use this text as a path.
+                        assert group.startswith("0::/") and group.count("\n") <= 1
+                        assert group.strip().endswith("/docker-" + service.container_id + ".scope")
+                        identity = {
+                            "pid": pid,
+                            "birth": before,
+                            "nspids": nspids,
+                            "cgroup_sha256": hashlib.sha256(group.encode()).hexdigest(),
+                        }
+                        evidence = {
+                            "container": state["id"],
+                            "started_at": service.started_at,
+                            "process": identity,
+                            "oom_killed": state["oom_killed"],
+                        }
+                        observations = row.setdefault("resource_outer_observations", [])
+                        if observations:
+                            assert {k: v for k, v in evidence.items() if k != "oom_killed"} == {
+                                k: v for k, v in observations[0].items() if k != "oom_killed"
+                            }
+                        if not observations or evidence != observations[-1]:
+                            assert len(observations) < 3
+                            observations.append(evidence)
 
                 connection = ContainerConnection(service, status, on_tick=tick)
                 channel = connection.channel
@@ -141,6 +189,12 @@ def scenario(engine, image, path, mode, test_mode):
                     row["result_withheld"] = True
                 else:
                     value = checked_completion(channel.receive(), request)
+                    if test_mode == "check-resources":
+                        tick()
+                        assert [v["oom_killed"] for v in row["resource_outer_observations"]] == [
+                            False,
+                            True,
+                        ]
                     if test_mode.startswith("check-"):
                         row["startup_check"] = value["report"]
                     elif test_mode != "recover":
@@ -158,6 +212,7 @@ def scenario(engine, image, path, mode, test_mode):
                             assert value["formal_result"] is False
                             assert value["result"]["total"] == 1
                         row["verdict"] = expected
+                    observe_resources = False
                     channel.send({"event": "finish"})
                     connection.finish()
                     row["guest_cleanup"] = value["cleanup"]
@@ -210,6 +265,7 @@ def main():
         *SOURCES,
         "scripts/container_runtime_acceptance.py",
         "scripts/container_kernel_acceptance.py",
+        "judge/container_processes.py",
     )
     report = {
         "passed": False,

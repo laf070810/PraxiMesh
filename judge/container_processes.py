@@ -268,7 +268,14 @@ class OwnedProcesses:
         ):
             raise SandboxUnavailable("Task PID 1 or cgroup identity changed")
         after = self.original_state()
-        if after != before:
+        child_oom = (
+            before["running"] is True
+            and before["oom_killed"] is False
+            and after == {**before, "oom_killed": True}
+        )
+        # Docker also records a child cgroup OOM while the original PID 1 lives.
+        # Preserve that real flag; it is not a new process/startup identity.
+        if after != before and not child_oom:
             if exited(after):
                 return None
             raise SandboxUnavailable("Task changed during process observation")

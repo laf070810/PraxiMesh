@@ -218,6 +218,55 @@ def test_task_membership_uses_original_cgroup_and_birth(observed_task):
     )
 
 
+def test_child_oom_marker_during_observation_does_not_replace_live_task(observed_task):
+    task = observed_task
+    original = task.service.inspect
+    first = True
+
+    def inspect():
+        nonlocal first
+        value = original()
+        if first:
+            first = False
+            task.state["State"]["OOMKilled"] = True
+        return value
+
+    task.service.inspect = inspect
+    assert task.observer.require_owned([5678]) == [task.members[5678]]
+    assert task.state["State"]["Running"] is True
+    assert task.state["State"]["Pid"] == 1234
+    assert task.state["State"]["OOMKilled"] is True
+
+
+@pytest.mark.parametrize("change", ["marker-reset", "stopped", "exit-code", "birth", "group"])
+def test_oom_marker_never_hides_another_state_or_process_change(observed_task, change):
+    task = observed_task
+    if change == "marker-reset":
+        task.state["State"]["OOMKilled"] = True
+    original = task.service.inspect
+    first = True
+
+    def inspect():
+        nonlocal first
+        value = original()
+        if first:
+            first = False
+            task.state["State"]["OOMKilled"] = change != "marker-reset"
+            if change == "stopped":
+                task.state["State"].update(Running=False, Status="exited", Pid=0)
+            elif change == "exit-code":
+                task.state["State"]["ExitCode"] = 137
+            elif change == "birth":
+                task.members[1234]["birth"] += 1
+            elif change == "group":
+                task.members[1234]["cgroup"] = "0::/different"
+        return value
+
+    task.service.inspect = inspect
+    with pytest.raises(SandboxUnavailable):
+        task.observer.require_owned([])
+
+
 @pytest.mark.parametrize(
     "inventory", [[True], [0], [-1], [2**31], [1234, 1234], ["1234"], tuple([1234]), [1234] * 4097]
 )

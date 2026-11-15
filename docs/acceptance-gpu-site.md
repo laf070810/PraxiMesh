@@ -57,7 +57,19 @@ worker 失败日志现只增加最多四个已冻结平台源码文件/行号，
 
 原日志、退出事件和源码身份保存在 `owned-gpu-site-4/controller-exit-failure.json` 及 `worker-failure.log`。本次自动回退已完成，独立 `automatic-recovery-audit.json` 核对原 CPU 数据、旧代、全部 GPU 容器停止、配置退出、GPU 0 空闲和原服务不变。未运行正式 API 提交。
 
-[退出观察修复](rfcs/029-controller-termination-observation.md)只在固定故障消息发送后使用已绑定的原维护对象；非空清单仍要求活跃归属，确认退出后重新取得完整空清单。254 项相关组件检查通过，实际容器与新冻结镜像重放中。该结果不能当作新版本 GPU 启动通过。
+[退出观察修复](rfcs/029-controller-termination-observation.md)只在固定故障消息发送后使用已绑定的原维护对象；非空清单仍要求活跃归属，确认退出后重新取得完整空清单。254 项相关组件检查通过，后续真实容器与新冻结镜像结果见下节。该结果不能当作新版本 GPU 启动通过。
+
+## 退出观察版本的实测与资源标志问题
+
+修复提交 `b8168d94a1bf1e0a421ec418bb62841ca9067710` 的 351 项启动/控制端回归、补充后的 44 项进程检查通过。真实无设备故障五项、进程归属十八项、原控制端十项全部通过，原任务、标签和临时目录清理通过。证据在 `test-results/termination-observation-2026-11-15/`；这些检查不使用 GPU。
+
+同源 CPU 包 `2026-11-15-cpu-upgrade-target-8` 的清单摘要为 `6fae12f084cd358ea715ed1554ca02670cddf00e440bd4fa89f8e75c436b0e9e`，GPU 包 `2026-11-15-termination-four-image-1` 为 `2b526252efb24a6dee2da6b55d1674578dd6b7a0a41d8924ef9d56117f3a8a9f`。1002 个归档文件与 Git 逐字节一致，source ID 为 `46dc3ae11a61251c1a0f48b83dc6af8f4ef9dd404d393551204e8acb7f1bc77c`。完整核验/导入、十项无设备 worker 检查及 CPU 应用通过，后者用时 431.575 秒，含真实评测、浏览器、准入/排空恢复和清理；结果见 `test-results/termination-releases-2026-11-15/`。
+
+该版本在原站点的 `owned-gpu-site-5/` 通过初始恢复，随后资源检查被进程状态比较拒绝。事件记录显示先有 OOM，约两秒后原控制端发出 SIGKILL，再以 137 退出；没有保存两次完整 inspect 差异。模型只改变活跃原任务的 OOM 标志即可复现同一报错，原始失败保存在 `oom-marker-reproduction.log`。单向标志变化修复及拒绝边界共 391 项组件检查通过。首次附加诊断误用容器内解析器处理宿主 cgroup，报告 `px-container-kernel-364694870edd/` 保留，资源已清理。
+
+修正诊断入口后，`test-results/px-container-kernel-2b9039cb46f0/result.json` 的三组真实无设备检查通过：九项资源检查及十七个 guest 清理、恢复失败时扣留结果，以及新正确调用。实际观察记录确认同一活跃容器、启动时间、PID 1、出生时间、命名空间 PID 和 cgroup 摘要未变，而 OOM 标志从 false 变为 true；原标志没有被改写。容器、临时目录和镜像标签清理通过。这证明该标志可在原进程存活时变化，不是 CUDA 或新版本 GPU 启动通过。
+
+本轮再次自动回退到原 CPU 版本；`owned-gpu-site-5/automatic-recovery-audit.json` 确认数据保留、GPU 空闲、全部原 worker 停止、配置退出和原服务不变。本轮尚未到达控制器故障检查，不能据此认定退出观察修复已通过 GPU；正式 API 仍未验证。
 
 ## 待完成的真实范围
 
