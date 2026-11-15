@@ -38,7 +38,15 @@ def environment(role):
         if not result.get("APP_SECRET_KEY"):
             private_file(DATA / "preview-secret.key")
         result["APP_SECRET_KEY"] = secret_key(DATA, result.get("APP_SECRET_KEY", ""))
-    elif result.get("PRAXIMESH_LOCAL_AI") == "1":
+    else:
+        result = coaching_environment(result)
+    return result
+
+
+def coaching_environment(result):
+    """Configure the same optional local tutor for either self-hosted database."""
+    result = dict(result)
+    if result.get("PRAXIMESH_LOCAL_AI") == "1":
         if AI_DATA.is_symlink() or not AI_DATA.is_dir():
             raise PreviewError("Local tutor credentials require a private volume.")
         result.update(
@@ -59,6 +67,31 @@ def environment(role):
         # Remote services must use HTTPS; the local exception belongs to the sidecar only.
         result["COACHING_ALLOW_LOOPBACK_HTTP"] = "0"
     return result
+
+
+def worker_health():
+    """Observe the CPU worker receipt and its fresh database publication only."""
+    if not Path(os.environ["JUDGE_RECEIPT"]).is_file():
+        return 1
+    import django
+
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "praximesh.settings")
+    django.setup()
+    from django.utils import timezone
+
+    from core.models import WorkerHealth
+    from core.queue import configured_fingerprint
+
+    return (
+        0
+        if WorkerHealth.objects.filter(
+            pk=socket.gethostname(),
+            ready=True,
+            checked_at__gte=timezone.now() - timedelta(seconds=30),
+            fingerprint=configured_fingerprint(),
+        ).exists()
+        else 1
+    )
 
 
 def main():
@@ -88,27 +121,7 @@ def main():
             "--access-logfile=-",
         ]
     elif role == "health":
-        if not Path(os.environ["JUDGE_RECEIPT"]).is_file():
-            return 1
-        import django
-
-        os.environ.setdefault("DJANGO_SETTINGS_MODULE", "praximesh.settings")
-        django.setup()
-        from django.utils import timezone
-
-        from core.models import WorkerHealth
-        from core.queue import configured_fingerprint
-
-        return (
-            0
-            if WorkerHealth.objects.filter(
-                pk=socket.gethostname(),
-                ready=True,
-                checked_at__gte=timezone.now() - timedelta(seconds=30),
-                fingerprint=configured_fingerprint(),
-            ).exists()
-            else 1
-        )
+        return worker_health()
     else:
         args = [
             sys.executable,
