@@ -2,6 +2,20 @@
 
 更新：2026-11-16。**GPU 网站部署尚未验收通过，公共激活入口仍关闭。** 本页记录 [RFC-026](rfcs/026-gpu-site-hardware-rehearsal.md) 的真实临时站点检查；[本地完整 GPU 启动与公开样例](acceptance-gpu0-startup.md)已有独立通过结果。
 
+当前进展：内部完整启动、两题正式 API、计时分享、worker 丢失恢复和不同发布包升级的两处协调器中断已通过。公共命令候选 `3193c35` 的冻结制品与 CPU 应用通过，但 GPU 验收期间出现外部 Slurm 占用；已自动回到原 CPU 代并核对数据保留，成功流程尚未执行完。完整 PostgreSQL/GPU Compose 仍在独立分支实施。
+
+<a id="public-command-attempt"></a>
+
+## 公共命令候选与外部占用后的回退
+
+分支 `feat/gpu-deployment-entry` 的源提交 `3193c35aa5c393c8f9c2f5814023fa5c5eadddd1` 将公共 `apply` / `recover` 分派到已有 CPU/GPU 生命周期，并在数据库操作前核对原 GPU 绑定。263 项相关组件检查通过；冻结四镜像包与配套 CPU 包完成构建、导入、十项无设备 worker 检查和 442.675 秒完整 CPU 应用验收，源码与 Git 逐字节核对通过。该分支尚未合入主分支。
+
+实际公共命令从原 CPU 代 `47a13f1dd22b` 创建 GPU 候选 `09d1c1bfae50`，开始前 GPU 0 完整清单为空。原 worker 于 2026-11-15 16:56:56 UTC 启动，通过十个阶段后，完整 NVIDIA 清单中的进程不属于原任务 cgroup，启动关闭。随后只读宿主检查确认出现 UID 2048 的 Slurm 作业 2205451（PID 208357）。没有终止外部进程、重置设备或放宽归属检查。
+
+原 `apply` 自动完成曝光前恢复，终态为 `rolled_back`，沿用原 CPU 数据库。独立审计确认 55 张业务表、33 个序列与 684 条记录保留，14 个登记 GPU worker 均停止，配置退出，自有活动任务记录与物理预约均为零；已有真实 Web、CPU worker 和 tutor 与上一份审计的身份、启动时间及健康状态一致。原候选、数据库和失败日志保留。
+
+证据位于 `test-results/public-gpu-entry-releases-2026-11-15/` 和 `test-results/uvm-releases-2026-11-15/owned-public-cli-16/`；后者 `failed-activation-rollback-audit.json` 仅表示失败回退审计通过，原 `result.json` 仍为失败。本次没有到达计划中的曝光中断、公共 `recover` 成功流程及正式 GPU Submit；需在连续独占窗口沿原站点重新验收。
+
 ## 首次 CPU→GPU 尝试与原站点恢复
 
 采用源提交 `75e2762` 的[同源 CPU/四镜像包](acceptance-current-releases.md#uvm-release)，新建 PostgreSQL、回环 HTTPS、合成账号和独立 GPU 节点。原 CPU 版本的实际提交、草稿及目录快照通过；普通 GPU worker 创建完成但未启动。
