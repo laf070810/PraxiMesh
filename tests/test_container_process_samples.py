@@ -1,6 +1,7 @@
 """Actual CPU process handles plus bounded current-query ownership checks; no GPU."""
 
 import errno
+import io
 import os
 import subprocess
 import sys
@@ -166,3 +167,31 @@ def test_handle_does_not_accept_a_different_kernel_descriptor(live_sample, monke
     monkeypatch.setattr(os, "pidfd_open", lambda _pid: actual(os.getpid()))
     with pytest.raises(SandboxUnavailable, match="changed its original PID"):
         SampledProcess(item.view, item.process.pid, item.group)
+
+
+@pytest.mark.parametrize(
+    "chain,accepted",
+    [
+        ("1234 44 1", True),
+        ("1234", False),
+        ("1234 45 1", False),
+        ("1234 44 2", False),
+        ("4321 44 1", False),
+        ("1234 44 1\nNSpid: 1234 44 1", False),
+    ],
+)
+def test_handle_requires_the_complete_original_target_namespace_chain(monkeypatch, chain, accepted):
+    sampled = object.__new__(SampledProcess)
+    sampled.fd, sampled.pid = 12, 1234
+    sampled.identity = {"nspids": [1234, 44, 1]}
+
+    def read(path, *_args, **_kwargs):
+        assert path == Path("/proc/self/fdinfo/12")
+        return io.StringIO("Pid: 1234\nNSpid: " + chain + "\n")
+
+    monkeypatch.setattr(Path, "open", read)
+    if accepted:
+        sampled.bound()
+    else:
+        with pytest.raises(SandboxUnavailable):
+            sampled.bound()

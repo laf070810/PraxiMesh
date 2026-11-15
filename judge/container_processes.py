@@ -309,7 +309,8 @@ class SampledProcess:
         if (
             len(data) > 4096
             or [row[1:] for row in fields if row[:1] == ["Pid:"]] != [[str(self.pid)]]
-            or [row[1:] for row in fields if row[:1] == ["NSpid:"]] != [[str(self.pid)]]
+            or [row[1:] for row in fields if row[:1] == ["NSpid:"]]
+            != [[str(pid) for pid in self.identity["nspids"]]]
         ):
             raise SandboxUnavailable("Sampled process handle changed its original PID")
 
