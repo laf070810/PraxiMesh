@@ -136,16 +136,18 @@ class KernelTask:
             ):
                 raise SandboxUnavailable("Kernel task image or resource identity changed")
             self.record = deepcopy(self.original_record())
-            tick()
+            # The connection constructor checks this original task before it
+            # starts the bridge; do not query the same inventory twice here.
             connection = ContainerConnection(self.service, self.status, on_tick=tick)
             channel = connection.channel
             channel.send(prepare_request(self.target))
             check_prepared(channel.receive(), self.identity)
-            tick()
             on_begin()
-            tick()
             # Neither source nor protected fixtures cross the channel before
-            # the caller's start transaction and original-record recheck.
+            # the caller's start transaction and original-record recheck. Use
+            # the channel's clock so the adjacent send shares this full check;
+            # later waits and partial writes still perform periodic checks.
+            channel.check(force=True)
             channel.send(request)
             message = channel.receive()
             if fault:

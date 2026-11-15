@@ -52,10 +52,10 @@ class Channel:
         self.next_tick = 0
         self.sent = self.received = 0
 
-    def check(self):
+    def check(self, *, force=False):
         if time.monotonic() >= self.deadline:
             raise SandboxUnavailable("GPU controller transport deadline expired")
-        if time.monotonic() >= self.next_tick:
+        if force or time.monotonic() >= self.next_tick:
             self.on_tick()
             self.next_tick = time.monotonic() + 0.25
             if time.monotonic() >= self.deadline:

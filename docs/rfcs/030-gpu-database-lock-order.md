@@ -1,6 +1,6 @@
 # RFC-030：GPU 控制事务与部署检查的表锁顺序
 
-日期：2026-11-15。状态：已实施，真实 PostgreSQL 复现及修复验证通过；原站点恢复中，决策见 [ADR-084](../adr/084-gpu-control-table-lock-order.md)。
+日期：2026-11-15。状态：已实施，真实 PostgreSQL 复现及修复验证通过；原站点恢复及新版本候选队列已通过，决策见 [ADR-084](../adr/084-gpu-control-table-lock-order.md)。
 
 ## 问题
 

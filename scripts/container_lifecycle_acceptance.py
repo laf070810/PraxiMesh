@@ -59,6 +59,7 @@ def invoke(engine, image, journal, job, reservation, row, *, request, mode="norm
         assert channel.receive() == IDENTITY
         processes = tree(engine, service)
         row["processes"] = processes
+        channel.check(force=True)
         channel.send(request)
         if mode in {"fault-prepare-fail", "recovery-fail"}:
             try:

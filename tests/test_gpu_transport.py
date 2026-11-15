@@ -94,6 +94,61 @@ def test_callback_wait_cannot_extend_transport_deadline():
         receiver.close()
 
 
+def test_forced_checkpoint_observes_revoked_ownership_before_sending(monkeypatch):
+    clock = [10.0]
+    monkeypatch.setattr(time, "monotonic", lambda: clock[0])
+    sender, receiver = channels()
+    revoked = False
+
+    def check_owner():
+        if revoked:
+            raise SandboxUnavailable("original ownership revoked")
+
+    sender.on_tick = check_owner
+    try:
+        sender.check()
+        clock[0] += 0.1
+        revoked = True
+        sender.check()  # The ordinary periodic check is not due yet.
+        with pytest.raises(SandboxUnavailable, match="ownership revoked"):
+            sender.check(force=True)
+            sender.send({"source": "inert transport fixture"})
+        with pytest.raises(BlockingIOError):
+            receiver.sock.recv(1)
+    finally:
+        sender.close()
+        receiver.close()
+
+
+def test_forced_checkpoint_shares_periodic_clock_without_extending_deadline(monkeypatch):
+    clock, checks = [10.0], []
+    monkeypatch.setattr(time, "monotonic", lambda: clock[0])
+    sender, receiver = channels()
+
+    def observe():
+        checks.append(clock[0])
+        clock[0] += 0.4
+
+    sender.on_tick = observe
+    deadline = sender.deadline
+    try:
+        sender.check(force=True)
+        sender.send({"event": "first"})
+        assert receiver.receive() == {"event": "first"}
+        assert len(checks) == 1
+        clock[0] += 0.25
+        sender.send({"event": "second"})
+        assert receiver.receive() == {"event": "second"}
+        assert len(checks) == 2 and sender.deadline == deadline
+        clock[0] = deadline - 0.1
+        with pytest.raises(SandboxUnavailable, match="deadline"):
+            sender.check(force=True)
+        assert sender.deadline == deadline
+    finally:
+        sender.close()
+        receiver.close()
+
+
 def test_reset_with_unread_input_is_a_platform_failure_not_clean_completion():
     sender, receiver = channels()
     try:

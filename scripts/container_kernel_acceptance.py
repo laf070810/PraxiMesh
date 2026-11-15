@@ -168,6 +168,7 @@ def scenario(engine, image, path, mode, test_mode):
                 channel.send({"event": "prepare-cpu-fixture"})
                 assert channel.receive() == IDENTITY
                 row["processes"] = tree(engine, service)
+                channel.check(force=True)
                 channel.send(request)
                 if mode == "hang":
                     cancel_at = time.monotonic() + 1

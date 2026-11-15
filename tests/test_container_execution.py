@@ -1,8 +1,11 @@
 """Kernel caller fences with modeled supervision; not hardware evidence."""
 
 import copy
+import json
 import os
 import shutil
+import socket
+import struct
 import subprocess
 import sys
 import time
@@ -107,6 +110,11 @@ def flow(monkeypatch, bundle):
     class Connection:
         def __init__(self, _service, _status, *, on_tick):
             self.channel, self.on_tick = self, on_tick
+            self.on_tick()  # The real constructor checks before starting the bridge.
+
+        def check(self, *, force=False):
+            assert force is True
+            self.on_tick()
 
         def send(self, value):
             self.on_tick()
@@ -269,6 +277,50 @@ def test_result_requires_begin_original_task_cleanup_and_final_idle(flow):
     assert value["artifacts"]["resource_profile"] == WORKLOAD_PROFILE
     with pytest.raises(ValueError, match="once"):
         flow.run()
+
+
+def test_preparation_does_not_spend_execution_window_on_duplicate_checks(flow, monkeypatch):
+    # Real framing/heartbeat clock, modeled one-second inventory observations.
+    # This verifies scheduling, not CUDA speed or an actual reservation budget.
+    from judge.gpu_transport import Channel
+
+    clock, sent = [0.0], []
+    monkeypatch.setattr(time, "monotonic", lambda: clock[0])
+    observe = flow.Monitor.observe
+
+    def slow_inventory(self, service=None):
+        observe(self, service)
+        clock[0] += 1
+
+    class TimedChannel(Channel):
+        def send(self, value):
+            super().send(value)
+            if value.get("event") == "execute":
+                sent.append(clock[0])
+
+    class Connection(flow.Connection):
+        def __init__(self, service, status, *, on_tick):
+            super().__init__(service, status, on_tick=on_tick)
+            local, self.remote = socket.socketpair()
+            self.channel = TimedChannel(local, deadline=100, on_tick=on_tick)
+            for value in flow.incoming:
+                raw = json.dumps(value).encode()
+                self.remote.sendall(struct.pack("!I", len(raw)) + raw)
+
+        def close(self):
+            self.channel.close()
+            self.remote.close()
+            super().close()
+
+    def begin():
+        flow.events.append("begin")
+        clock[0] += 0.75
+
+    monkeypatch.setattr(flow.Monitor, "observe", slow_inventory)
+    monkeypatch.setattr(module, "ContainerConnection", Connection)
+    flow.run(on_begin=begin)
+    assert len(sent) == 1 and sent[0] < 8
+    assert "outer-recovered" in flow.events
 
 
 @pytest.mark.parametrize("defect", ["target", "driver", "boolean", "limits", "extra"])

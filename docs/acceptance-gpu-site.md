@@ -79,6 +79,22 @@ worker 失败日志现只增加最多四个已冻结平台源码文件/行号，
 
 随后候选队列检查期间，03:26:40 的心跳 UPDATE 因 PostgreSQL 锁等待超时退出，就绪随后失效。原轮次和测试提交保留，普通 API 尚未验证。`database-error-observation.json` 只记录固定错误类别。原锁升级冲突已在自有 PostgreSQL 重现，修复后的 36 项及旧清理专项三项实际检查通过；112 项相关组件通过，普通环境跳过的四项 PostgreSQL 检查已在实际数据库运行。规则见 [RFC-030](rfcs/030-gpu-database-lock-order.md)。原站点的恢复仍在进行，完整启动不能外推为队列或发布通过。
 
+## 原轮恢复与正式 API 的首轮结果
+
+原 `9cc50bc` worker 的第二次完整启动于 03:53:53 UTC 完成，随后沿原容器、原启动时间与原候选轮次恢复。`4380a19` 调用者使用已核对旧源码的 200 ms 清理等待，没有重新入队或刷新期限。原轮清理和 CPU 回退通过；`owned-gpu-recovery-6-1/final-audit.json` 确认原数据、目录、序列、设备空闲、停止对象和原服务身份。
+
+`4380a19eb6eb5ec187575514dc1a527bedce9687` 的同源包含 1007 个与 Git 一致的文件，source ID 为 `6344ea103f87788d20485219d168ff59999d235cf1e52cb61014c69039867490`。GPU 包 `2026-11-15-lock-order-four-image-1` 清单摘要为 `55919bad9f5b9804e22b1e13f5a0018d6e564b9ee53ed8cea546edc1ad941f9b`，CPU 包 `2026-11-15-cpu-upgrade-target-10` 为 `93162b5775b757492a704a3f157b1680d7af9a6de7dff4127f93748b861e67d9`。完整核验/导入、十项无设备 worker 检查和 CPU 应用验收通过；CPU 应用用时 436.157 秒，结果在 `test-results/lock-order-releases-2026-11-15/`。
+
+原站点新代 `b3e793bde609` 于 04:12:36 UTC 启动正式 worker，04:30:40 完成全部 24 阶段，随后候选正确/错误提交与清理通过，CPU→GPU 发布成功。仅在此合成站点发布完整 CUDA 候选包，经普通 HTTPS 建立两个测试账号和令牌，保持默认每日额度。向量加法的 Run、正确 Submit、三个错解 Submit 和恢复正确 Submit 共六项全部通过，同一完整环境下生成实际控制器计时成绩。
+
+第七项矩阵参考 Run 返回 `time_limit`，没有编译初始化完成字段；原提交 `30ca2fe5-0f0f-4a62-a68b-704abb280a5f` 和请求键、响应、任务容器记录均保留。原时序证明准备阶段消耗约 27 秒，而 Run 的有效执行截止点为预约开始后 35 秒，见 [RFC-031](rfcs/031-gpu-preparation-checkpoints.md)。普通 API 整套报告仍为失败，矩阵其余五项、隐私与浏览器分享尚未验证，不能按向量结果判定全部题目通过。
+
+之后沿原协调器正常发布到 CPU 代 `d401764f045b`。发布前后的三账号五张用户表及完整目录摘要一致；扩展检查覆盖 55 张非运行状态表、33 个序列和全部七个 GPU 结果。发布后独立 CPU 验收只更新自己的草稿并新增一个提交，其他表摘要一致。原 GPU worker 正常退出码为 0、配置退出、journal 无活动任务、GPU 0 空闲，三个原用户服务身份及启动时间不变。证据在 `owned-gpu-site-7/final-audit.json`、`owned-gpu-preservation/` 和 `owned-gpu-api-1/`，均位于本页前述私有证据根目录。
+
+## 准备检查点修复的非 GPU 验证
+
+[RFC-031](rfcs/031-gpu-preparation-checkpoints.md) / [ADR-085](adr/085-gpu-preparation-checkpoints.md) 将开始回调后的强制核对接入原通道心跳时钟，移除紧邻重复检查，保持 90/180 秒预约、各层恢复余量及原绝对期限。268 项相关组件与本地管道检查通过；真实 CPU 容器的通信九项、调用链二十七项及故障五项全部通过，容器、临时存储和镜像标签清理通过。记录在 `test-results/checkpoint-observation-2026-11-15/verified-reports.json`。该结果不证明矩阵 Run 已修复；后续须使用新冻结四镜像重新完成 GPU 启动与普通 API。
+
 ## 待完成的真实范围
 
-继续原站点，依次完成 CPU→GPU、正式 API 参考解/错解/恢复正确解、GPU→GPU、GPU→CPU，以及曝光前后的实际中断和恢复。分别核对历史数据、会话、GPU 环境、正式性能、物理预约和清理。全部成功前，仍按[需求追踪](requirements.md)保留网站 GPU 发布门槛。
+继续原站点验证修复后的矩阵 Run、完整两题 API 和浏览器分享，补齐 GPU→GPU，以及曝光前后的实际中断和恢复。新版本须重新核对历史数据、会话、GPU 环境、正式性能、物理预约和清理。已有 CPU→GPU→CPU 结果只证明上述固定版本与实际数据范围；全部成功前，仍按[需求追踪](requirements.md)保留网站 GPU 发布门槛。
