@@ -28,7 +28,9 @@ jobs:
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && vars.PRAXIMESH_DEPLOY_ENABLED == 'true'
     environment: production
     runs-on: [self-hosted, linux, x64, praximesh-deploy]
-    timeout-minutes: 60
+    # One GPU startup allows 72 minutes; failed candidates may also need original
+    # database recovery. Inner startup/task deadlines remain independently fixed.
+    timeout-minutes: 360
     steps:
       # No checkout or downloaded executable runs on the deployment host.
       # The controller and immutable release must be independently reviewed

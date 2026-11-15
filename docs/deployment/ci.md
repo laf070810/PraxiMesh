@@ -79,6 +79,8 @@ runner 只需主动连接 GitHub；无需为 runner 额外开放入站控制端�
 
 工作流不 checkout、不下载执行代码，不接受任意路径或命令；不会自动将运行中的 Compose 站点转成协调器站点。Compose 的 SQLite 数据也不会随 runner 注册而迁入 PostgreSQL。
 
+部署 job 的外层上限配置为 360 分钟，以容纳最长 72 分钟的 GPU 完整启动，以及失败候选的原库恢复；各任务、启动和观察期限仍由协调器分别执行，不随 job 时长增加。GitHub 达到 job 上限会取消作业，届时保留原站点并先运行 `status`、再按原操作 `recover`，不要重新发布另一版本。[GitHub 超时语义](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idtimeout-minutes)。
+
 ## 作业没有启动时
 
 | 表现 | 检查位置 |
