@@ -71,6 +71,22 @@ def controller_digest():
     return digest.hexdigest()
 
 
+def failure_locations(error):
+    """Only public, frozen platform filenames/lines; never messages, source or locals."""
+    frame, locations = error.__traceback__, []
+    for _ in range(64):
+        if frame is None:
+            break
+        try:
+            name = Path(frame.tb_frame.f_code.co_filename).relative_to(ROOT).as_posix()
+        except (TypeError, ValueError):
+            name = None
+        if name in EXECUTION_SOURCES and 0 < frame.tb_lineno <= 100000:
+            locations.append(f"{name}:{frame.tb_lineno}")
+        frame = frame.tb_next
+    return ",".join(locations[-4:]) or "unavailable"
+
+
 def identity(path):
     info = path.lstat()
     return [info.st_dev, info.st_ino]

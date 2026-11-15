@@ -210,8 +210,10 @@ def test_management_observer_requires_the_callers_complete_pid_domain(
 
 
 def test_missing_process_is_distinct_from_a_permission_failure(view, monkeypatch):
-    with pytest.raises(ProcessDisappeared):
+    with pytest.raises(ProcessDisappeared) as missing:
         view.read(5678)
+    assert missing.value.identity is None
+    assert module.process_failure_details(missing.value) == {"pid": 5678, "field": "directory"}
     original = module.read_file
 
     def denied(directory, name, maximum):
@@ -223,6 +225,37 @@ def test_missing_process_is_distinct_from_a_permission_failure(view, monkeypatch
     with pytest.raises(SandboxUnavailable) as error:
         view.read(1234)
     assert type(error.value) is SandboxUnavailable
+
+
+@pytest.mark.parametrize(
+    "pid,field",
+    [
+        (True, "stat"),
+        (0, "stat"),
+        (2**31, "stat"),
+        (1234, "secret"),
+        (1234, []),
+        ("1234", "status"),
+    ],
+)
+def test_process_diagnostics_are_bounded_and_never_supply_ownership(pid, field):
+    error = ProcessDisappeared("private message", requested_pid=pid, field=field)
+    assert module.process_failure_details(error) == {} and error.identity is None
+
+
+def test_missing_proc_field_is_reported_even_when_kernel_error_has_no_filename(view, monkeypatch):
+    original = module.read_file
+
+    def failed(directory, name, maximum):
+        if name == "status":
+            raise FileNotFoundError(errno.ENOENT, "private error text")
+        return original(directory, name, maximum)
+
+    monkeypatch.setattr(module, "read_file", failed)
+    with pytest.raises(ProcessDisappeared) as caught:
+        view.read(1234)
+    assert caught.value.identity is None
+    assert module.process_failure_details(caught.value) == {"pid": 1234, "field": "status"}
 
 
 def test_exited_process_retains_birth_and_cgroup_for_original_identity_check():

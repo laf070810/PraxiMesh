@@ -7,10 +7,11 @@ from contextlib import contextmanager
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from judge.container_controller import ContainerController  # noqa: E402
+from judge.container_controller import ContainerController, failure_locations  # noqa: E402
 from judge.container_practice_protocol import invocation, serve  # noqa: E402
 from judge.container_practice_state import LocalPracticeState, require  # noqa: E402
 from judge.container_practice_transport import PipeChannel  # noqa: E402
+from judge.container_processes import ProcessDisappeared, process_failure_details  # noqa: E402
 from judge.gpu_device_lock import DeviceLockError  # noqa: E402
 from judge.sandbox import SandboxUnavailable  # noqa: E402
 
@@ -57,7 +58,37 @@ def main(argv=None):
                     state.check()
 
                 with PipeChannel(0, 1, deadline=deadline, on_tick=check) as channel:
-                    serve(control, state, channel, mode=mode, nonce=nonce, on_tick=check)
+                    try:
+                        serve(control, state, channel, mode=mode, nonce=nonce, on_tick=check)
+                    except (OSError, ValueError, DeviceLockError, SandboxUnavailable) as error:
+                        kind = (
+                            "ProcessDisappeared"
+                            if type(error) is ProcessDisappeared
+                            else "SandboxUnavailable"
+                            if isinstance(error, SandboxUnavailable)
+                            else "DeviceLockError"
+                            if isinstance(error, DeviceLockError)
+                            else "OSError"
+                            if isinstance(error, OSError)
+                            else "ValueError"
+                        )
+                        try:
+                            control.journal.write(
+                                "local-failure." + nonce + ".json",
+                                {
+                                    "schema": 1,
+                                    "scope": "praximesh-local-failure-v1",
+                                    "mode": mode,
+                                    "nonce": nonce,
+                                    "error": kind,
+                                    "origin": failure_locations(error),
+                                    "process": process_failure_details(error),
+                                },
+                                create=True,
+                            )
+                        except Exception:
+                            pass  # Preserve the original failure if its state cannot be written.
+                        raise
         return 0
     except InterruptedError:
         print("Local operation cancelled; retain original state for recovery.", file=sys.stderr)

@@ -43,9 +43,24 @@ def host_pid_security_options(info):
 class ProcessDisappeared(SandboxUnavailable):
     """A missing/exited process, never evidence that its container or GPU is idle."""
 
-    def __init__(self, message, *, identity=None):
+    def __init__(self, message, *, identity=None, requested_pid=None, field=None):
         super().__init__(message)
         self.identity = deepcopy(identity)
+        # Diagnostic context never grants ownership or substitutes for identity.
+        self.requested_pid = requested_pid
+        self.field = field
+
+
+def process_failure_details(error):
+    if (
+        type(error) is ProcessDisappeared
+        and type(error.requested_pid) is int
+        and 0 < error.requested_pid < 2**31
+        and type(error.field) is str
+        and error.field in {"directory", "stat", "status", "cgroup", "state"}
+    ):
+        return {"pid": error.requested_pid, "field": error.field}
+    return {}
 
 
 def host_manifest():
@@ -133,7 +148,9 @@ def process_identity(pid, process_stat, status, cgroup):
             "cgroup": cgroup.strip(),
         }
         if fields[0] in {"Z", "X", "x"}:
-            raise ProcessDisappeared("Observed process has exited", identity=identity)
+            raise ProcessDisappeared(
+                "Observed process has exited", identity=identity, requested_pid=pid, field="state"
+            )
         return identity
     except (ValueError, IndexError, TypeError):
         raise SandboxUnavailable("Unusable process identity") from None
@@ -173,21 +190,28 @@ class HostProcessView:
         if type(pid) is not int or not 0 < pid < 2**31:
             raise SandboxUnavailable("A positive host PID is required")
         self.check()
+        field = "directory"
         try:
             directory = os.open(
                 str(pid), os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=self.fd
             )
             try:
-                before = read_file(directory, "stat", 4096)
-                status = read_file(directory, "status", 16384)
-                group = read_file(directory, "cgroup", 4096)
-                after = read_file(directory, "stat", 4096)
+
+                def read(name, maximum):
+                    nonlocal field
+                    field = name
+                    return read_file(directory, name, maximum)
+
+                before = read("stat", 4096)
+                status = read("status", 16384)
+                group = read("cgroup", 4096)
+                after = read("stat", 4096)
                 first = process_identity(pid, before, status, group)
                 second = process_identity(
                     pid,
                     after,
-                    read_file(directory, "status", 16384),
-                    read_file(directory, "cgroup", 4096),
+                    read("status", 16384),
+                    read("cgroup", 4096),
                 )
                 if first != second:
                     raise SandboxUnavailable("Process identity changed during observation")
@@ -195,7 +219,9 @@ class HostProcessView:
                 os.close(directory)
         except OSError as error:
             if error.errno in {errno.ENOENT, errno.ESRCH}:
-                raise ProcessDisappeared("Host process disappeared") from None
+                raise ProcessDisappeared(
+                    "Host process disappeared", requested_pid=pid, field=field
+                ) from None
             raise SandboxUnavailable("Host process cannot be read") from None
         except (ValueError, UnicodeError):
             raise SandboxUnavailable("Host process cannot be read") from None

@@ -1,5 +1,6 @@
 """Fixed entry refusal and real signal handling; no GPU methods are called."""
 
+import json
 import os
 import select
 import signal
@@ -12,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from judge.container_processes import ProcessDisappeared
 from scripts import container_practice_entry as entry
 from tests.test_container_adapter import configured as configured
 from tests.test_container_driver import bundle as bundle
@@ -70,6 +72,53 @@ def test_fixed_initialization_preserves_binding_and_never_builds_a_task(local, m
         "ready": False,
         "formal_result": False,
     }
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_failure_keeps_only_fixed_private_diagnostics_without_changing_user_output(
+    local, monkeypatch, capsys, existing
+):
+    @contextmanager
+    def control(_device):
+        yield local.control
+
+    @contextmanager
+    def pipe(*args, **kwargs):
+        yield object()
+
+    values = args()
+    values[1] = local.guard.device_uuid
+    name = "local-failure." + values[2] + ".json"
+    if existing:
+        local.journal.write(name, {"original": True}, create=True)
+
+    def fail(*args, **kwargs):
+        raise ProcessDisappeared("secret source and database URL", requested_pid=5678, field="stat")
+
+    monkeypatch.setattr(entry, "ContainerController", control)
+    monkeypatch.setattr(entry, "PipeChannel", pipe)
+    monkeypatch.setattr(entry, "serve", fail)
+    assert entry.main(values) == 2
+    value = local.journal.read(name)
+    if existing:
+        assert value == {"original": True}
+    else:
+        name, line = value["origin"].split(":")
+        assert name == "scripts/container_practice_entry.py" and 0 < int(line) <= 100000
+        assert value == {
+            "schema": 1,
+            "scope": "praximesh-local-failure-v1",
+            "mode": "initialize",
+            "nonce": values[2],
+            "error": "ProcessDisappeared",
+            "origin": value["origin"],
+            "process": {"pid": 5678, "field": "stat"},
+        }
+        assert "secret" not in json.dumps(value)
+    assert (
+        capsys.readouterr().err
+        == "Local controller unavailable; retain original state for recovery.\n"
+    )
 
 
 @pytest.mark.parametrize("number", [signal.SIGINT, signal.SIGTERM])

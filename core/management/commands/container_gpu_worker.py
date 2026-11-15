@@ -1,7 +1,5 @@
 """Container deployment entry; full startup is mandatory before every claim loop."""
 
-from pathlib import Path
-
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connections
@@ -9,28 +7,10 @@ from django.db import connections
 from core.container_worker_database import check_database
 from core.gpu_worker import StopFlag, run_worker, stop_signals
 from judge.container_adapter import ContainerGPUAdapter
-from judge.container_controller import STATE, ContainerController
+from judge.container_controller import ROOT, STATE, ContainerController, failure_locations  # noqa: F401
+from judge.container_processes import process_failure_details
 from judge.container_worker_config import read_config
 from judge.container_worker_image import verify_image
-from judge.gpu_policy import EXECUTION_SOURCES
-
-ROOT = Path(__file__).resolve().parents[3]
-
-
-def failure_locations(error):
-    """Only public, frozen platform filenames/lines; never messages, source or locals."""
-    frame, locations = error.__traceback__, []
-    for _ in range(64):
-        if frame is None:
-            break
-        try:
-            name = Path(frame.tb_frame.f_code.co_filename).relative_to(ROOT).as_posix()
-        except (TypeError, ValueError):
-            name = None
-        if name in EXECUTION_SOURCES and 0 < frame.tb_lineno <= 100000:
-            locations.append(f"{name}:{frame.tb_lineno}")
-        frame = frame.tb_next
-    return ",".join(locations[-4:]) or "unavailable"
 
 
 class Command(BaseCommand):
@@ -99,9 +79,11 @@ class Command(BaseCommand):
                     container_journal=control.journal,
                 )
         except Exception as error:
+            process = process_failure_details(error)
+            detail = f" pid={process['pid']} field={process['field']}" if process else ""
             raise CommandError(
                 f"Container GPU worker stopped: stage={stage} error={type(error).__name__} "
-                f"origin={failure_locations(error)}"
+                f"origin={failure_locations(error)}{detail}"
             ) from None
         finally:
             connections.close_all()
