@@ -1,6 +1,6 @@
 # RFC-040：首次 GPU 发布曝光后的确认丢失
 
-日期：2026-11-15。状态：实现与 91 项组件检查通过，实际 GPU 中断仍待验收。决定见 [ADR-094](../adr/094-initial-gpu-exposure-acknowledgement.md)，延续 [RFC-022](022-gpu-release-coordination.md) 和 [ADR-072](../adr/072-coordinated-gpu-release-recovery.md)。
+日期：2026-11-15。状态：实现、91 项组件和[实际 GPU 候选曝光中断](../acceptance-gpu-site.md)通过。决定见 [ADR-094](../adr/094-initial-gpu-exposure-acknowledgement.md)，延续 [RFC-022](022-gpu-release-coordination.md) 和 [ADR-072](../adr/072-coordinated-gpu-release-recovery.md)。
 
 ## 已复现的问题
 

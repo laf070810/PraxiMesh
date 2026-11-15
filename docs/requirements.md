@@ -1,8 +1,8 @@
 # 全部 PRD 要求的实施与证据
 
-更新：2026-11-15。目标：按 PRD 实施阶段 A/B/C 与 D/E/F 补充。维护者已明确当前先交付可本地验证的自部署版本；公开运营和许可证选择稍后确定，GPU 正式题型及完整验收仍未完成。**C 的专业评测、组织与辅导，D 的完整筛选、私有成就与挑战，E 的类/API，以及 F 的版本题目反馈均已通过本地验收。外部部署与授权事项仍未完成。** 当前固定制品及 E→F HTTPS 升级见 [F 验收](acceptance-f.md)，类/API见 [E 验收](acceptance-e.md)，筛选与挑战见 [D 验收](acceptance-d.md)，既有阶段 A 验收见 [acceptance.md](acceptance.md)，架构见 [RFC-006](rfcs/006-complete-product.md)和 [ADR-011](adr/011-specialists-organizations-coaching.md)。
+更新：2026-11-16。目标：按 PRD 实施阶段 A/B/C 与 D/E/F 补充。维护者已明确当前先交付可本地验证的自部署版本；公开运营和许可证选择稍后确定，GPU 正式题型及完整验收仍未完成。**C 的专业评测、组织与辅导，D 的完整筛选、私有成就与挑战，E 的类/API，以及 F 的版本题目反馈均已通过本地验收。外部部署与授权事项仍未完成。** 当前固定制品及 E→F HTTPS 升级见 [F 验收](acceptance-f.md)，类/API见 [E 验收](acceptance-e.md)，筛选与挑战见 [D 验收](acceptance-d.md)，既有阶段 A 验收见 [acceptance.md](acceptance.md)，架构见 [RFC-006](rfcs/006-complete-product.md)和 [ADR-011](adr/011-specialists-organizations-coaching.md)。
 
-GPU 当前进度：`6e40ba7` 的进程观察、资源恢复与[受控退出修复](rfcs/039-terminating-task-sampled-identities.md)已通过本地完整启动、向量公开样例，以及冻结四镜像的 CPU 应用与无设备入口检查。原临时站点的 CPU→GPU 发布、十四项两题 API、八组真实成绩浏览器检查和实际 worker 丢失恢复也已通过；故障后同一容器重新完成全部 24 阶段，并完成新的正确 Submit。具体身份与历史版本范围见[临时站点记录](acceptance-gpu-site.md)。不同 GPU 版本升级、首次曝光确认丢失及完整发布恢复继续验收，网站 GPU 公共激活仍关闭。
+GPU 当前进度：`6e40ba7` 已通过本地与站点完整启动、两题十四项 API、八组真实成绩浏览器检查和实际 worker 丢失恢复。`d59bbc8` 又完成不同发布包升级、首次曝光确认丢失时保留新写入且不重启原 worker、开放前中断后的原库完整恢复，以及正常 CPU 退出；其应用与完整 WASI CI 均成功。具体身份与历史版本范围见[临时站点记录](acceptance-gpu-site.md)。公共部署命令仍在独立分支进行实际验收，完整 PostgreSQL/GPU Compose 站点尚未交付；现有默认 Compose 仍为已验收的 CPU/WASI 与可选本地 AI。
 
 ## 功能要求
 

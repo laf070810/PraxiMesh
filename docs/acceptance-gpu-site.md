@@ -1,6 +1,6 @@
 # 独立临时站点的 GPU 发布验收
 
-更新：2026-11-15。**GPU 网站部署尚未验收通过，公共激活入口仍关闭。** 本页记录 [RFC-026](rfcs/026-gpu-site-hardware-rehearsal.md) 的真实临时站点检查；[本地完整 GPU 启动与公开样例](acceptance-gpu0-startup.md)已有独立通过结果。
+更新：2026-11-16。**GPU 网站部署尚未验收通过，公共激活入口仍关闭。** 本页记录 [RFC-026](rfcs/026-gpu-site-hardware-rehearsal.md) 的真实临时站点检查；[本地完整 GPU 启动与公开样例](acceptance-gpu0-startup.md)已有独立通过结果。
 
 ## 首次 CPU→GPU 尝试与原站点恢复
 
@@ -199,6 +199,22 @@ worker 崩溃验收的首个普通 API 任务因观察端轮询触发限流而�
 
 之后正常退回同源 CPU 包的代 `c32bd5085086`。55 张业务表、33 个序列和 679 条业务记录比对通过，GPU 配置退出、物理预约为零、journal 无活动任务、完整设备清单为空；11 个已登记 GPU worker 均停止，本轮恢复后的原 worker 正常退出码为 0。再经 HTTPS 完成正确 CPU Submit `8a821277-2761-495e-a9fb-d1683cef7164`。原 Web、CPU worker、tutor 的身份、启动时间、重启次数和健康状态不变，独立审计为 `owned-gpu-site-14/final-audit.json`。原临时站点与所有历史继续保留。
 
+## 不同发布包升级与两次实际协调器中断
+
+源提交 `d59bbc84d0545e361968ea11605f8b5634a0e6f1` 合入首次曝光确认丢失修复。其 GPU 包 `2026-11-15-exposure-recovery-four-image-1` 的清单摘要为 `0ab9f7c6068f8571f23d645ed9190bb0dae508e990281239540cadbe4987ebd5`，配套 CPU 包 `2026-11-15-cpu-upgrade-target-17` 为 `b8dae3730fe9510a066b580355128130196a1953b2e13b63038f1e99a0de2264`。1028 个归档文件与 Git 一致，source ID 为 `fe4031dc6b94b5b1a6ee246740cc24ca8fffb19896c68ee287543ccd92107cb5`；标准导入、十项无设备 worker 检查及 434.979 秒 CPU 应用验收通过，结果在 `test-results/exposure-recovery-releases-2026-11-15/`。
+
+原站点先以 `6e40ba7` 包建立 GPU 代 `f9d07d666b8a`，随后升级到 `d59bbc8` 包的 `6c7f26f44599`。两个代均重新完成全部 24 阶段和候选正确/错误队列。两包的源码、Web 与 CPU worker 镜像不同，GPU worker 和 task 镜像相同；这是不同发布包与代际配置的升级，不宣称 GPU 执行程序发生变化。
+
+新代已持久保存曝光决定并打开真实路由、尚未完成健康确认时，暂停原调用者。经普通 HTTPS 完成 CPU Submit `7ee103ee-e466-4f6b-bc83-6b99c0888a54` 并保存快照后，核对原 PID、出生时间、UID、命令和工作目录，经 pidfd 发送 SIGKILL。正常恢复保留新写入，GPU worker `752e77d411c750db0bb38d7880e419cf292242990d61b6e1fcb75c3dbe6e750f` 及其 `2026-11-15T15:29:06.761677618Z` 启动时间不变；[首次曝光确认丢失修复](adr/094-initial-gpu-exposure-acknowledgement.md)通过实际验证。
+
+随后在下一候选 `21b5e2b051ae` 迁移完成、尚未准备或开放 GPU 时，再次终止原调用者。正常恢复继续使用原 `6c7f26f44599` 数据库，同一 worker 容器于 15:48:52 UTC 重新启动并完成新的全部阶段与候选队列。原库、新提交和此前记录保留；未用新节点或新库跳过恢复。
+
+最终正常退回 CPU 代 `47a13f1dd22b`。五组前后快照逐一核对通过，最后一组包含 55 张业务表、33 个序列、683 条业务记录；再完成正确 CPU Submit `5f6a1564-e3be-4ab4-9f5a-4f85b9edc233`。13 个已登记 GPU worker 全部停止，GPU 配置退出、物理预约和活动 journal 均为零，GPU 0 空闲。原始调用、两个中断点和独立 `final-audit.json` 在 `test-results/uvm-releases-2026-11-15/owned-gpu-faults-15/`。
+
+三项原有服务的容器和镜像身份不变。原 CPU worker 在本轮期间于 15:34 记录沙箱凭证到期，其启动时间和重启次数随后变化，检查时已健康；因此本轮不宣称全部原服务启动时间未变。固定日志标记、前后观察另存同目录，本轮没有停止或重建该服务。
+
+该提交的[应用 CI](https://github.com/laf070810/PraxiMesh/actions/runs/43727147123)与[完整 WASI 工作流](https://github.com/laf070810/PraxiMesh/actions/runs/43727147122)均已成功。
+
 ## 待完成的真实范围
 
-正式任务中的 worker 丢失、原预约清理与正确性恢复已有上述固定版本的实际通过结果。不同冻结版本之间的 GPU 升级、首次候选曝光确认丢失及完整发布恢复继续验收；全部成功前，仍按[需求追踪](requirements.md)保留网站 GPU 发布门槛。
+正式任务中的 worker 丢失、原预约清理、不同发布包升级、首次候选曝光确认丢失及开放前原库恢复均已有上述固定版本的实际结果。公共 `apply/recover` 入口正在独立分支验证，完整 PostgreSQL/GPU Compose 站点仍待实现与验收；仍按[需求追踪](requirements.md)保留未完成项，不从内部流程通过推断所有部署入口均已交付。
