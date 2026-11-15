@@ -607,7 +607,10 @@ class GPURelease:
             )
         source = self.generation(self.attempt["source"])
         if self.attempt["phase"] == "recover_source":
-            self.settle_gpu(source)
+            from scripts.deploy_gpu_abort import maybe_abort
+
+            if not maybe_abort(self.host, source, target):
+                self.settle_gpu(source)
             self.recovery_phase("freeze_source")
         if self.attempt["phase"] == "freeze_source":
             self.host.quiesce(source)

@@ -251,6 +251,15 @@ GPU 数据库冻结持有排空锁，直到 runtime 连接权限撤销和现有�
 
 具体范围、失败复现和 CPU 进程中断见 [G56](../acceptance-g56.md)，设计见 [ADR-072](../adr/072-coordinated-gpu-release-recovery.md)。[真实数据库检查](production.md#database-validation)已补验证完整迁移 schema、角色/锁、冻结与复制，结果见 [G57](../acceptance-g57.md)。仍需实际应用/worker 与数据库的完整组合验收，以及获授权独占 GPU 上的完整启动、队列、升级、候选失败回退和曝光后恢复。未完成这些检查前不开放公共入口；数据库辅助代码改变 worker 源码契约，须制作新的匹配制品，不能改写旧包。
 
+<a id="failed-startup-cpu-rollback"></a>
+### 未开放的 GPU 候选启动失败
+
+原站点是 CPU 版本、GPU 候选尚未曝光、准备仍停在启动观察且没有候选检查轮次时，已退出为错误码 1 的原 worker 可以进入内部中止流程。`scripts/deploy_gpu_abort.py` 在原操作和锁下确认没有活动任务或物理预约，再确认停止、原子冻结候选库，最后保存单独的 `aborted` 证明；原准备和恢复记录保持原字节。
+
+此证明只用于原配置退出及 CPU 回退，不是 ready 或 GPU 健康证据。运行中的 worker、OOM、未知退出、已开放站点、GPU 回退目标及未完成工作不适用。中止未完成时只能继续同一目标，不能手工删日志或把失败恢复标为成功。规则见 [ADR-082](../adr/082-unexposed-gpu-startup-abort.md)，实际范围见[临时站点记录](../acceptance-gpu-site.md)。
+
+组件入口为 `tests/test_deploy_gpu_abort.py`，使用真实私有文件/锁与自有进程中断，数据库和 Docker 是模型。实际冻结边界使用 `scripts/postgres_tests.py -q tests/test_deploy_database_postgres.py tests/test_deploy_gpu_config_database.py`，沿用自有 PostgreSQL 资源；模型结果不能代替原临时站点回退。
+
 <a id="configuration-retirement"></a>
 ### 回到 CPU 前退出原 GPU 配置
 

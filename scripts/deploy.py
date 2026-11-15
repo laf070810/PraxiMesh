@@ -783,6 +783,7 @@ class Deployment:
             or state.get("gpu_configuration")
             or state.get("gpu_runtime")
             or state.get("gpu_legacy_oom")
+            or state.get("gpu_startup_aborts")
             or state.get("gpu_recoveries")
             or state.get("gpu_candidate_checks")
             or state.get("gpu_preparations")

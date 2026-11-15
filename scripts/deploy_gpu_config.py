@@ -62,8 +62,28 @@ def require_idle_journal(node):
     read_private(node.journal_fd, "publication.lock")
 
 
-def require_stopped_workers(host, node, binding):
+def require_stopped_workers(host, node, binding, *, abort=None):
     """Observe all containers; never adopt an unrecorded ID or mutate an object."""
+    from scripts.deploy_gpu_abort import (
+        StartupAbort,
+        completed_recovery_abort,
+    )
+    from scripts.deploy_gpu_abort import (
+        records as abort_records,
+    )
+
+    if abort is not None and type(abort) is not StartupAbort:
+        raise ValueError("Expected the original internal GPU startup abort context")
+    aborted = set()
+    for key, value in abort_records(host).items():
+        recovery = host.state.get("gpu_recoveries", {}).get(key)
+        if value["phase"] == "aborted":
+            completed_recovery_abort(host, node, binding, key, recovery)
+        elif abort is None or not abort.permits(host, node, binding, key, recovery):
+            raise ValueError(
+                "Finish the original GPU startup abort before publishing configuration"
+            )
+        aborted.add(key)
     known, names = {}, set()
     for role, key, suffix in (
         ("gpu_worker", "gpu_workers", ""),
@@ -125,7 +145,7 @@ def require_stopped_workers(host, node, binding):
             lifecycle = transitions.get(record["generation"]["gpu_worker"])
             if (
                 key != record["operation"] + ":" + record["generation"]["gpu_worker"]
-                or record["phase"] != "ready"
+                or (record["phase"] != "ready" and key not in aborted)
                 or record["container"] not in known
                 or record["runtime_sha256"] != known[record["container"]][1]["runtime_sha256"]
                 or record["generation"]["id"] != known[record["container"]][0]

@@ -727,6 +727,9 @@ class WorkerRuntime:
         return info
 
     def start(self):
+        from scripts.deploy_gpu_abort import require_not_aborted
+
+        require_not_aborted(self.host, self.generation)
         config, metadata, token = self.common()
         record = self.load()
         if record is None or record["metadata"] != metadata:

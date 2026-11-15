@@ -11,6 +11,7 @@
 - [RFC-026：真实 GPU 整站验收](rfcs/026-gpu-site-hardware-rehearsal.md) — 新建临时站点、正式队列、切换和恢复的验收边界
 - [临时 GPU 站点的实际发布与恢复](acceptance-gpu-site.md) — 原预检失败定位、同一操作回退与后续整站验收
 - [RFC-027：rootless worker 的 OOM 启动配置](rfcs/027-rootless-worker-oom-contract.md)、[ADR-081](adr/081-rootless-worker-oom-contract.md) — 固定有效设置及原无设备预检的有限恢复
+- [RFC-028：GPU 候选启动失败后的 CPU 回退](rfcs/028-failed-gpu-startup-cpu-rollback.md)、[ADR-082](adr/082-unexposed-gpu-startup-abort.md) — 未曝光、已退出且无待恢复工作的候选中止
 - [GitHub 托管应用与 WASI 验收](acceptance-hosted-ci.md) — 按确切提交记录工作流结果和故障定位；专用部署节点与 GPU 仍需分别验收
 - [旧 F→当前 CPU 整站升级](acceptance-f-current.md) — 真实旧应用、三项迁移、数据保留、HTTPS/WASI 与清理通过
 - [F 升级准备与当前 CPU 发布包验收](acceptance-upgrade-preparation.md) — 保留历次目标包、准备阶段和原始失败

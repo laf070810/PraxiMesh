@@ -103,6 +103,9 @@ class GPUWorkerRecovery:
         self.record = None
 
     def original(self):
+        from scripts.deploy_gpu_abort import require_not_aborted
+
+        require_not_aborted(self.host, self.worker.generation)
         config, metadata, token = self.worker.common()
         operation = self.host.state["operation"]
         exposed = operation.get("exposure_target")

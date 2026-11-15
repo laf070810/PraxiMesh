@@ -23,11 +23,19 @@
 | CPU | `var/releases/2026-11-15-cpu-upgrade-target-6/` | `816d2cc230395d2d6220d092c2832fdfff712eae9f50407757c9c8dc06d520e8` |
 | GPU | `var/releases/2026-11-15-oom-four-image-1/` | `622e36b4a968115e4f286b9662c35c0327e79c993adce7f001595de47b3e84bc` |
 
-两包同源、Web/CPU 镜像和评测配置相同；GPU worker 与 task 镜像沿用完全相同的已核验字节。完整核验、标准导入及 10 项无设备 worker/Compose/PostgreSQL 检查通过。CPU 应用首轮通过启动探针与部分浏览器流程后，因调用者未提供本地 CLI 所需的匹配 WASI 环境而停止；补齐并提前校验 bundle 后，在新目录重放，结果另记。
+两包同源、Web/CPU 镜像和评测配置相同；GPU worker 与 task 镜像沿用完全相同的已核验字节。完整核验、标准导入及 10 项无设备 worker/Compose/PostgreSQL 检查通过。CPU 应用首轮通过启动探针与部分浏览器流程后，因调用者未提供本地 CLI 所需的匹配 WASI 环境而停止；补齐并提前校验 bundle 后，在新目录完成完整重放，433.774 秒、退出码 0。129 项启动探针、三组基础/七组扩展浏览器、实际提交与资源清理均通过，报告为 `process-final.json` 和 `cpu-application-2/release-acceptance.json`。
 
 GPU 构建在完整制品保存后，清理唯一临时镜像标签时失败：原预检仍引用同一 GPU worker 镜像。原制品不重写，独立核验后继续；临时标签及镜像保留。构建清理已补充按完整 ID/标签及实际容器引用检查，使用中的最后一个标签保留并写入独立 `cleanup.json`，其他标签仍使用 `--no-prune`。98 项相关组件检查通过，实际保留路径确认原镜像元数据未变；没有停止引用该镜像的容器或强制删除缓存。
 
 新包及构建原始失败在 `test-results/oom-releases-2026-11-15/`；`source-and-pair-audit.json` 保存源提交与镜像身份，`cleanup-reproduction.json` 和 `cleanup-safe-retention.json` 保存实际标签检查。源码包本身仍是原 `645f0dd`，不包含随后补充的构建清理逻辑。
+
+## 正式 worker 的首次完整启动
+
+原临时站点继续采用这批冻结包，新 schema 2 无设备预检通过，正式 GPU worker 启动成功。首次启动及随后原操作恢复均完成 21 个阶段：初始恢复、资源检查和全部 19 项内核检查，包括实际超时、非法地址、取消及附着进程终止。
+
+两次均在首个控制器故障检查失败，后两项未执行；没有签发就绪或开放提交。第二次原任务的 Docker 事件确认独立退出码为预期的 70，但完整检查仍未通过，具体失败条件待定位。现场为 `owned-gpu-site-2/`，最小事件观察仅保存容器 ID、时间和退出码，不保存命令/环境内容。原临时库、配置、容器和任务历史继续保留。
+
+此时原 CPU 回退也等待同一 GPU 完整启动，因此新增[有限中止路径](rfcs/028-failed-gpu-startup-cpu-rollback.md)。300 项相关组件、补充后的 26 项边界检查及 39 项真实 PostgreSQL 冻结/配置检查通过；临时 PostgreSQL 资源已清理。原站点只读资格预检通过，发布日志字节未变；实际中止回退尚未执行。
 
 ## 待完成的真实范围
 
