@@ -523,7 +523,10 @@ def test_post_exposure_failure_and_repeated_recovery_keep_current_database(model
     current = copy.deepcopy(host.state["current"])
     writes = host.read()["rows"][current["database"]]
     assert host.state["operation"]["phase"] == "needs_recovery"
+    starts = sum(row[0] == "start_gpu" for row in host.read()["events"])
     recover(host)
+    if target == "gpu":
+        assert sum(row[0] == "start_gpu" for row in host.read()["events"]) == starts + 1
     assert host.state["current"] == current
     assert host.read()["rows"][current["database"]][: len(writes)] == writes
     recover(host)
@@ -658,6 +661,80 @@ def test_lost_recovery_exposure_reply_does_not_restart_live_worker(model, target
     assert sum(row[0] == "start_gpu" for row in host.read()["events"]) == before
 
 
+@pytest.mark.parametrize("previous", [None, "cpu", "gpu"])
+@pytest.mark.parametrize("worker_stopped", [False, True])
+def test_initial_apply_reply_loss_uses_original_worker_liveness(model, previous, worker_stopped):
+    host = model(previous, "gpu")
+
+    class CallerDisappeared(BaseException):
+        pass
+
+    def disappear(event):
+        if event[0] == "health":
+            host.hook = lambda event: None
+            raise CallerDisappeared
+
+    host.hook = disappear
+    with pytest.raises(CallerDisappeared):
+        apply(host)
+    current = copy.deepcopy(host.state["current"])
+    assert host.state["operation"]["exposure_target"] == current["id"]
+    assert host.state["operation"]["phase"] == "exposing"
+    before = host.read()
+    assert before["gpu"][current["id"]]["running"]
+    if worker_stopped:
+        host.change(lambda data: data["gpu"][current["id"]].update(running=False))
+    recover(host)
+    after = host.read()
+
+    def starts(data):
+        return sum(row[0] == "start_gpu" for row in data["events"])
+
+    assert starts(after) == starts(before) + int(worker_stopped)
+    assert host.state["current"] == current
+    assert (
+        after["rows"][current["database"]][: len(before["rows"][current["database"]])]
+        == (before["rows"][current["database"]])
+    )
+    if not worker_stopped:
+        assert after["gpu"][current["id"]] == before["gpu"][current["id"]]
+        assert not any(
+            row[0] in {"maintenance", "recover_gpu", "copy", "check_gpu"}
+            or row[0] == "runtime"
+            and row[-1] == "stop"
+            for row in after["events"][len(before["events"]) :]
+        )
+
+
+def test_initial_exposure_identity_failure_keeps_original_route_and_worker(model, monkeypatch):
+    host = model("gpu", "gpu")
+
+    class CallerDisappeared(BaseException):
+        pass
+
+    def disappear(event):
+        if event[0] == "health":
+            host.hook = lambda event: None
+            raise CallerDisappeared
+
+    host.hook = disappear
+    with pytest.raises(CallerDisappeared):
+        apply(host)
+    before = host.read()
+
+    def refuse(flow, generation):
+        raise GPUReleaseError("Modeled original worker identity mismatch")
+
+    monkeypatch.setattr(GPURelease, "exposure_worker_stopped", refuse)
+    with pytest.raises(GPUReleaseError, match="identity mismatch"):
+        recover(host)
+    after = host.read()
+    assert {key: value for key, value in after.items() if key != "events"} == {
+        key: value for key, value in before.items() if key != "events"
+    }
+    assert all(row == ["save", "recovering"] for row in after["events"][len(before["events"]) :])
+
+
 def test_cpu_exposure_retry_refuses_an_unrelated_proxy_route(model):
     host = model("gpu", "cpu")
     apply(host)
@@ -768,10 +845,15 @@ def test_actual_cpu_sigkill_recovers_recorded_direction_without_copying_user_wri
         target = before["current"] if exposed else before["operation"]["previous"]
         writes = host.read()["rows"][target["database"]]
         copied = sum(row[0] == "copy" for row in host.read()["events"])
+        original_worker = copy.deepcopy(host.read()["gpu"][target["id"]])
+        starts = sum(row[0] == "start_gpu" for row in host.read()["events"])
         recover(host)
         assert host.state["current"] == target
         assert host.read()["rows"][target["database"]][: len(writes)] == writes
         assert sum(row[0] == "copy" for row in host.read()["events"]) == copied
+        if point == "after-exposure":
+            assert host.read()["gpu"][target["id"]] == original_worker
+            assert sum(row[0] == "start_gpu" for row in host.read()["events"]) == starts
     finally:
         if pid is not None:
             os.kill(pid, signal.SIGKILL)

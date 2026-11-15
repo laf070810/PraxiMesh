@@ -558,12 +558,22 @@ class GPURelease:
         if not self.record["recoveries"] or self.attempt["phase"] == "finished":
             if len(self.record["recoveries"]) >= MAX_ATTEMPTS:
                 raise GPUReleaseError("Recovery attempt limit reached; all history retained")
+            # A first apply caller can disappear after the durable GPU decision
+            # but before the exposure acknowledgement. Resume that exact exposure
+            # before touching its live worker or withdrawing its original route.
+            initial_exposure = (
+                not self.record["recoveries"]
+                and self.record["phase"] == operation["phase"] == "exposing"
+                and gpu(target)
+                and target == self.record["candidate"]
+                and operation.get("exposure_target") == target_id
+            )
             self.record["recoveries"].append(
                 {
                     "id": str(uuid.uuid4()),
                     "target": target_id,
                     "source": None,
-                    "phase": "maintenance",
+                    "phase": "expose_target" if initial_exposure else "maintenance",
                 }
             )
             self.save("recovering")
